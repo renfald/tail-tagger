@@ -1,38 +1,47 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
-                             QHBoxLayout, QFrame)
-from PySide6.QtGui import QPalette, QColor
-
-class Color(QWidget):  # Just a simple widget to show color
-    def __init__(self, color):
-        super().__init__()
-        self.setAutoFillBackground(True)
-
-        palette = self.palette()
-        palette.setColor(QPalette.Window, QColor(color))
-        self.setPalette(palette)
+                             QHBoxLayout, QFrame, QLabel, QListWidget,
+                             QSizePolicy)
+from PySide6.QtGui import QColor, QPalette
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Image Tagger")  # Set window title
+        self.setWindowTitle("Image Tagger")
 
-        central_widget = QWidget()  # Create a central widget to hold everything
+        central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        layout = QHBoxLayout()  # Horizontal layout for panels
+        layout = QHBoxLayout()
         central_widget.setLayout(layout)
+        layout.setSpacing(5)  # Add some spacing between panels
 
-        left_panel = Color("lightskyblue")  # Placeholder left panel
-        center_panel = Color("lightcoral")   # Placeholder center panel
-        right_panel = Color("lightgreen")  # Placeholder right panel
-
+        # Left Panel (Tag Input Area)
+        left_panel = QFrame()
+        left_panel.setFrameShape(QFrame.StyledPanel)  # Give it a border
+        left_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding) # Fixed width, expanding height
+        left_panel.setFixedWidth(200)  # Set initial width
         layout.addWidget(left_panel)
+
+        # Center Panel (Image Display)
+        center_panel = QLabel()
+        center_panel.setFrameShape(QFrame.StyledPanel) # Give it a border
+        center_panel.setAlignment(Qt.AlignCenter) # Center content
+        center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding) # Expanding in both directions
         layout.addWidget(center_panel)
+
+        # Right Panel (Tag List)
+        right_panel = QListWidget()
+        right_panel.setFrameShape(QFrame.StyledPanel) # Give it a border
+        right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding) # Fixed width, expanding height
+        right_panel.setFixedWidth(200) # Set initial width
         layout.addWidget(right_panel)
 
-app = QApplication(sys.argv)  # Create the application instance
-window = MainWindow()         # Create our main window
-window.show()                # Show the window
-app.exec()                   # Run the event loop (application starts)
+
+from PySide6.QtCore import Qt  # Import Qt namespace for alignment
+
+app = QApplication(sys.argv)
+window = MainWindow()
+window.show()
+app.exec()
