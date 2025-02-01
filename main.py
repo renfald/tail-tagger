@@ -1,45 +1,93 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
-                             QSizePolicy)
+                             QSizePolicy, QVBoxLayout) # Added QVBoxLayout
 from PySide6.QtGui import QColor, QPalette
-
+from PySide6.QtCore import Qt
+import os  # Import the 'os' module for file paths
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Image Tagger")
 
+        # Set initial window size
+        self.resize(1024, 768)  # Add this line to set initial size
+
+        # --- Dark Mode Theme ---
+        app.setStyle("Fusion") # Good for cross-platform dark mode
+        dark_palette = QPalette()
+        dark_color = QColor(53, 53, 53)
+        dark_disabled_color = QColor(127, 127, 127)
+        dark_palette.setColor(QPalette.Window, dark_color)
+        dark_palette.setColor(QPalette.WindowText, Qt.white)
+        dark_palette.setColor(QPalette.Base, QColor(25, 25, 25))
+        dark_palette.setColor(QPalette.AlternateBase, dark_color)
+        dark_palette.setColor(QPalette.ToolTipBase, Qt.white)
+        dark_palette.setColor(QPalette.ToolTipText, Qt.white)
+        dark_palette.setColor(QPalette.Text, Qt.white)
+        dark_palette.setColor(QPalette.Disabled, QPalette.Text, dark_disabled_color)
+        dark_palette.setColor(QPalette.Dark, QColor(35, 35, 35))
+        dark_palette.setColor(QPalette.Shadow, QColor(20, 20, 20))
+        dark_palette.setColor(QPalette.Button, dark_color)
+        dark_palette.setColor(QPalette.ButtonText, Qt.white)
+        dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, dark_disabled_color)
+        dark_palette.setColor(QPalette.BrightText, Qt.red)
+        dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
+        dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        dark_palette.setColor(QPalette.Disabled, QPalette.Highlight, dark_disabled_color)
+        dark_palette.setColor(QPalette.HighlightedText, Qt.white)
+        app.setPalette(dark_palette)
+        # --- End Dark Mode Theme ---
+
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
         layout = QHBoxLayout()
         central_widget.setLayout(layout)
-        layout.setSpacing(5)  # Add some spacing between panels
+        layout.setSpacing(5)
 
         # Left Panel (Tag Input Area)
         left_panel = QFrame()
-        left_panel.setFrameShape(QFrame.StyledPanel)  # Give it a border
-        left_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding) # Fixed width, expanding height
-        left_panel.setFixedWidth(200)  # Set initial width
+        left_panel.setFrameShape(QFrame.StyledPanel)
+        left_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        left_panel.setFixedWidth(200)
+        left_layout = QVBoxLayout() # Vertical layout for tags in left panel
+        left_panel.setLayout(left_layout) # Set layout for left panel
         layout.addWidget(left_panel)
 
         # Center Panel (Image Display)
         center_panel = QLabel()
-        center_panel.setFrameShape(QFrame.StyledPanel) # Give it a border
-        center_panel.setAlignment(Qt.AlignCenter) # Center content
-        center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding) # Expanding in both directions
+        center_panel.setFrameShape(QFrame.StyledPanel)
+        center_panel.setAlignment(Qt.AlignCenter)
+        center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(center_panel)
 
         # Right Panel (Tag List)
         right_panel = QListWidget()
-        right_panel.setFrameShape(QFrame.StyledPanel) # Give it a border
-        right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding) # Fixed width, expanding height
-        right_panel.setFixedWidth(200) # Set initial width
+        right_panel.setFrameShape(QFrame.StyledPanel)
+        right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        right_panel.setFixedWidth(200)
         layout.addWidget(right_panel)
 
+        # --- Load Tags from CSV ---
+        self.load_tags_from_csv(left_layout) # Call function to load tags
+        # --- End Load Tags from CSV ---
 
-from PySide6.QtCore import Qt  # Import Qt namespace for alignment
+
+    def load_tags_from_csv(self, layout): # Pass the layout to the function
+        tags_file_path = os.path.join("data", "tag_list.csv") # Construct file path
+        try:
+            with open(tags_file_path, 'r', encoding='utf-8') as file: # Open CSV file
+                for line in file:
+                    tag_name = line.strip() # Read each line as a tag
+                    tag_label = QLabel(tag_name) # Create QLabel for each tag
+                    layout.addWidget(tag_label) # Add tag label to the layout
+        except FileNotFoundError:
+            error_label = QLabel("Error: tag_list.csv not found in 'data' folder.") # Error label if file not found
+            layout.addWidget(error_label)
+
 
 app = QApplication(sys.argv)
 window = MainWindow()
