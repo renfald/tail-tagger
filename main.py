@@ -3,7 +3,7 @@ import os  # Import the 'os' module for file paths
 from tag_widget import TagWidget  # Import TagWidget from tag_widget.py
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
-                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton)
+                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem)
 from PySide6.QtGui import QColor, QPalette, QPixmap, QImage
 from PySide6.QtCore import Qt
 
@@ -100,6 +100,10 @@ class MainWindow(QMainWindow):
         bottom_layout.setContentsMargins(10, 5, 10, 5) # Add margins around content
         bottom_panel.setLayout(bottom_layout)
 
+        # --- Horizontal Spacers to Center Content ---
+        left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum) # Flexible spacer on the left
+        bottom_layout.addItem(left_spacer) # Add left spacer
+
         # Image Filename Label
         self.filename_label = QLabel("filename.jpg") # <--- Instance variable for filename label
         bottom_layout.addWidget(self.filename_label)
@@ -107,17 +111,19 @@ class MainWindow(QMainWindow):
         # Image Index Label
         self.index_label = QLabel("1 of 100") # <--- Instance variable for index label
         bottom_layout.addWidget(self.index_label)
-        bottom_layout.setAlignment(Qt.AlignCenter) # Center index label
+
+        right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum) # Flexible spacer on the right
+        bottom_layout.addItem(right_spacer) # Add right spacer
+        # --- End Horizontal Spacers ---
 
         # Previous Image Button
         prev_button = QPushButton("< Prev") # <--- Create Previous button
         bottom_layout.addWidget(prev_button)
-        bottom_layout.setAlignment(prev_button, Qt.AlignRight) # Align buttons to the right
 
         # Next Image Button
         next_button = QPushButton("Next >") # <--- Create Next button
         bottom_layout.addWidget(next_button)
-        bottom_layout.setAlignment(next_button, Qt.AlignRight) # Align buttons to the right
+
 
         main_layout.addWidget(bottom_panel) # <--- Add bottom_panel to main_layout (QVBoxLayout)
         # --- End Bottom Panel ---  
