@@ -3,7 +3,7 @@ import os  # Import the 'os' module for file paths
 from tag_widget import TagWidget  # Import TagWidget from tag_widget.py
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
-                             QSizePolicy, QVBoxLayout) # Added QVBoxLayout
+                             QSizePolicy, QVBoxLayout, QScrollArea) # Added QVBoxLayout
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtCore import Qt
 
@@ -49,7 +49,9 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(layout)
         layout.setSpacing(5)
 
-        # Left Panel (Tag Input Area)
+        # --- Left Panel with Scroll Area ---
+        left_scroll_area = QScrollArea() # <--- Create QScrollArea
+        left_scroll_area.setWidgetResizable(True) # <--- Important: Make content widget resizable
         left_panel = QFrame()
         left_panel.setFrameShape(QFrame.StyledPanel)
         left_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
@@ -57,7 +59,9 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout() # Vertical layout for tags in left panel
         left_layout.setAlignment(Qt.AlignTop) # Align tags to the top
         left_panel.setLayout(left_layout) # Set layout for left panel
-        layout.addWidget(left_panel)
+        left_scroll_area.setWidget(left_panel) # <--- Set left_panel as the scroll area's widget
+        layout.addWidget(left_scroll_area) # <--- Add QScrollArea to main layout
+        # --- End Left Panel with Scroll Area ---
 
         # Center Panel (Image Display)
         center_panel = QLabel()
