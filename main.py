@@ -4,7 +4,7 @@ from tag_widget import TagWidget  # Import TagWidget from tag_widget.py
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
                              QSizePolicy, QVBoxLayout, QScrollArea) # Added QVBoxLayout
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QPalette, QPixmap, QImage
 from PySide6.QtCore import Qt
 
 class MainWindow(QMainWindow):
@@ -47,27 +47,40 @@ class MainWindow(QMainWindow):
 
         layout = QHBoxLayout()
         central_widget.setLayout(layout)
-        layout.setSpacing(5)
+        layout.setSpacing(0)
 
-        # --- Left Panel with Scroll Area ---
-        left_scroll_area = QScrollArea() # <--- Create QScrollArea
-        left_scroll_area.setWidgetResizable(True) # <--- Important: Make content widget resizable
+        left_scroll_area = QScrollArea()
+        left_scroll_area.setWidgetResizable(True)
+        left_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        left_scroll_area.setFixedWidth(200)
+
         left_panel = QFrame()
         left_panel.setFrameShape(QFrame.StyledPanel)
-        left_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        left_panel.setFixedWidth(200)
-        left_layout = QVBoxLayout() # Vertical layout for tags in left panel
-        left_layout.setAlignment(Qt.AlignTop) # Align tags to the top
-        left_panel.setLayout(left_layout) # Set layout for left panel
-        left_scroll_area.setWidget(left_panel) # <--- Set left_panel as the scroll area's widget
-        layout.addWidget(left_scroll_area) # <--- Add QScrollArea to main layout
-        # --- End Left Panel with Scroll Area ---
+        
+        left_layout = QVBoxLayout()
+        left_layout.setAlignment(Qt.AlignTop)
+        left_layout.setSpacing(0) # <--- Set QVBoxLayout spacing to 0
+        left_layout.setContentsMargins(0, 0, 0, 0) # <--- Set QVBoxLayout margins to 0
+        
+        left_panel.setLayout(left_layout)
+
+        left_scroll_area.setWidget(left_panel)
+        layout.addWidget(left_scroll_area)
 
         # Center Panel (Image Display)
         center_panel = QLabel()
         center_panel.setFrameShape(QFrame.StyledPanel)
         center_panel.setAlignment(Qt.AlignCenter)
         center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        # --- Image Loading and Display ---
+        image_path = r"input\sample3.png" # <--- REPLACE WITH YOUR IMAGE PATH
+        pixmap = QPixmap(image_path) # Load image into QPixmap
+        if pixmap.isNull(): # Check if loading failed
+            center_panel.setText("Error loading image") # Display error text
+        else:
+            center_panel.setPixmap(pixmap) # Set QPixmap to QLabel
+
         layout.addWidget(center_panel)
 
         # Right Panel (Tag List)
