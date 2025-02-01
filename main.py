@@ -3,7 +3,7 @@ import os  # Import the 'os' module for file paths
 from tag_widget import TagWidget  # Import TagWidget from tag_widget.py
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
-                             QSizePolicy, QVBoxLayout, QScrollArea) # Added QVBoxLayout
+                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton)
 from PySide6.QtGui import QColor, QPalette, QPixmap, QImage
 from PySide6.QtCore import Qt
 
@@ -45,9 +45,18 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        layout = QHBoxLayout()
-        central_widget.setLayout(layout)
-        layout.setSpacing(0)
+        # --- Main Layout Changed to QVBoxLayout ---
+        main_layout = QVBoxLayout() # <--- Changed to QVBoxLayout for main window
+        main_layout.setSpacing(0) # No spacing in main layout
+        central_widget.setLayout(main_layout) # <--- Set QVBoxLayout
+        # --- End Main Layout Change ---
+
+
+        # --- Top Horizontal Layout for Panels (now inside main QVBoxLayout) ---
+        panels_layout = QHBoxLayout() # <--- Create QHBoxLayout for panels
+        panels_layout.setSpacing(0) # No spacing between panels
+        main_layout.addLayout(panels_layout) # <--- Add panels_layout to main_layout
+        # --- End Top Horizontal Layout for Panels ---
 
         left_scroll_area = QScrollArea()
         left_scroll_area.setWidgetResizable(True)
@@ -65,14 +74,14 @@ class MainWindow(QMainWindow):
         left_panel.setLayout(left_layout)
 
         left_scroll_area.setWidget(left_panel)
-        layout.addWidget(left_scroll_area)
+        panels_layout.addWidget(left_scroll_area)
 
         # Center Panel (Image Display)
         self.center_panel = QLabel() # <--- Make center_panel an instance variable (self.center_panel)
         self.center_panel.setFrameShape(QFrame.StyledPanel)
         self.center_panel.setAlignment(Qt.AlignCenter)
         self.center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self.center_panel)
+        panels_layout.addWidget(self.center_panel)
         
 
         # Right Panel (Tag List)
@@ -80,7 +89,39 @@ class MainWindow(QMainWindow):
         right_panel.setFrameShape(QFrame.StyledPanel)
         right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         right_panel.setFixedWidth(200)
-        layout.addWidget(right_panel)
+        panels_layout.addWidget(right_panel)
+
+        # --- Bottom Panel for Image Info and Buttons ---
+        bottom_panel = QFrame() # <--- Create bottom panel QFrame
+        bottom_panel.setFrameShape(QFrame.StyledPanel) # Give it a border
+        bottom_panel.setFixedHeight(50) # Set a fixed height for bottom panel
+        bottom_layout = QHBoxLayout() # <--- Create QHBoxLayout for bottom panel
+        bottom_layout.setSpacing(10) # Add some spacing between elements in bottom panel
+        bottom_layout.setContentsMargins(10, 5, 10, 5) # Add margins around content
+        bottom_panel.setLayout(bottom_layout)
+
+        # Image Filename Label
+        self.filename_label = QLabel("filename.jpg") # <--- Instance variable for filename label
+        bottom_layout.addWidget(self.filename_label)
+
+        # Image Index Label
+        self.index_label = QLabel("1 of 100") # <--- Instance variable for index label
+        bottom_layout.addWidget(self.index_label)
+        bottom_layout.setAlignment(Qt.AlignCenter) # Center index label
+
+        # Previous Image Button
+        prev_button = QPushButton("< Prev") # <--- Create Previous button
+        bottom_layout.addWidget(prev_button)
+        bottom_layout.setAlignment(prev_button, Qt.AlignRight) # Align buttons to the right
+
+        # Next Image Button
+        next_button = QPushButton("Next >") # <--- Create Next button
+        bottom_layout.addWidget(next_button)
+        bottom_layout.setAlignment(next_button, Qt.AlignRight) # Align buttons to the right
+
+        main_layout.addWidget(bottom_panel) # <--- Add bottom_panel to main_layout (QVBoxLayout)
+        # --- End Bottom Panel ---  
+
 
         # --- Load Tags from CSV ---
         self.load_tags_from_csv(left_layout) # Call function to load tags
