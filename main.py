@@ -1,10 +1,11 @@
 import sys
+import os  # Import the 'os' module for file paths
+from tag_widget import TagWidget  # Import TagWidget from tag_widget.py
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
                              QSizePolicy, QVBoxLayout) # Added QVBoxLayout
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtCore import Qt
-import os  # Import the 'os' module for file paths
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -54,6 +55,7 @@ class MainWindow(QMainWindow):
         left_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         left_panel.setFixedWidth(200)
         left_layout = QVBoxLayout() # Vertical layout for tags in left panel
+        left_layout.setAlignment(Qt.AlignTop) # Align tags to the top
         left_panel.setLayout(left_layout) # Set layout for left panel
         layout.addWidget(left_panel)
 
@@ -76,16 +78,17 @@ class MainWindow(QMainWindow):
         # --- End Load Tags from CSV ---
 
 
-    def load_tags_from_csv(self, layout): # Pass the layout to the function
-        tags_file_path = os.path.join("data", "tag_list.csv") # Construct file path
+    def load_tags_from_csv(self, layout):
+        tags_file_path = os.path.join("data", "tag_list.csv")
         try:
-            with open(tags_file_path, 'r', encoding='utf-8') as file: # Open CSV file
+            with open(tags_file_path, 'r', encoding='utf-8') as file:
+                next(file) # Skip the header line
                 for line in file:
-                    tag_name = line.strip() # Read each line as a tag
-                    tag_label = QLabel(tag_name) # Create QLabel for each tag
-                    layout.addWidget(tag_label) # Add tag label to the layout
+                    tag_name = line.strip()
+                    tag_widget = TagWidget(tag_name) # Create TagWidget instead of QLabel <---- CHANGED THIS LINE
+                    layout.addWidget(tag_widget) # Add TagWidget to layout
         except FileNotFoundError:
-            error_label = QLabel("Error: tag_list.csv not found in 'data' folder.") # Error label if file not found
+            error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
             layout.addWidget(error_label)
 
 
