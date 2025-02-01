@@ -68,20 +68,12 @@ class MainWindow(QMainWindow):
         layout.addWidget(left_scroll_area)
 
         # Center Panel (Image Display)
-        center_panel = QLabel()
-        center_panel.setFrameShape(QFrame.StyledPanel)
-        center_panel.setAlignment(Qt.AlignCenter)
-        center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.center_panel = QLabel() # <--- Make center_panel an instance variable (self.center_panel)
+        self.center_panel.setFrameShape(QFrame.StyledPanel)
+        self.center_panel.setAlignment(Qt.AlignCenter)
+        self.center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.addWidget(self.center_panel)
         
-        # --- Image Loading and Display ---
-        image_path = r"input\sample3.png" # <--- REPLACE WITH YOUR IMAGE PATH
-        pixmap = QPixmap(image_path) # Load image into QPixmap
-        if pixmap.isNull(): # Check if loading failed
-            center_panel.setText("Error loading image") # Display error text
-        else:
-            center_panel.setPixmap(pixmap) # Set QPixmap to QLabel
-
-        layout.addWidget(center_panel)
 
         # Right Panel (Tag List)
         right_panel = QListWidget()
@@ -94,6 +86,10 @@ class MainWindow(QMainWindow):
         self.load_tags_from_csv(left_layout) # Call function to load tags
         # --- End Load Tags from CSV ---
 
+        # --- Image Loading and Display ---
+        self.image_path = r"input\sample4.jpg" # <--- REPLACE WITH YOUR IMAGE PATH
+        self.update_image_display() # <--- Call update_image_display initially
+        # --- End Initial Image Load and Display ---
 
     def load_tags_from_csv(self, layout):
         tags_file_path = os.path.join("data", "tag_list.csv")
@@ -107,6 +103,27 @@ class MainWindow(QMainWindow):
         except FileNotFoundError:
             error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
             layout.addWidget(error_label)
+
+    def update_image_display(self): # <--- New function to handle image loading and scaling
+        pixmap = QPixmap(self.image_path) # Load image
+
+        if pixmap.isNull(): # Error handling
+            self.center_panel.setText("Error loading image")
+            return
+
+        # --- Image Scaling ---
+        panel_width = self.center_panel.width() # Get current panel width
+        panel_height = self.center_panel.height() # Get current panel height
+
+        scaled_pixmap = pixmap.scaled(
+            panel_width,
+            panel_height,
+            Qt.AspectRatioMode.KeepAspectRatio, # Maintain aspect ratio
+            Qt.TransformationMode.SmoothTransformation # Use smooth scaling algorithm
+        )
+        # --- End Image Scaling ---
+
+        self.center_panel.setPixmap(scaled_pixmap) # Set scaled pixmap to QLabel
 
 
 app = QApplication(sys.argv)
