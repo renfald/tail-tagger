@@ -1,6 +1,6 @@
 import sys
-import os  # Import the 'os' module for file paths
-from tag_widget import TagWidget  # Import TagWidget from tag_widget.py
+import os
+from tag_widget import TagWidget
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem)
@@ -8,15 +8,20 @@ from PySide6.QtGui import QColor, QPalette, QPixmap, QImage
 from PySide6.QtCore import Qt
 
 class MainWindow(QMainWindow):
+    """Main application window for the Image Tagger."""
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Image Tagger")
+        self.resize(1024, 768)
 
-        # Set initial window size
-        self.resize(1024, 768)  # Add this line to set initial size
+        self._setup_dark_mode_theme()
+        self._setup_ui()
+        self._load_tags()
+        self._load_initial_image()
 
-        # --- Dark Mode Theme ---
-        app.setStyle("Fusion") # Good for cross-platform dark mode
+    def _setup_dark_mode_theme(self):
+        """Sets up the application-wide dark mode theme."""
+        app.setStyle("Fusion")
         dark_palette = QPalette()
         dark_color = QColor(53, 53, 53)
         dark_disabled_color = QColor(127, 127, 127)
@@ -39,25 +44,21 @@ class MainWindow(QMainWindow):
         dark_palette.setColor(QPalette.Disabled, QPalette.Highlight, dark_disabled_color)
         dark_palette.setColor(QPalette.HighlightedText, Qt.white)
         app.setPalette(dark_palette)
-        # --- End Dark Mode Theme ---
 
-
+    def _setup_ui(self):
+        """Sets up the main user interface layout and elements."""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        # --- Main Layout Changed to QVBoxLayout ---
-        main_layout = QVBoxLayout() # <--- Changed to QVBoxLayout for main window
-        main_layout.setSpacing(0) # No spacing in main layout
-        central_widget.setLayout(main_layout) # <--- Set QVBoxLayout
-        # --- End Main Layout Change ---
+        main_layout = QVBoxLayout()
+        main_layout.setSpacing(0)
+        central_widget.setLayout(main_layout)
 
+        panels_layout = QHBoxLayout()
+        panels_layout.setSpacing(0)
+        main_layout.addLayout(panels_layout)
 
-        # --- Top Horizontal Layout for Panels (now inside main QVBoxLayout) ---
-        panels_layout = QHBoxLayout() # <--- Create QHBoxLayout for panels
-        panels_layout.setSpacing(0) # No spacing between panels
-        main_layout.addLayout(panels_layout) # <--- Add panels_layout to main_layout
-        # --- End Top Horizontal Layout for Panels ---
-
+        # Left Panel - Tag List
         left_scroll_area = QScrollArea()
         left_scroll_area.setWidgetResizable(True)
         left_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
@@ -65,118 +66,104 @@ class MainWindow(QMainWindow):
 
         left_panel = QFrame()
         left_panel.setFrameShape(QFrame.StyledPanel)
-        
         left_layout = QVBoxLayout()
         left_layout.setAlignment(Qt.AlignTop)
-        left_layout.setSpacing(0) # <--- Set QVBoxLayout spacing to 0
-        left_layout.setContentsMargins(0, 0, 0, 0) # <--- Set QVBoxLayout margins to 0
-        
+        left_layout.setSpacing(0)
+        left_layout.setContentsMargins(0, 0, 0, 0)
         left_panel.setLayout(left_layout)
+        self.tag_list_layout = left_layout # Store layout for tag loading
 
         left_scroll_area.setWidget(left_panel)
         panels_layout.addWidget(left_scroll_area)
 
-        # Center Panel (Image Display)
-        self.center_panel = QLabel() # <--- Make center_panel an instance variable (self.center_panel)
+        # Center Panel - Image Display
+        self.center_panel = QLabel()
         self.center_panel.setFrameShape(QFrame.StyledPanel)
         self.center_panel.setAlignment(Qt.AlignCenter)
         self.center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         panels_layout.addWidget(self.center_panel)
-        
 
-        # Right Panel (Tag List)
+        # Right Panel - Selected Tags (Currently Placeholder)
         right_panel = QListWidget()
         right_panel.setFrameShape(QFrame.StyledPanel)
         right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         right_panel.setFixedWidth(200)
         panels_layout.addWidget(right_panel)
 
-        # --- Bottom Panel for Image Info and Buttons ---
-        bottom_panel = QFrame() # <--- Create bottom panel QFrame
-        bottom_panel.setFrameShape(QFrame.StyledPanel) # Give it a border
-        bottom_panel.setFixedHeight(50) # Set a fixed height for bottom panel
-        bottom_layout = QHBoxLayout() # <--- Create QHBoxLayout for bottom panel
-        bottom_layout.setSpacing(10) # Add some spacing between elements in bottom panel
-        bottom_layout.setContentsMargins(10, 5, 10, 5) # Add margins around content
+        # Bottom Panel - Image Info and Buttons
+        bottom_panel = QFrame()
+        bottom_panel.setFrameShape(QFrame.StyledPanel)
+        bottom_panel.setFixedHeight(50)
+        bottom_layout = QHBoxLayout()
+        bottom_layout.setSpacing(10)
+        bottom_layout.setContentsMargins(10, 5, 10, 5)
         bottom_panel.setLayout(bottom_layout)
 
-        # --- Horizontal Spacers to Center Content ---
-        left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum) # Flexible spacer on the left
-        bottom_layout.addItem(left_spacer) # Add left spacer
+        left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        bottom_layout.addItem(left_spacer)
 
-        # Image Filename Label
-        self.filename_label = QLabel("filename.jpg") # <--- Instance variable for filename label
+        self.filename_label = QLabel("filename.jpg")
         bottom_layout.addWidget(self.filename_label)
 
-        # Image Index Label
-        self.index_label = QLabel("1 of 100") # <--- Instance variable for index label
+        self.index_label = QLabel("1 of 100")
         bottom_layout.addWidget(self.index_label)
 
-        right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum) # Flexible spacer on the right
-        bottom_layout.addItem(right_spacer) # Add right spacer
-        # --- End Horizontal Spacers ---
+        right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        bottom_layout.addItem(right_spacer)
 
-        # Previous Image Button
-        prev_button = QPushButton("< Prev") # <--- Create Previous button
+        prev_button = QPushButton("< Prev")
         bottom_layout.addWidget(prev_button)
 
-        # Next Image Button
-        next_button = QPushButton("Next >") # <--- Create Next button
+        next_button = QPushButton("Next >")
         bottom_layout.addWidget(next_button)
 
+        main_layout.addWidget(bottom_panel)
+        self.bottom_panel_layout = bottom_layout # Store for potential future use
 
-        main_layout.addWidget(bottom_panel) # <--- Add bottom_panel to main_layout (QVBoxLayout)
-        # --- End Bottom Panel ---  
 
-
-        # --- Load Tags from CSV ---
-        self.load_tags_from_csv(left_layout) # Call function to load tags
-        # --- End Load Tags from CSV ---
-
-        # --- Image Loading and Display ---
-        self.image_path = r"input\sample4.jpg" # <--- REPLACE WITH YOUR IMAGE PATH
-        self.update_image_display() # <--- Call update_image_display initially
-        # --- End Initial Image Load and Display ---
-
-    def load_tags_from_csv(self, layout):
+    def _load_tags(self):
+        """Loads tags from CSV file and populates the left panel."""
+        layout = self.tag_list_layout
         tags_file_path = os.path.join("data", "tag_list.csv")
         try:
             with open(tags_file_path, 'r', encoding='utf-8') as file:
-                next(file) # Skip the header line
+                next(file) # Skip header line
                 for line in file:
                     tag_name = line.strip()
-                    tag_widget = TagWidget(tag_name) # Create TagWidget instead of QLabel <---- CHANGED THIS LINE
-                    layout.addWidget(tag_widget) # Add TagWidget to layout
+                    tag_widget = TagWidget(tag_name)
+                    layout.addWidget(tag_widget)
         except FileNotFoundError:
             error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
             layout.addWidget(error_label)
 
-    def update_image_display(self): # <--- New function to handle image loading and scaling
-        pixmap = QPixmap(self.image_path) # Load image
+    def _load_initial_image(self):
+        """Loads the initial test image and displays it in the center panel."""
+        self.image_path = r"input\sample4.jpg" # Initial test image path
+        self.update_image_display()
 
-        if pixmap.isNull(): # Error handling
+    def update_image_display(self):
+        """Loads the image from self.image_path, scales it to fit the center panel, and displays it."""
+        pixmap = QPixmap(self.image_path)
+
+        if pixmap.isNull():
             self.center_panel.setText("Error loading image")
             self.filename_label.setText("Error")
             return
 
-        # --- Image Scaling ---
-        panel_width = self.center_panel.width() # Get current panel width
-        panel_height = self.center_panel.height() # Get current panel height
+        panel_width = self.center_panel.width()
+        panel_height = self.center_panel.height()
 
         scaled_pixmap = pixmap.scaled(
             panel_width,
             panel_height,
-            Qt.AspectRatioMode.KeepAspectRatio, # Maintain aspect ratio
-            Qt.TransformationMode.SmoothTransformation # Use smooth scaling algorithm
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
         )
-        # --- End Image Scaling ---
+        self.center_panel.setPixmap(scaled_pixmap)
 
-        self.center_panel.setPixmap(scaled_pixmap) # Set scaled pixmap to QLabel
-        
-        # --- Update Filename Label ---
-        filename = os.path.basename(self.image_path) # Extract filename from path
-        self.filename_label.setText(filename) # Set filename label text
-        # --- End Update Filename Label ---
+        filename = os.path.basename(self.image_path)
+        self.filename_label.setText(filename)
+
 
 app = QApplication(sys.argv)
 window = MainWindow()

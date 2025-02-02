@@ -2,42 +2,47 @@ from PySide6.QtWidgets import QLabel, QFrame, QSizePolicy, QHBoxLayout
 from PySide6.QtCore import Qt, QSize
 
 class TagWidget(QFrame):
+    """Widget to display a tag with selection capability."""
     def __init__(self, tag_name):
         super().__init__()
         self.tag_name = tag_name
         self.is_selected = False
 
-        self.setFrameShape(QFrame.StyledPanel) # Make it look like a panel
+        self._setup_ui()
+
+    def _setup_ui(self):
+        """Sets up the UI elements for the tag widget."""
+        self.setFrameShape(QFrame.StyledPanel)
         self.setLineWidth(1)
 
-        self.tag_label = QLabel(tag_name)
+        self.tag_label = QLabel(self.tag_name)
         self.tag_label.setAlignment(Qt.AlignCenter)
-        self.tag_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed) # <--- Add Size Policy to tag_label
+        self.tag_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        # --- Use QHBoxLayout to control TagWidget width ---
         tag_layout = QHBoxLayout()
         tag_layout.addWidget(self.tag_label)
         tag_layout.setContentsMargins(0, 2, 0, 2)
         tag_layout.setSpacing(0)
         self.setLayout(tag_layout)
-        # --- End QHBoxLayout ---
 
-        self.setCursor(Qt.PointingHandCursor) # Change cursor to pointer on hover
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed) # Preferred width, fixed height
-        # --- Set minimum size hint to control width ---
-        self.setMinimumSize(QSize(0, 0)) # Let layout manage width, but set min size hint
-        # --- End minimum size hint ---
+        self.setCursor(Qt.PointingHandCursor)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.setMinimumSize(QSize(0, 0))
 
-    def mousePressEvent(self, event): # Handle mouse click events
-        super().mousePressEvent(event) # Call parent class's method
-        self.toggle_selection() # Toggle selection on click
+
+    def mousePressEvent(self, event):
+        """Handles mouse press events to toggle tag selection."""
+        super().mousePressEvent(event)
+        self.toggle_selection()
 
     def toggle_selection(self):
-        self.is_selected = not self.is_selected # Toggle boolean
-        self.update_style() # Update visual style based on selection
+        """Toggles the selection state of the tag."""
+        self.is_selected = not self.is_selected
+        self._update_style()
 
-    def update_style(self):
+    def _update_style(self):
+        """Updates the visual style of the tag based on its selection state."""
         if self.is_selected:
-            self.setStyleSheet("background-color: #606060; border: 1px solid #A0A0A0;") # Darker background, lighter border when selected
+            self.setStyleSheet("background-color: #606060; border: 1px solid #A0A0A0;")
         else:
-            self.setStyleSheet("") # Reset to default style when not selected
+            self.setStyleSheet("")
