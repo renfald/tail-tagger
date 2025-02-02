@@ -4,7 +4,7 @@ from tag_widget import TagWidget
 from center_panel import CenterPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
-                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem)
+                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem, QFileDialog)
 from PySide6.QtGui import QColor, QPalette, QPixmap, QImage
 from PySide6.QtCore import Qt
 
@@ -50,6 +50,15 @@ class MainWindow(QMainWindow):
         """Sets up the main user interface layout and elements."""
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+
+        # --- Menu Bar ---
+        menu_bar = self.menuBar()
+        file_menu = menu_bar.addMenu("&File")
+
+        open_folder_action = file_menu.addAction("Open Folder...")
+        open_folder_action.triggered.connect(self._open_folder_dialog)
+        # --- End Menu Bar ---
+
 
         main_layout = QVBoxLayout()
         main_layout.setSpacing(0)
@@ -137,12 +146,25 @@ class MainWindow(QMainWindow):
 
     def _load_initial_image(self):
         """Loads the initial test image and displays it in the center panel."""
-        self.image_path = r"input\sample4.jpg" # Initial test image path
+        self.image_path = r"input\sample.png" # Initial test image path
         # Set image path in CenterPanel and update
         self.center_panel.set_image_path(self.image_path)
         
         filename = os.path.basename(self.image_path)
         self.filename_label.setText(filename)
+
+    def _open_folder_dialog(self):
+            """Opens a folder selection dialog and handles the selected folder."""
+            folder_path = QFileDialog.getExistingDirectory(
+                self,
+                "Select Image Folder", # Dialog title
+                os.path.expanduser("~"), # Start directory (user's home directory)
+                QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
+            )
+
+            if folder_path: # If a folder was selected (not cancelled)
+                print(f"Selected folder: {folder_path}") # For now, just print the path
+                # We'll add image loading logic here in the next step
 
 app = QApplication(sys.argv)
 window = MainWindow()
