@@ -4,7 +4,7 @@ from tag_widget import TagWidget
 from center_panel import CenterPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
-                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem, QFileDialog)
+                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem, QFileDialog, QListWidgetItem)
 from PySide6.QtGui import QColor, QPalette, QPixmap, QImage
 from PySide6.QtCore import Qt
 
@@ -98,11 +98,12 @@ class MainWindow(QMainWindow):
         panels_layout.addWidget(self.center_panel)
 
         # Right Panel - Selected Tags (Currently Placeholder)
-        right_panel = QListWidget()
-        right_panel.setFrameShape(QFrame.StyledPanel)
-        right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        right_panel.setFixedWidth(200)
-        panels_layout.addWidget(right_panel)
+        self.right_panel = QListWidget()
+        self.right_panel.setFrameShape(QFrame.StyledPanel)
+        self.right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.right_panel.setFixedWidth(200)
+        self.right_panel.itemClicked.connect(self._handle_tag_clicked_right_panel)
+        panels_layout.addWidget(self.right_panel)
 
         # Bottom Panel - Image Info and Buttons
         bottom_panel = QFrame()
@@ -146,6 +147,7 @@ class MainWindow(QMainWindow):
                 for line in file:
                     tag_name = line.strip()
                     tag_widget = TagWidget(tag_name)
+                    tag_widget.tag_clicked.connect(self._handle_tag_clicked_left_panel)
                     layout.addWidget(tag_widget)
         except FileNotFoundError:
             error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
@@ -218,8 +220,6 @@ class MainWindow(QMainWindow):
             self.prev_button.setEnabled(False) # Disable "Prev" button
             self.next_button.setEnabled(False) # Disable "Next" button
     
-
-
     def _load_and_display_image(self, image_path):
         """Loads and displays an image in the center panel and updates filename label."""
         self.center_panel.set_image_path(image_path) # Use CenterPanel's method to load and display
@@ -261,6 +261,34 @@ class MainWindow(QMainWindow):
             image_path = self.image_paths[self.current_image_index] # Get path of next image
             self._load_and_display_image(image_path) # Load and display
             self._update_index_label() # Update index label
+
+    def _handle_tag_clicked_left_panel(self, tag_name):
+            """Handles clicks on tags in the left panel. Adds tag to selected tags."""
+            if tag_name not in self.selected_tags_for_current_image: # Prevent duplicates
+                self.selected_tags_for_current_image.append(tag_name)
+                print(f"Tag '{tag_name}' selected and added to right panel.") # Debug
+                self._update_right_panel_display() # Update right panel after adding tag
+            else:
+                print(f"Tag '{tag_name}' already selected, ignoring click.") # Debug - should not happen in Phase 1
+    
+    def _handle_tag_clicked_right_panel(self, item):
+        """Handles clicks on tags in the right panel. Removes tag from selected tags."""
+        tag_name = item.text() # Get tag name from the clicked QListWidgetItem
+        if tag_name in self.selected_tags_for_current_image:
+            self.selected_tags_for_current_image.remove(tag_name) # Remove tag from selected list
+            print(f"Tag '{tag_name}' deselected and removed from right panel.") # Debug
+            self._update_right_panel_display() # Update right panel after removing tag
+        else:
+            print(f"Tag '{tag_name}' not in selected tags (right panel click issue?).") # Debug - should not happen
+    
+    def _update_right_panel_display(self):
+            """Updates the right panel to display the currently selected tags."""
+            self.right_panel.clear() # Clear the right panel
+
+            for tag_name in self.selected_tags_for_current_image: # Iterate through selected tags
+                item = QListWidgetItem(tag_name) # Create a QListWidgetItem for each tag
+                self.right_panel.addItem(item) # Add item to the right panel list
+            print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}") # Debug
 
 
 app = QApplication(sys.argv)
