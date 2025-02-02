@@ -15,13 +15,11 @@ class CenterPanel(QLabel):
 
     def resizeEvent(self, event):
         """Handles resize events to scale and display the image."""
-        print(f"CenterPanel.resizeEvent: New size - width={self.width()}, height={self.height()}")
         super().resizeEvent(event) # Important: Call base class implementation first
         self.update_image_display()
 
     def update_image_display(self):
         """Loads and scales the image to fit the center panel."""
-        print(f"CenterPanel.update_image_display: Start. Current size - width={self.width()}, height={self.height()}")
         if not self.image_path:
             self.clear() # Clear if no image path set
             return
@@ -34,13 +32,11 @@ class CenterPanel(QLabel):
 
         panel_width = self.width()
         panel_height = self.height()
-        print(f"CenterPanel.update_image_display: Panel size - width={panel_width}, height={panel_height}")
-        
+
         scaled_pixmap = pixmap.scaled(
             panel_width,
             panel_height,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation
         )
-        print(f"CenterPanel.update_image_display: Scaled pixmap size - width={scaled_pixmap.width()}, height={scaled_pixmap.height()}")
         self.setPixmap(scaled_pixmap)

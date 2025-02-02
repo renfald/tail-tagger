@@ -1,6 +1,7 @@
 import sys
 import os
 from tag_widget import TagWidget
+from center_panel import CenterPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem)
@@ -77,10 +78,9 @@ class MainWindow(QMainWindow):
         panels_layout.addWidget(left_scroll_area)
 
         # Center Panel - Image Display
-        self.center_panel = QLabel()
+        self.center_panel = CenterPanel()
         self.center_panel.setFrameShape(QFrame.StyledPanel)
-        self.center_panel.setAlignment(Qt.AlignCenter)
-        self.center_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.center_panel.setMinimumSize(100, 100)  # Set minimum size
         panels_layout.addWidget(self.center_panel)
 
         # Right Panel - Selected Tags (Currently Placeholder)
@@ -120,7 +120,6 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(bottom_panel)
         self.bottom_panel_layout = bottom_layout # Store for potential future use
 
-
     def _load_tags(self):
         """Loads tags from CSV file and populates the left panel."""
         layout = self.tag_list_layout
@@ -139,31 +138,11 @@ class MainWindow(QMainWindow):
     def _load_initial_image(self):
         """Loads the initial test image and displays it in the center panel."""
         self.image_path = r"input\sample4.jpg" # Initial test image path
-        self.update_image_display()
-
-    def update_image_display(self):
-        """Loads the image from self.image_path, scales it to fit the center panel, and displays it."""
-        pixmap = QPixmap(self.image_path)
-
-        if pixmap.isNull():
-            self.center_panel.setText("Error loading image")
-            self.filename_label.setText("Error")
-            return
-
-        panel_width = self.center_panel.width()
-        panel_height = self.center_panel.height()
-
-        scaled_pixmap = pixmap.scaled(
-            panel_width,
-            panel_height,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.center_panel.setPixmap(scaled_pixmap)
-
+        # Set image path in CenterPanel and update
+        self.center_panel.set_image_path(self.image_path)
+        
         filename = os.path.basename(self.image_path)
         self.filename_label.setText(filename)
-
 
 app = QApplication(sys.argv)
 window = MainWindow()
