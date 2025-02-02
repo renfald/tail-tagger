@@ -22,10 +22,7 @@ class MainWindow(QMainWindow):
         self._setup_dark_mode_theme()
         self._setup_ui()
         self._load_tags()
-        self._load_initial_image()
-
-        self.prev_button.setEnabled(False) # Disable "Prev" button initially
-        self.next_button.setEnabled(False) # Disable "Next" button initially
+        self._load_initial_directory()
 
     def _setup_dark_mode_theme(self):
         """Sets up the application-wide dark mode theme."""
@@ -118,10 +115,10 @@ class MainWindow(QMainWindow):
         left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         bottom_layout.addItem(left_spacer)
 
-        self.filename_label = QLabel("filename.jpg")
+        self.filename_label = QLabel("No Image")
         bottom_layout.addWidget(self.filename_label)
 
-        self.index_label = QLabel("1 of 100")
+        self.index_label = QLabel("0 of 0")
         bottom_layout.addWidget(self.index_label)
 
         right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
@@ -153,14 +150,16 @@ class MainWindow(QMainWindow):
             error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
             layout.addWidget(error_label)
 
-    def _load_initial_image(self):
-        """Loads the initial test image and displays it in the center panel."""
-        self.image_path = r"input\sample2.png" # Initial test image path
-        # Set image path in CenterPanel and update
-        self.center_panel.set_image_path(self.image_path)
-        
-        filename = os.path.basename(self.image_path)
-        self.filename_label.setText(filename)
+    def _load_initial_directory(self):
+            """Loads images from a hardcoded initial directory for development."""
+            sample_directory = r"J:\Repositories\image_tagger_app\input"  # <--- !!!  Set your sample directory here !!!
+            if os.path.isdir(sample_directory): # Check if the directory exists
+                print(f"Loading initial directory: {sample_directory}") # Debug print
+                self._load_image_folder(sample_directory) # Load images from sample directory
+                self.last_folder_path = sample_directory # Set last_folder_path to initial directory
+            else:
+                print(f"Initial directory not found: {sample_directory}") # Debug print
+                self._load_image_folder(None)
 
     def _open_folder_dialog(self):
             """Opens a folder selection dialog, loads images, and updates UI.
@@ -179,29 +178,45 @@ class MainWindow(QMainWindow):
 
             if folder_path:
                 self.last_folder_path = folder_path # Update last_folder_path with newly selected path
-                image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'] # Common image extensions
-                self.image_paths = [] # Initialize image_paths list
+                self._load_image_folder(folder_path) # Call the new method to load images and update UI
 
-                for filename in os.listdir(folder_path): # Iterate through files in folder
-                    if any(filename.lower().endswith(ext) for ext in image_extensions): # Check for image extension
-                        image_path = os.path.join(folder_path, filename) # Create full path
-                        self.image_paths.append(image_path) # Add to image paths list
+    def _load_image_folder(self, folder_path):
+        """Loads images from the given folder path and updates the UI."""
+        if not folder_path: # Handle None folder_path (e.g., invalid initial directory)
+            print("No folder path provided to _load_image_folder, handling as no images.") # Debug
+            self.image_paths = [] # Clear image paths
+            self.center_panel.clear() # Clear center panel
+            self.center_panel.setText(f"Initial directory not found:\n{r'input'}") # Display error message, use 'input' as placeholder
+            self.filename_label.setText("No Image") # Clear filename label
+            self.index_label.setText("0 of 0") # Update index label to 0 of 0
+            self.prev_button.setEnabled(False) # Disable "Prev" button
+            self.next_button.setEnabled(False) # Disable "Next" button
+            return # Exit the method early        
+        
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'] # Common image extensions
+        self.image_paths = [] # Initialize image_paths list
 
-                if self.image_paths: # If we found images
-                    print(f"Found {len(self.image_paths)} images in folder: {folder_path}") # Debug print
-                    self.current_image_index = 0 # Initialize image index
-                    self._load_and_display_image(self.image_paths[0]) # Load and display first image
-                    self._update_index_label() # Update index label
-                    self.prev_button.setEnabled(True)  # Enable "Prev" button
-                    self.next_button.setEnabled(True)  # Enable "Next" button
-                else: # No images found
-                    print(f"No images found in folder: {folder_path}") # Debug print
-                    self.center_panel.clear() # Clear center panel
-                    self.center_panel.setText("No images found in this folder.") # Display message
-                    self.filename_label.setText("No Image") # Clear filename label
-                    self.index_label.setText("0 of 0") # Update index label to 0 of 0
-                    self.prev_button.setEnabled(False) # Disable "Prev" button
-                    self.next_button.setEnabled(False) # Disable "Next" button
+        for filename in os.listdir(folder_path): # Iterate through files in folder
+            if any(filename.lower().endswith(ext) for ext in image_extensions): # Check for image extension
+                image_path = os.path.join(folder_path, filename) # Create full path
+                self.image_paths.append(image_path) # Add to image paths list
+
+        if self.image_paths: # If we found images
+            print(f"Found {len(self.image_paths)} images in folder: {folder_path}") # Debug print
+            self.current_image_index = 0 # Initialize image index
+            self._load_and_display_image(self.image_paths[0]) # Load and display first image
+            self._update_index_label() # Update index label
+            self.prev_button.setEnabled(True)  # Enable "Prev" button
+            self.next_button.setEnabled(True)  # Enable "Next" button
+        else: # No images found
+            print(f"No images found in folder: {folder_path}") # Debug print
+            self.center_panel.clear() # Clear center panel
+            self.center_panel.setText("No images found in this folder.") # Display message
+            self.filename_label.setText("No Image") # Clear filename label
+            self.index_label.setText("0 of 0") # Update index label to 0 of 0
+            self.prev_button.setEnabled(False) # Disable "Prev" button
+            self.next_button.setEnabled(False) # Disable "Next" button
+    
 
 
     def _load_and_display_image(self, image_path):
