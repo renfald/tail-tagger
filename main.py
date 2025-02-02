@@ -17,7 +17,8 @@ class MainWindow(QMainWindow):
 
         self.image_paths = []
         self.current_image_index = 0
-
+        self.last_folder_path = None
+        
         self._setup_dark_mode_theme()
         self._setup_ui()
         self._load_tags()
@@ -157,15 +158,22 @@ class MainWindow(QMainWindow):
         self.filename_label.setText(filename)
 
     def _open_folder_dialog(self):
-            """Opens a folder selection dialog, loads images, and updates UI."""
+            """Opens a folder selection dialog, loads images, and updates UI.
+            Preserves and reuses the last selected folder path."""
+
+            start_directory = os.path.expanduser("~") # Default to home directory
+            if self.last_folder_path and os.path.isdir(self.last_folder_path): # Check if last path is valid
+                start_directory = self.last_folder_path # Use last folder path if valid
+
             folder_path = QFileDialog.getExistingDirectory(
                 self,
                 "Select Image Folder",
-                os.path.expanduser("~"),
+                start_directory, # Use start_directory (either last path or home dir)
                 QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
             )
 
             if folder_path:
+                self.last_folder_path = folder_path # Update last_folder_path with newly selected path
                 image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'] # Common image extensions
                 self.image_paths = [] # Initialize image_paths list
 
