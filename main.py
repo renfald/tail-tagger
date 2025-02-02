@@ -156,6 +156,7 @@ class MainWindow(QMainWindow):
 
         if pixmap.isNull(): # Error handling
             self.center_panel.setText("Error loading image")
+            self.filename_label.setText("Error")
             return
 
         # --- Image Scaling ---
@@ -171,7 +172,11 @@ class MainWindow(QMainWindow):
         # --- End Image Scaling ---
 
         self.center_panel.setPixmap(scaled_pixmap) # Set scaled pixmap to QLabel
-
+        
+        # --- Update Filename Label ---
+        filename = os.path.basename(self.image_path) # Extract filename from path
+        self.filename_label.setText(filename) # Set filename label text
+        # --- End Update Filename Label ---
 
 app = QApplication(sys.argv)
 window = MainWindow()
