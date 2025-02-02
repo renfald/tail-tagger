@@ -15,6 +15,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Image Tagger")
         self.resize(1024, 768)
 
+        self.image_paths = []
+        self.current_image_index = 0
+
         self._setup_dark_mode_theme()
         self._setup_ui()
         self._load_tags()
@@ -146,7 +149,7 @@ class MainWindow(QMainWindow):
 
     def _load_initial_image(self):
         """Loads the initial test image and displays it in the center panel."""
-        self.image_path = r"input\sample.png" # Initial test image path
+        self.image_path = r"input\sample2.png" # Initial test image path
         # Set image path in CenterPanel and update
         self.center_panel.set_image_path(self.image_path)
         
@@ -154,17 +157,49 @@ class MainWindow(QMainWindow):
         self.filename_label.setText(filename)
 
     def _open_folder_dialog(self):
-            """Opens a folder selection dialog and handles the selected folder."""
+            """Opens a folder selection dialog, loads images, and updates UI."""
             folder_path = QFileDialog.getExistingDirectory(
                 self,
-                "Select Image Folder", # Dialog title
-                os.path.expanduser("~"), # Start directory (user's home directory)
+                "Select Image Folder",
+                os.path.expanduser("~"),
                 QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
             )
 
-            if folder_path: # If a folder was selected (not cancelled)
-                print(f"Selected folder: {folder_path}") # For now, just print the path
-                # We'll add image loading logic here in the next step
+            if folder_path:
+                image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'] # Common image extensions
+                self.image_paths = [] # Initialize image_paths list
+
+                for filename in os.listdir(folder_path): # Iterate through files in folder
+                    if any(filename.lower().endswith(ext) for ext in image_extensions): # Check for image extension
+                        image_path = os.path.join(folder_path, filename) # Create full path
+                        self.image_paths.append(image_path) # Add to image paths list
+
+                if self.image_paths: # If we found images
+                    print(f"Found {len(self.image_paths)} images in folder: {folder_path}") # Debug print
+                    self.current_image_index = 0 # Initialize image index
+                    self._load_and_display_image(self.image_paths[0]) # Load and display first image
+                    self._update_index_label() # Update index label
+                else: # No images found
+                    print(f"No images found in folder: {folder_path}") # Debug print
+                    self.center_panel.clear() # Clear center panel
+                    self.center_panel.setText("No images found in this folder.") # Display message
+                    self.filename_label.setText("No Image") # Clear filename label
+                    self.index_label.setText("0 of 0") # Update index label to 0 of 0
+
+
+    def _load_and_display_image(self, image_path):
+        """Loads and displays an image in the center panel and updates filename label."""
+        self.center_panel.set_image_path(image_path) # Use CenterPanel's method to load and display
+        filename = os.path.basename(image_path)
+        self.filename_label.setText(filename) # Update filename label
+
+    def _update_index_label(self):
+        """Updates the image index label in the bottom panel."""
+        if self.image_paths:
+            index_text = f"{self.current_image_index + 1} of {len(self.image_paths)}"
+        else:
+            index_text = "0 of 0" # No images loaded
+        self.index_label.setText(index_text)
 
 app = QApplication(sys.argv)
 window = MainWindow()
