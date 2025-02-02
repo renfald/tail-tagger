@@ -99,12 +99,22 @@ class MainWindow(QMainWindow):
         panels_layout.addWidget(self.center_panel)
 
         # Right Panel - Selected Tags (Currently Placeholder)
-        self.right_panel = QListWidget()
+        right_scroll_area = QScrollArea() # Add scroll area for right panel
+        right_scroll_area.setWidgetResizable(True)
+        right_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        right_scroll_area.setFixedWidth(200)
+
+        self.right_panel = QFrame() # Create QFrame for right panel
         self.right_panel.setFrameShape(QFrame.StyledPanel)
-        self.right_panel.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        self.right_panel.setFixedWidth(200)
-        self.right_panel.itemClicked.connect(self._handle_tag_clicked_right_panel)
-        panels_layout.addWidget(self.right_panel)
+        right_layout = QVBoxLayout() # Create QVBoxLayout for right panel
+        right_layout.setAlignment(Qt.AlignTop)
+        right_layout.setSpacing(0)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_panel.setLayout(right_layout)
+        self.right_panel_layout = right_layout # Store layout for tag loading
+
+        right_scroll_area.setWidget(self.right_panel) # Set QFrame as scroll area widget
+        panels_layout.addWidget(right_scroll_area) # Add scroll area to panels layout
 
         # Bottom Panel - Image Info and Buttons
         bottom_panel = QFrame()
@@ -299,11 +309,14 @@ class MainWindow(QMainWindow):
     
     def _update_right_panel_display(self):
         """Updates the right panel to display the currently selected tags."""
-        self.right_panel.clear() # Clear the right panel
+        layout = self.right_panel_layout # Get the QVBoxLayout for the right panel
+        for i in reversed(range(layout.count())): # Clear existing widgets in layout
+            layout.itemAt(i).widget().setParent(None) # Remove widget from layout and set parent to None for cleanup
 
         for tag_name in self.selected_tags_for_current_image: # Iterate through selected tags
-            item = QListWidgetItem(tag_name) # Create a QListWidgetItem for each tag
-            self.right_panel.addItem(item) # Add item to the right panel list
+
+            tag_widget = TagWidget(tag_name) # Create a TagWidget instance for each tag
+            layout.addWidget(tag_widget) # Add TagWidget to the right panel layout
         print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}") # Debug
 
 
