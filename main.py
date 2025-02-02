@@ -18,6 +18,7 @@ class MainWindow(QMainWindow):
         self.image_paths = []
         self.current_image_index = 0
         self.last_folder_path = None
+        self.selected_tags_for_current_image = [] # Initialize selected tags list
         
         self._setup_dark_mode_theme()
         self._setup_ui()

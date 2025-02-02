@@ -1,8 +1,11 @@
 from PySide6.QtWidgets import QLabel, QFrame, QSizePolicy, QHBoxLayout
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, Signal  
 
 class TagWidget(QFrame):
     """Widget to display a tag with selection capability."""
+    
+    tag_clicked = Signal(str)
+    
     def __init__(self, tag_name):
         super().__init__()
         self.tag_name = tag_name
@@ -34,6 +37,7 @@ class TagWidget(QFrame):
         """Handles mouse press events to toggle tag selection."""
         super().mousePressEvent(event)
         self.toggle_selection()
+        self.tag_clicked.emit(self.tag_name)
 
     def toggle_selection(self):
         """Toggles the selection state of the tag."""
@@ -43,6 +47,6 @@ class TagWidget(QFrame):
     def _update_style(self):
         """Updates the visual style of the tag based on its selection state."""
         if self.is_selected:
-            self.setStyleSheet("background-color: #606060; border: 1px solid #A0A0A0;")
+            self.setStyleSheet("background-color: #212121; color: #525252;")
         else:
             self.setStyleSheet("")
