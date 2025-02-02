@@ -18,7 +18,8 @@ class MainWindow(QMainWindow):
         self.image_paths = []
         self.current_image_index = 0
         self.last_folder_path = None
-        self.selected_tags_for_current_image = [] # Initialize selected tags list
+        self.selected_tags_for_current_image = []
+        self.tag_widgets_by_name = {}
         
         self._setup_dark_mode_theme()
         self._setup_ui()
@@ -149,6 +150,7 @@ class MainWindow(QMainWindow):
                     tag_widget = TagWidget(tag_name)
                     tag_widget.tag_clicked.connect(self._handle_tag_clicked_left_panel)
                     layout.addWidget(tag_widget)
+                    self.tag_widgets_by_name[tag_name] = tag_widget
         except FileNotFoundError:
             error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
             layout.addWidget(error_label)
@@ -235,41 +237,50 @@ class MainWindow(QMainWindow):
         self.index_label.setText(index_text)
 
     def _prev_image(self):
-            """Navigates to the previous image in the list."""
-            if not self.image_paths: # No images loaded, do nothing
-                return
+        """Navigates to the previous image in the list."""
+        if not self.image_paths: # No images loaded, do nothing
+            return
 
-            self.current_image_index -= 1 # Decrement index
+        self.current_image_index -= 1 # Decrement index
 
-            if self.current_image_index < 0: # Wrap around to the last image if needed
-                self.current_image_index = len(self.image_paths) - 1
+        if self.current_image_index < 0: # Wrap around to the last image if needed
+            self.current_image_index = len(self.image_paths) - 1
 
-            image_path = self.image_paths[self.current_image_index] # Get path of previous image
-            self._load_and_display_image(image_path) # Load and display
-            self._update_index_label() # Update index label
+        image_path = self.image_paths[self.current_image_index] # Get path of previous image
+        self._load_and_display_image(image_path) # Load and display
+        self._update_index_label() # Update index label
 
     def _next_image(self):
-            """Navigates to the next image in the list."""
-            if not self.image_paths: # No images loaded, do nothing
-                return
+        """Navigates to the next image in the list."""
+        if not self.image_paths: # No images loaded, do nothing
+            return
 
-            self.current_image_index += 1 # Increment index
+        self.current_image_index += 1 # Increment index
 
-            if self.current_image_index >= len(self.image_paths): # Wrap around to the first image if needed
-                self.current_image_index = 0
+        if self.current_image_index >= len(self.image_paths): # Wrap around to the first image if needed
+            self.current_image_index = 0
 
-            image_path = self.image_paths[self.current_image_index] # Get path of next image
-            self._load_and_display_image(image_path) # Load and display
-            self._update_index_label() # Update index label
+        image_path = self.image_paths[self.current_image_index] # Get path of next image
+        self._load_and_display_image(image_path) # Load and display
+        self._update_index_label() # Update index label
 
     def _handle_tag_clicked_left_panel(self, tag_name):
-            """Handles clicks on tags in the left panel. Adds tag to selected tags."""
-            if tag_name not in self.selected_tags_for_current_image: # Prevent duplicates
-                self.selected_tags_for_current_image.append(tag_name)
-                print(f"Tag '{tag_name}' selected and added to right panel.") # Debug
-                self._update_right_panel_display() # Update right panel after adding tag
-            else:
-                print(f"Tag '{tag_name}' already selected, ignoring click.") # Debug - should not happen in Phase 1
+        """Handles clicks on tags in the left panel. Adds tag to selected tags."""
+        tag_widget = self.tag_widgets_by_name.get(tag_name) # Get TagWidget instance from dictionary
+        if not tag_widget:
+            print(f"Warning: TagWidget not found for tag name: {tag_name}") # Debug - should not happen, but safety check
+            return
+        
+        if tag_name not in self.selected_tags_for_current_image: # Prevent duplicates
+            self.selected_tags_for_current_image.append(tag_name)
+            print(f"Tag '{tag_name}' selected and added to right panel.") # Debug
+            self._update_right_panel_display() # Update right panel after adding tag
+            tag_widget.set_selected(True)
+        else: # Tag was already selected, so deselect it
+            self.selected_tags_for_current_image.remove(tag_name) # Remove tag from selected list
+            print(f"Tag '{tag_name}' deselected and removed from right panel.") # Debug
+            self._update_right_panel_display() # Update right panel after removing tag
+            tag_widget.set_selected(False) # Visually mark tag as unselected in left panel
     
     def _handle_tag_clicked_right_panel(self, item):
         """Handles clicks on tags in the right panel. Removes tag from selected tags."""
@@ -278,17 +289,22 @@ class MainWindow(QMainWindow):
             self.selected_tags_for_current_image.remove(tag_name) # Remove tag from selected list
             print(f"Tag '{tag_name}' deselected and removed from right panel.") # Debug
             self._update_right_panel_display() # Update right panel after removing tag
+            tag_widget = self.tag_widgets_by_name.get(tag_name)
+            if tag_widget:
+                tag_widget.set_selected(False)
+            else:
+                print(f"Warning: TagWidget not found for tag name: {tag_name} (right panel click).")
         else:
             print(f"Tag '{tag_name}' not in selected tags (right panel click issue?).") # Debug - should not happen
     
     def _update_right_panel_display(self):
-            """Updates the right panel to display the currently selected tags."""
-            self.right_panel.clear() # Clear the right panel
+        """Updates the right panel to display the currently selected tags."""
+        self.right_panel.clear() # Clear the right panel
 
-            for tag_name in self.selected_tags_for_current_image: # Iterate through selected tags
-                item = QListWidgetItem(tag_name) # Create a QListWidgetItem for each tag
-                self.right_panel.addItem(item) # Add item to the right panel list
-            print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}") # Debug
+        for tag_name in self.selected_tags_for_current_image: # Iterate through selected tags
+            item = QListWidgetItem(tag_name) # Create a QListWidgetItem for each tag
+            self.right_panel.addItem(item) # Add item to the right panel list
+        print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}") # Debug
 
 
 app = QApplication(sys.argv)
