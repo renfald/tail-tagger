@@ -24,6 +24,9 @@ class MainWindow(QMainWindow):
         self._load_tags()
         self._load_initial_image()
 
+        self.prev_button.setEnabled(False) # Disable "Prev" button initially
+        self.next_button.setEnabled(False) # Disable "Next" button initially
+
     def _setup_dark_mode_theme(self):
         """Sets up the application-wide dark mode theme."""
         app.setStyle("Fusion")
@@ -124,11 +127,13 @@ class MainWindow(QMainWindow):
         right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         bottom_layout.addItem(right_spacer)
 
-        prev_button = QPushButton("< Prev")
-        bottom_layout.addWidget(prev_button)
+        self.prev_button = QPushButton("< Prev")
+        self.prev_button.clicked.connect(self._prev_image)
+        bottom_layout.addWidget(self.prev_button)
 
-        next_button = QPushButton("Next >")
-        bottom_layout.addWidget(next_button)
+        self.next_button = QPushButton("Next >")
+        self.next_button.clicked.connect(self._next_image)
+        bottom_layout.addWidget(self.next_button)
 
         main_layout.addWidget(bottom_panel)
         self.bottom_panel_layout = bottom_layout # Store for potential future use
@@ -187,12 +192,16 @@ class MainWindow(QMainWindow):
                     self.current_image_index = 0 # Initialize image index
                     self._load_and_display_image(self.image_paths[0]) # Load and display first image
                     self._update_index_label() # Update index label
+                    self.prev_button.setEnabled(True)  # Enable "Prev" button
+                    self.next_button.setEnabled(True)  # Enable "Next" button
                 else: # No images found
                     print(f"No images found in folder: {folder_path}") # Debug print
                     self.center_panel.clear() # Clear center panel
                     self.center_panel.setText("No images found in this folder.") # Display message
                     self.filename_label.setText("No Image") # Clear filename label
                     self.index_label.setText("0 of 0") # Update index label to 0 of 0
+                    self.prev_button.setEnabled(False) # Disable "Prev" button
+                    self.next_button.setEnabled(False) # Disable "Next" button
 
 
     def _load_and_display_image(self, image_path):
@@ -208,6 +217,35 @@ class MainWindow(QMainWindow):
         else:
             index_text = "0 of 0" # No images loaded
         self.index_label.setText(index_text)
+
+    def _prev_image(self):
+            """Navigates to the previous image in the list."""
+            if not self.image_paths: # No images loaded, do nothing
+                return
+
+            self.current_image_index -= 1 # Decrement index
+
+            if self.current_image_index < 0: # Wrap around to the last image if needed
+                self.current_image_index = len(self.image_paths) - 1
+
+            image_path = self.image_paths[self.current_image_index] # Get path of previous image
+            self._load_and_display_image(image_path) # Load and display
+            self._update_index_label() # Update index label
+
+    def _next_image(self):
+            """Navigates to the next image in the list."""
+            if not self.image_paths: # No images loaded, do nothing
+                return
+
+            self.current_image_index += 1 # Increment index
+
+            if self.current_image_index >= len(self.image_paths): # Wrap around to the first image if needed
+                self.current_image_index = 0
+
+            image_path = self.image_paths[self.current_image_index] # Get path of next image
+            self._load_and_display_image(image_path) # Load and display
+            self._update_index_label() # Update index label
+
 
 app = QApplication(sys.argv)
 window = MainWindow()
