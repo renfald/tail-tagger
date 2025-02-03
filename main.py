@@ -4,7 +4,8 @@ from tag_widget import TagWidget
 from center_panel import CenterPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QHBoxLayout, QFrame, QLabel, QListWidget,
-                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem, QFileDialog, QListWidgetItem)
+                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem, 
+                             QFileDialog, QLineEdit)
 from PySide6.QtGui import QColor, QPalette, QPixmap, QImage
 from PySide6.QtCore import Qt
 
@@ -88,6 +89,12 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_panel.setLayout(left_layout)
         self.tag_list_layout = left_layout # Store layout for tag loading
+
+        # Search Bar for Left Panel
+        self.tag_search_bar = QLineEdit() # Create QLineEdit for search bar
+        self.tag_search_bar.setPlaceholderText("Search tags...") # Set placeholder text
+        self.tag_search_bar.setStyleSheet("color: #858585; background-color: #252525;") # Set style
+        left_layout.addWidget(self.tag_search_bar) # Add search bar to left panel layout
 
         left_scroll_area.setWidget(left_panel)
         panels_layout.addWidget(left_scroll_area)
@@ -292,20 +299,19 @@ class MainWindow(QMainWindow):
             self._update_right_panel_display() # Update right panel after removing tag
             tag_widget.set_selected(False) # Visually mark tag as unselected in left panel
     
-    def _handle_tag_clicked_right_panel(self, item):
-        """Handles clicks on tags in the right panel. Removes tag from selected tags."""
-        tag_name = item.text() # Get tag name from the clicked QListWidgetItem
-        if tag_name in self.selected_tags_for_current_image:
-            self.selected_tags_for_current_image.remove(tag_name) # Remove tag from selected list
-            print(f"Tag '{tag_name}' deselected and removed from right panel.") # Debug
-            self._update_right_panel_display() # Update right panel after removing tag
-            tag_widget = self.tag_widgets_by_name.get(tag_name)
-            if tag_widget:
-                tag_widget.set_selected(False)
+    def _handle_tag_clicked_right_panel_tag_widget(self, tag_name):
+            """Handles clicks on TagWidgets in the right panel. Deselects and removes the tag."""
+            if tag_name in self.selected_tags_for_current_image:
+                self.selected_tags_for_current_image.remove(tag_name) # Remove tag from selected list
+                print(f"Tag '{tag_name}' deselected and removed from right panel (via TagWidget click).") # Debug
+                self._update_right_panel_display() # Update right panel after removing tag
+                tag_widget = self.tag_widgets_by_name.get(tag_name) # Get TagWidget instance from left panel
+                if tag_widget:
+                    tag_widget.set_selected(False) # Visually mark tag as unselected in left panel
+                else:
+                    print(f"Warning: TagWidget not found for tag name: {tag_name} (right panel TagWidget click).") # Debug - should not happen
             else:
-                print(f"Warning: TagWidget not found for tag name: {tag_name} (right panel click).")
-        else:
-            print(f"Tag '{tag_name}' not in selected tags (right panel click issue?).") # Debug - should not happen
+                print(f"Tag '{tag_name}' not in selected tags (right panel TagWidget click issue?).") # Debug - should not happen
     
     def _update_right_panel_display(self):
         """Updates the right panel to display the currently selected tags."""
@@ -314,8 +320,8 @@ class MainWindow(QMainWindow):
             layout.itemAt(i).widget().setParent(None) # Remove widget from layout and set parent to None for cleanup
 
         for tag_name in self.selected_tags_for_current_image: # Iterate through selected tags
-
             tag_widget = TagWidget(tag_name) # Create a TagWidget instance for each tag
+            tag_widget.tag_clicked.connect(self._handle_tag_clicked_right_panel_tag_widget)
             layout.addWidget(tag_widget) # Add TagWidget to the right panel layout
         print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}") # Debug
 
