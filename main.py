@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
         self.tag_search_bar.setPlaceholderText("Search tags...")
         self.tag_search_bar.setStyleSheet("color: #858585; background-color: #252525;")  # Style to match dark theme
         left_layout.addWidget(self.tag_search_bar)
+        self.tag_search_bar.textChanged.connect(self._filter_tags)
 
         left_scroll_area.setWidget(left_panel)
         panels_layout.addWidget(left_scroll_area)
@@ -170,6 +171,16 @@ class MainWindow(QMainWindow):
             error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
             layout.addWidget(error_label)
 
+    def _filter_tags(self, text):
+        """Filters the tags in the left panel based on the search bar text."""
+        search_text = text.lower()  # Convert search text to lowercase for case-insensitive search
+
+        for tag_name, tag_widget in self.tag_widgets_by_name.items(): # Iterate through our TagWidgets
+            if search_text in tag_name.lower():  # Check if tag name (lowercase) contains search text
+                tag_widget.show()  # If it matches, show the TagWidget
+            else:
+                tag_widget.hide()  # If it doesn't match, hide the TagWidget   
+    
     def _load_initial_directory(self):
         """Loads images from a hardcoded initial directory for development."""
         sample_directory = r"J:\Repositories\image_tagger_app\input"  # <--- !!!  Set your sample directory here
