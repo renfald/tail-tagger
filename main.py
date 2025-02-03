@@ -2,26 +2,26 @@ import sys
 import os
 from tag_widget import TagWidget
 from center_panel import CenterPanel
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget,
-                             QHBoxLayout, QFrame, QLabel, QListWidget,
-                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem, 
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
+                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QLineEdit)
-from PySide6.QtGui import QColor, QPalette, QPixmap, QImage
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtCore import Qt
 
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Image Tagger")
         self.resize(1024, 768)
 
-        self.image_paths = []
-        self.current_image_index = 0
-        self.last_folder_path = None
-        self.selected_tags_for_current_image = []
-        self.tag_widgets_by_name = {}
-        
+        self.image_paths = []  # List of image file paths in the loaded folder
+        self.current_image_index = 0  # Index of the currently displayed image
+        self.last_folder_path = None  # Path of the last loaded folder (for persistence)
+        self.selected_tags_for_current_image = []  # List of tags selected for the current image (tag names)
+        self.tag_widgets_by_name = {}  # Dictionary to store TagWidget instances by tag name (for left panel)
+
         self._setup_dark_mode_theme()
         self._setup_ui()
         self._load_tags()
@@ -61,11 +61,9 @@ class MainWindow(QMainWindow):
         # --- Menu Bar ---
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("&File")
-
         open_folder_action = file_menu.addAction("Open Folder...")
         open_folder_action.triggered.connect(self._open_folder_dialog)
         # --- End Menu Bar ---
-
 
         main_layout = QVBoxLayout()
         main_layout.setSpacing(0)
@@ -88,13 +86,13 @@ class MainWindow(QMainWindow):
         left_layout.setSpacing(0)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_panel.setLayout(left_layout)
-        self.tag_list_layout = left_layout # Store layout for tag loading
+        self.tag_list_layout = left_layout
 
         # Search Bar for Left Panel
-        self.tag_search_bar = QLineEdit() # Create QLineEdit for search bar
-        self.tag_search_bar.setPlaceholderText("Search tags...") # Set placeholder text
-        self.tag_search_bar.setStyleSheet("color: #858585; background-color: #252525;") # Set style
-        left_layout.addWidget(self.tag_search_bar) # Add search bar to left panel layout
+        self.tag_search_bar = QLineEdit()  # Search input field
+        self.tag_search_bar.setPlaceholderText("Search tags...")
+        self.tag_search_bar.setStyleSheet("color: #858585; background-color: #252525;")  # Style to match dark theme
+        left_layout.addWidget(self.tag_search_bar)
 
         left_scroll_area.setWidget(left_panel)
         panels_layout.addWidget(left_scroll_area)
@@ -102,26 +100,26 @@ class MainWindow(QMainWindow):
         # Center Panel - Image Display
         self.center_panel = CenterPanel()
         self.center_panel.setFrameShape(QFrame.StyledPanel)
-        self.center_panel.setMinimumSize(100, 100)  # Set minimum size
+        self.center_panel.setMinimumSize(100, 100)
         panels_layout.addWidget(self.center_panel)
 
-        # Right Panel - Selected Tags (Currently Placeholder)
-        right_scroll_area = QScrollArea() # Add scroll area for right panel
+        # Right Panel - Selected Tags
+        right_scroll_area = QScrollArea()
         right_scroll_area.setWidgetResizable(True)
         right_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         right_scroll_area.setFixedWidth(200)
 
-        self.right_panel = QFrame() # Create QFrame for right panel
+        self.right_panel = QFrame()  # Container for selected tags
         self.right_panel.setFrameShape(QFrame.StyledPanel)
-        right_layout = QVBoxLayout() # Create QVBoxLayout for right panel
+        right_layout = QVBoxLayout()
         right_layout.setAlignment(Qt.AlignTop)
         right_layout.setSpacing(0)
         right_layout.setContentsMargins(0, 0, 0, 0)
         self.right_panel.setLayout(right_layout)
-        self.right_panel_layout = right_layout # Store layout for tag loading
+        self.right_panel_layout = right_layout
 
-        right_scroll_area.setWidget(self.right_panel) # Set QFrame as scroll area widget
-        panels_layout.addWidget(right_scroll_area) # Add scroll area to panels layout
+        right_scroll_area.setWidget(self.right_panel)
+        panels_layout.addWidget(right_scroll_area)
 
         # Bottom Panel - Image Info and Buttons
         bottom_panel = QFrame()
@@ -153,7 +151,7 @@ class MainWindow(QMainWindow):
         bottom_layout.addWidget(self.next_button)
 
         main_layout.addWidget(bottom_panel)
-        self.bottom_panel_layout = bottom_layout # Store for potential future use
+        self.bottom_panel_layout = bottom_layout
 
     def _load_tags(self):
         """Loads tags from CSV file and populates the left panel."""
@@ -161,169 +159,168 @@ class MainWindow(QMainWindow):
         tags_file_path = os.path.join("data", "tag_list.csv")
         try:
             with open(tags_file_path, 'r', encoding='utf-8') as file:
-                next(file) # Skip header line
+                next(file)  # Skip header line
                 for line in file:
                     tag_name = line.strip()
                     tag_widget = TagWidget(tag_name)
                     tag_widget.tag_clicked.connect(self._handle_tag_clicked_left_panel)
                     layout.addWidget(tag_widget)
-                    self.tag_widgets_by_name[tag_name] = tag_widget
+                    self.tag_widgets_by_name[tag_name] = tag_widget  # Store TagWidget instance by name
         except FileNotFoundError:
             error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
             layout.addWidget(error_label)
 
     def _load_initial_directory(self):
-            """Loads images from a hardcoded initial directory for development."""
-            sample_directory = r"J:\Repositories\image_tagger_app\input"  # <--- !!!  Set your sample directory here !!!
-            if os.path.isdir(sample_directory): # Check if the directory exists
-                print(f"Loading initial directory: {sample_directory}") # Debug print
-                self._load_image_folder(sample_directory) # Load images from sample directory
-                self.last_folder_path = sample_directory # Set last_folder_path to initial directory
-            else:
-                print(f"Initial directory not found: {sample_directory}") # Debug print
-                self._load_image_folder(None)
+        """Loads images from a hardcoded initial directory for development."""
+        sample_directory = r"J:\Repositories\image_tagger_app\input"  # <--- !!!  Set your sample directory here
+        if os.path.isdir(sample_directory):
+            print(f"Loading initial directory: {sample_directory}")
+            self._load_image_folder(sample_directory)
+            self.last_folder_path = sample_directory  # Set last_folder_path for folder persistence
+        else:
+            print(f"Initial directory not found: {sample_directory}")
+            self._load_image_folder(None)
 
     def _open_folder_dialog(self):
-            """Opens a folder selection dialog, loads images, and updates UI.
-            Preserves and reuses the last selected folder path."""
+        """Opens a folder selection dialog, loads images, and updates UI.
+        Preserves and reuses the last selected folder path."""
+        start_directory = os.path.expanduser("~")  # Default to home directory
+        if self.last_folder_path and os.path.isdir(self.last_folder_path):
+            start_directory = self.last_folder_path  # Use last folder path if valid
 
-            start_directory = os.path.expanduser("~") # Default to home directory
-            if self.last_folder_path and os.path.isdir(self.last_folder_path): # Check if last path is valid
-                start_directory = self.last_folder_path # Use last folder path if valid
+        folder_path = QFileDialog.getExistingDirectory(
+            self,
+            "Select Image Folder",
+            start_directory,  # Use start_directory (either last path or home dir)
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
+        )
 
-            folder_path = QFileDialog.getExistingDirectory(
-                self,
-                "Select Image Folder",
-                start_directory, # Use start_directory (either last path or home dir)
-                QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
-            )
-
-            if folder_path:
-                self.last_folder_path = folder_path # Update last_folder_path with newly selected path
-                self._load_image_folder(folder_path) # Call the new method to load images and update UI
+        if folder_path:
+            self.last_folder_path = folder_path  # Update last_folder_path with newly selected path
+            self._load_image_folder(folder_path)  # Call the new method to load images and update UI
 
     def _load_image_folder(self, folder_path):
         """Loads images from the given folder path and updates the UI."""
-        if not folder_path: # Handle None folder_path (e.g., invalid initial directory)
-            print("No folder path provided to _load_image_folder, handling as no images.") # Debug
-            self.image_paths = [] # Clear image paths
-            self.center_panel.clear() # Clear center panel
-            self.center_panel.setText(f"Initial directory not found:\n{r'input'}") # Display error message, use 'input' as placeholder
-            self.filename_label.setText("No Image") # Clear filename label
-            self.index_label.setText("0 of 0") # Update index label to 0 of 0
-            self.prev_button.setEnabled(False) # Disable "Prev" button
-            self.next_button.setEnabled(False) # Disable "Next" button
-            return # Exit the method early        
-        
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'] # Common image extensions
-        self.image_paths = [] # Initialize image_paths list
+        if not folder_path:  # Handle None folder_path (e.g., invalid initial directory)
+            print("No folder path provided to _load_image_folder, handling as no images.")
+            self.image_paths = []
+            self.center_panel.clear()
+            self.center_panel.setText("Initial directory not found:\ninput")  # Using "input" as placeholder
+            self.filename_label.setText("No Image")
+            self.index_label.setText("0 of 0")
+            self.prev_button.setEnabled(False)
+            self.next_button.setEnabled(False)
+            return
 
-        for filename in os.listdir(folder_path): # Iterate through files in folder
-            if any(filename.lower().endswith(ext) for ext in image_extensions): # Check for image extension
-                image_path = os.path.join(folder_path, filename) # Create full path
-                self.image_paths.append(image_path) # Add to image paths list
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']  # Common image extensions
+        self.image_paths = []
 
-        if self.image_paths: # If we found images
-            print(f"Found {len(self.image_paths)} images in folder: {folder_path}") # Debug print
-            self.current_image_index = 0 # Initialize image index
-            self._load_and_display_image(self.image_paths[0]) # Load and display first image
-            self._update_index_label() # Update index label
-            self.prev_button.setEnabled(True)  # Enable "Prev" button
-            self.next_button.setEnabled(True)  # Enable "Next" button
-        else: # No images found
-            print(f"No images found in folder: {folder_path}") # Debug print
-            self.center_panel.clear() # Clear center panel
-            self.center_panel.setText("No images found in this folder.") # Display message
-            self.filename_label.setText("No Image") # Clear filename label
-            self.index_label.setText("0 of 0") # Update index label to 0 of 0
-            self.prev_button.setEnabled(False) # Disable "Prev" button
-            self.next_button.setEnabled(False) # Disable "Next" button
-    
+        for filename in os.listdir(folder_path):
+            if any(filename.lower().endswith(ext) for ext in image_extensions):
+                image_path = os.path.join(folder_path, filename)
+                self.image_paths.append(image_path)
+
+        if self.image_paths:
+            print(f"Found {len(self.image_paths)} images in folder: {folder_path}")
+            self.current_image_index = 0
+            self._load_and_display_image(self.image_paths[0])
+            self._update_index_label()
+            self.prev_button.setEnabled(True)
+            self.next_button.setEnabled(True)
+        else:
+            print(f"No images found in folder: {folder_path}")
+            self.center_panel.clear()
+            self.center_panel.setText("No images found in this folder.")
+            self.filename_label.setText("No Image")
+            self.index_label.setText("0 of 0")
+            self.prev_button.setEnabled(False)
+            self.next_button.setEnabled(False)
+
     def _load_and_display_image(self, image_path):
         """Loads and displays an image in the center panel and updates filename label."""
-        self.center_panel.set_image_path(image_path) # Use CenterPanel's method to load and display
+        self.center_panel.set_image_path(image_path)
         filename = os.path.basename(image_path)
-        self.filename_label.setText(filename) # Update filename label
+        self.filename_label.setText(filename)
 
     def _update_index_label(self):
         """Updates the image index label in the bottom panel."""
         if self.image_paths:
             index_text = f"{self.current_image_index + 1} of {len(self.image_paths)}"
         else:
-            index_text = "0 of 0" # No images loaded
+            index_text = "0 of 0"  # No images loaded
         self.index_label.setText(index_text)
 
     def _prev_image(self):
         """Navigates to the previous image in the list."""
-        if not self.image_paths: # No images loaded, do nothing
+        if not self.image_paths:
             return
 
-        self.current_image_index -= 1 # Decrement index
+        self.current_image_index -= 1
 
-        if self.current_image_index < 0: # Wrap around to the last image if needed
+        if self.current_image_index < 0:
             self.current_image_index = len(self.image_paths) - 1
 
-        image_path = self.image_paths[self.current_image_index] # Get path of previous image
-        self._load_and_display_image(image_path) # Load and display
-        self._update_index_label() # Update index label
+        image_path = self.image_paths[self.current_image_index]
+        self._load_and_display_image(image_path)
+        self._update_index_label()
 
     def _next_image(self):
         """Navigates to the next image in the list."""
-        if not self.image_paths: # No images loaded, do nothing
+        if not self.image_paths:
             return
 
-        self.current_image_index += 1 # Increment index
+        self.current_image_index += 1
 
-        if self.current_image_index >= len(self.image_paths): # Wrap around to the first image if needed
+        if self.current_image_index >= len(self.image_paths):
             self.current_image_index = 0
 
-        image_path = self.image_paths[self.current_image_index] # Get path of next image
-        self._load_and_display_image(image_path) # Load and display
-        self._update_index_label() # Update index label
+        image_path = self.image_paths[self.current_image_index]
+        self._load_and_display_image(image_path)
+        self._update_index_label()
 
     def _handle_tag_clicked_left_panel(self, tag_name):
-        """Handles clicks on tags in the left panel. Adds tag to selected tags."""
-        tag_widget = self.tag_widgets_by_name.get(tag_name) # Get TagWidget instance from dictionary
+        """Handles clicks on tags in the left panel. Adds/removes tag from selected tags and updates UI."""
+        tag_widget = self.tag_widgets_by_name.get(tag_name)  # Get TagWidget instance from dictionary
         if not tag_widget:
-            print(f"Warning: TagWidget not found for tag name: {tag_name}") # Debug - should not happen, but safety check
+            print(f"Warning: TagWidget not found for tag name: {tag_name}")  # Debug - should not happen, but safety check
             return
-        
-        if tag_name not in self.selected_tags_for_current_image: # Prevent duplicates
-            self.selected_tags_for_current_image.append(tag_name)
-            print(f"Tag '{tag_name}' selected and added to right panel.") # Debug
-            self._update_right_panel_display() # Update right panel after adding tag
-            tag_widget.set_selected(True)
-        else: # Tag was already selected, so deselect it
-            self.selected_tags_for_current_image.remove(tag_name) # Remove tag from selected list
-            print(f"Tag '{tag_name}' deselected and removed from right panel.") # Debug
-            self._update_right_panel_display() # Update right panel after removing tag
-            tag_widget.set_selected(False) # Visually mark tag as unselected in left panel
-    
+
+        if tag_name not in self.selected_tags_for_current_image:  # Prevent duplicates
+            self.selected_tags_for_current_image.append(tag_name)  # Add tag to selected list
+            print(f"Tag '{tag_name}' selected and added to right panel.")  # Debug
+            self._update_right_panel_display()  # Update right panel after adding tag
+            tag_widget.set_selected(True)  # Visually mark tag as selected in left panel
+        else:  # Tag was already selected, so deselect it
+            self.selected_tags_for_current_image.remove(tag_name)  # Remove tag from selected list
+            print(f"Tag '{tag_name}' deselected and removed from right panel.")  # Debug
+            self._update_right_panel_display()  # Update right panel after removing tag
+            tag_widget.set_selected(False)  # Visually mark tag as unselected in left panel
+
     def _handle_tag_clicked_right_panel_tag_widget(self, tag_name):
-            """Handles clicks on TagWidgets in the right panel. Deselects and removes the tag."""
-            if tag_name in self.selected_tags_for_current_image:
-                self.selected_tags_for_current_image.remove(tag_name) # Remove tag from selected list
-                print(f"Tag '{tag_name}' deselected and removed from right panel (via TagWidget click).") # Debug
-                self._update_right_panel_display() # Update right panel after removing tag
-                tag_widget = self.tag_widgets_by_name.get(tag_name) # Get TagWidget instance from left panel
-                if tag_widget:
-                    tag_widget.set_selected(False) # Visually mark tag as unselected in left panel
-                else:
-                    print(f"Warning: TagWidget not found for tag name: {tag_name} (right panel TagWidget click).") # Debug - should not happen
+        """Handles clicks on TagWidgets in the right panel. Deselects and removes the tag."""
+        if tag_name in self.selected_tags_for_current_image:
+            self.selected_tags_for_current_image.remove(tag_name)  # Remove tag from selected list
+            print(f"Tag '{tag_name}' deselected and removed from right panel (via TagWidget click).")  # Debug
+            self._update_right_panel_display()  # Update right panel after removing tag
+            tag_widget = self.tag_widgets_by_name.get(tag_name)  # Get TagWidget instance from left panel
+            if tag_widget:
+                tag_widget.set_selected(False)  # Visually mark tag as unselected in left panel
             else:
-                print(f"Tag '{tag_name}' not in selected tags (right panel TagWidget click issue?).") # Debug - should not happen
-    
+                print(f"Warning: TagWidget not found for tag name: {tag_name} (right panel TagWidget click).")  # Debug - should not happen
+        else:
+            print(f"Tag '{tag_name}' not in selected tags (right panel TagWidget click issue?).")  # Debug - should not happen
+
     def _update_right_panel_display(self):
         """Updates the right panel to display the currently selected tags."""
-        layout = self.right_panel_layout # Get the QVBoxLayout for the right panel
-        for i in reversed(range(layout.count())): # Clear existing widgets in layout
-            layout.itemAt(i).widget().setParent(None) # Remove widget from layout and set parent to None for cleanup
+        layout = self.right_panel_layout
+        for i in reversed(range(layout.count())):  # Clear existing widgets in layout
+            layout.itemAt(i).widget().setParent(None)  # Remove widget from layout and set parent to None for cleanup
 
-        for tag_name in self.selected_tags_for_current_image: # Iterate through selected tags
-            tag_widget = TagWidget(tag_name) # Create a TagWidget instance for each tag
+        for tag_name in self.selected_tags_for_current_image:
+            tag_widget = TagWidget(tag_name)  # Create a TagWidget instance for each tag
             tag_widget.tag_clicked.connect(self._handle_tag_clicked_right_panel_tag_widget)
-            layout.addWidget(tag_widget) # Add TagWidget to the right panel layout
-        print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}") # Debug
+            layout.addWidget(tag_widget)  # Add TagWidget to the right panel layout
+        print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}")  # Debug
 
 
 app = QApplication(sys.argv)

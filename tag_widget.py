@@ -50,7 +50,7 @@ class TagWidget(QFrame):
         else:
             self.setStyleSheet("")
 
-    def set_selected(self, is_selected): # New method to set selection state externally
+    def set_selected(self, is_selected):
         """Sets the selection state of the tag and updates its visual style."""
         self.is_selected = is_selected # Set is_selected based on argument
         self._update_style() # Update style based on new is_selected value
