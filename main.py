@@ -172,14 +172,27 @@ class MainWindow(QMainWindow):
             layout.addWidget(error_label)
 
     def _filter_tags(self, text):
-        """Filters the tags in the left panel based on the search bar text."""
-        search_text = text.lower()  # Convert search text to lowercase for case-insensitive search
+        """Filters the tags in the left panel and highlights the search term in light yellow."""
+        search_text = text.lower()
+        highlight_color = "darkorange"  # Define the highlight color here
+        for tag_name, tag_widget in self.tag_widgets_by_name.items():
+            tag_lower = tag_name.lower()
+            if search_text and search_text in tag_lower:
+                start_index = tag_lower.find(search_text)
+                end_index = start_index + len(search_text)
 
-        for tag_name, tag_widget in self.tag_widgets_by_name.items(): # Iterate through our TagWidgets
-            if search_text in tag_name.lower():  # Check if tag name (lowercase) contains search text
-                tag_widget.show()  # If it matches, show the TagWidget
+                highlighted_tag_name = (
+                    tag_name[:start_index] +
+                    f'<span style="color: {highlight_color};"><b>{tag_name[start_index:end_index]}</b></span>' +
+                    tag_name[end_index:]
+                )
+                tag_widget.tag_label.setText(highlighted_tag_name)
+                tag_widget.show()
+            elif search_text:
+                tag_widget.hide()
             else:
-                tag_widget.hide()  # If it doesn't match, hide the TagWidget   
+                tag_widget.tag_label.setText(tag_name)
+                tag_widget.show()
     
     def _load_initial_directory(self):
         """Loads images from a hardcoded initial directory for development."""
@@ -248,10 +261,41 @@ class MainWindow(QMainWindow):
             self.next_button.setEnabled(False)
 
     def _load_and_display_image(self, image_path):
-        """Loads and displays an image in the center panel and updates filename label."""
+        """Loads and displays an image, and now loads associated tags."""
         self.center_panel.set_image_path(image_path)
         filename = os.path.basename(image_path)
         self.filename_label.setText(filename)
+
+        # --- Tag File Loading Logic ---
+        tag_file_path_no_ext = os.path.splitext(image_path)[0] # Path without image extension
+        tag_file_path_txt = tag_file_path_no_ext + ".txt"      # Try .txt extension
+        tag_file_path_ext_txt = image_path + ".txt"           # Try .jpg.txt extension (or .png.txt etc.)
+
+        loaded_tags = [] # Initialize an empty list to store loaded tags
+
+        if os.path.exists(tag_file_path_txt): # Check for .txt tag file first
+            tag_file_to_use = tag_file_path_txt
+        elif os.path.exists(tag_file_path_ext_txt): # If not, check for .jpg.txt style
+            tag_file_to_use = tag_file_path_ext_txt
+        else:
+            tag_file_to_use = None # No tag file found
+
+        if tag_file_to_use:
+            print(f"  Loading tags from: {tag_file_to_use}") # Indicate tag file loading
+            try:
+                with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
+                    tag_content = tag_file.readline().strip() # Read the first line and strip whitespace
+                    loaded_tags = [tag.strip() for tag in tag_content.split(',')] # Split by comma and space, strip tags
+                    print(f"  Loaded tags: {loaded_tags}") # Print the loaded tags to console
+            except Exception as e: # Catch any potential errors during file reading
+                print(f"  Error reading tag file: {e}") # Print error message if something goes wrong
+        else:
+            print("  No tag file found for this image.") # Indicate no tag file found
+            loaded_tags = [] # Ensure loaded_tags is empty if no file
+
+        self.selected_tags_for_current_image = loaded_tags # For now, just set loaded tags as selected
+        self._update_right_panel_display() # Update right panel to show loaded tags
+        # --- End Tag File Loading Logic ---
 
     def _update_index_label(self):
         """Updates the image index label in the bottom panel."""
