@@ -299,18 +299,7 @@ class MainWindow(QMainWindow):
             print("  No tag file found for this image.") # Indicate no tag file found
             loaded_tags = [] # Ensure loaded_tags is empty if no file
 
-        self.selected_tags_for_current_image = loaded_tags # For now, just set loaded tags as selected
-        # --- Left Panel Tag Synchronization ---
-        for tag_name in loaded_tags: # Iterate through loaded tags
-            tag_widget = self.tag_widgets_by_name.get(tag_name) # Try to get TagWidget from left panel
-            if tag_widget: # If TagWidget found in left panel
-                tag_widget.set_selected(True) # Visually select it in left panel
-                print(f"  Synchronized left panel: Tag '{tag_name}' selected.") # Debug message
-            else:
-                print(f"  Warning: TagWidget not found in left panel for loaded tag '{tag_name}'.") # Warning if not found
-        # --- End Left Panel Tag Synchronization ---
-        self._update_right_panel_display() # Update right panel to show loaded tags
-        # --- End Tag File Loading Logic ---
+        self._update_selected_tags(loaded_tags) # Use central function to set loaded tags and update UI
 
     def _update_index_label(self):
         """Updates the image index label in the bottom panel."""
@@ -349,39 +338,32 @@ class MainWindow(QMainWindow):
         self._update_index_label()
 
     def _handle_tag_clicked_left_panel(self, tag_name):
-        """Handles clicks on tags in the left panel. Adds/removes tag from selected tags and updates UI."""
-        tag_widget = self.tag_widgets_by_name.get(tag_name)  # Get TagWidget instance from dictionary
-        if not tag_widget:
-            print(f"Warning: TagWidget not found for tag name: {tag_name}")  # Debug - should not happen, but safety check
-            return
+        """Handles clicks on tags in the left panel. Updates selected tags list via _update_selected_tags."""
+        current_selected_tags = list(self.selected_tags_for_current_image) # Create a copy to avoid modifying directly
 
-        if tag_name not in self.selected_tags_for_current_image:  # Tag is NOT currently selected
-            self.selected_tags_for_current_image.append(tag_name)  # Add tag to selected list
-            print(f"Tag '{tag_name}' selected and added to right panel (via left panel click).")  # Debug
-            tag_widget.set_selected(True)  # Visually mark tag as selected in left panel
+        if tag_name not in current_selected_tags:  # Tag is NOT currently selected
+            current_selected_tags.append(tag_name)  # Add tag to the *copy*
+            print(f"Tag '{tag_name}' selected and added (via left panel click).")  # Debug
         else:  # Tag IS already selected (deselecting)
-            self.selected_tags_for_current_image.remove(tag_name)  # Remove tag from selected list
-            print(f"Tag '{tag_name}' deselected and removed from right panel (via left panel click).")  # Debug
-            tag_widget.set_selected(False)  # Visually mark tag as unselected in left panel
+            current_selected_tags.remove(tag_name)  # Remove tag from the *copy*
+            print(f"Tag '{tag_name}' deselected and removed (via left panel click).")  # Debug
 
-        self._update_right_panel_display()  # Update right panel AFTER any changes
+        self._update_selected_tags(current_selected_tags) # Call the central update function!
+        tag_widget = self.tag_widgets_by_name.get(tag_name) # Get TagWidget instance (for immediate visual feedback - still needed)
+        if tag_widget: # Safety check in case tag_widget is None
+            tag_widget.set_selected(tag_name in current_selected_tags) # Set left panel tag widget's selected state directly for immediate feedback
 
     def _handle_tag_clicked_right_panel_tag_widget(self, tag_name):
-        """Handles clicks on TagWidgets in the right panel. Deselects and removes the tag, and deselects in left panel."""
-        if tag_name in self.selected_tags_for_current_image:
-            self.selected_tags_for_current_image.remove(tag_name)  # Remove tag from selected list
-            print(f"Tag '{tag_name}' deselected and removed from right panel (via TagWidget click).")  # Debug
+        """Handles clicks on TagWidgets in the right panel. Updates selected tags list via _update_selected_tags."""
+        current_selected_tags = list(self.selected_tags_for_current_image) # Create a copy
 
-            tag_widget_left_panel = self.tag_widgets_by_name.get(tag_name)  # Get TagWidget instance from left panel
-            if tag_widget_left_panel:
-                tag_widget_left_panel.set_selected(False)  # Visually mark tag as unselected in left panel
-                print(f"  Synchronized left panel: Tag '{tag_name}' deselected (via right panel click).") # Debug
-            else:
-                print(f"  Warning: TagWidget not found in left panel for tag name: {tag_name} (right panel TagWidget click).")  # Debug - should not happen
-
-            self._update_right_panel_display()  # Update right panel AFTER removing tag
+        if tag_name in current_selected_tags:
+            current_selected_tags.remove(tag_name)  # Remove tag from the *copy*
+            print(f"Tag '{tag_name}' deselected and removed (via right panel click).")  # Debug
         else:
             print(f"Tag '{tag_name}' not in selected tags (right panel TagWidget click issue?).")  # Debug - should not happen
+
+        self._update_selected_tags(current_selected_tags) # Call the central update function!
 
     def _update_right_panel_display(self):
         """Updates the right panel to display the currently selected tags."""
@@ -394,7 +376,24 @@ class MainWindow(QMainWindow):
             tag_widget.tag_clicked.connect(self._handle_tag_clicked_right_panel_tag_widget)
             layout.addWidget(tag_widget)  # Add TagWidget to the right panel layout
         print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}")  # Debug
+    
+    def _update_selected_tags(self, new_tag_list):
+        """Updates the selected tags list and triggers UI updates for both panels."""
+        print(f"Updating selected tags to: {new_tag_list}") # Debug message
 
+        self.selected_tags_for_current_image = new_tag_list  # Update the authoritative list
+
+        self._update_right_panel_display() # Update the right panel to reflect the new list
+        self._update_left_panel_display_based_on_selection() # Synchronize left panel selections
+
+    def _update_left_panel_display_based_on_selection(self):
+        """Updates the visual selection state of tags in the left panel based on the current selected_tags_for_current_image list."""
+        print("  Updating left panel selection states...") # Debug message
+        for tag_name, tag_widget in self.tag_widgets_by_name.items():
+            if tag_name in self.selected_tags_for_current_image:
+                tag_widget.set_selected(True) # Select tag in left panel if in selected list
+            else:
+                tag_widget.set_selected(False) # Deselect tag in left panel if not in selected list
 
 app = QApplication(sys.argv)
 window = MainWindow()
