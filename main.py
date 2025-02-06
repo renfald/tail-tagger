@@ -261,7 +261,13 @@ class MainWindow(QMainWindow):
             self.next_button.setEnabled(False)
 
     def _load_and_display_image(self, image_path):
-        """Loads and displays an image, and now loads associated tags."""
+        """Loads and displays an image, and now loads associated tags and clears previous selections."""
+        # --- Clear Left Panel Selections ---
+        print("  Clearing left panel selections...") # Debug message
+        for tag_name, tag_widget in self.tag_widgets_by_name.items(): # Iterate through all TagWidgets
+            tag_widget.set_selected(False) # Deselect each TagWidget
+        # --- End Clear Left Panel Selections ---
+        
         self.center_panel.set_image_path(image_path)
         filename = os.path.basename(image_path)
         self.filename_label.setText(filename)
@@ -294,6 +300,15 @@ class MainWindow(QMainWindow):
             loaded_tags = [] # Ensure loaded_tags is empty if no file
 
         self.selected_tags_for_current_image = loaded_tags # For now, just set loaded tags as selected
+        # --- Left Panel Tag Synchronization ---
+        for tag_name in loaded_tags: # Iterate through loaded tags
+            tag_widget = self.tag_widgets_by_name.get(tag_name) # Try to get TagWidget from left panel
+            if tag_widget: # If TagWidget found in left panel
+                tag_widget.set_selected(True) # Visually select it in left panel
+                print(f"  Synchronized left panel: Tag '{tag_name}' selected.") # Debug message
+            else:
+                print(f"  Warning: TagWidget not found in left panel for loaded tag '{tag_name}'.") # Warning if not found
+        # --- End Left Panel Tag Synchronization ---
         self._update_right_panel_display() # Update right panel to show loaded tags
         # --- End Tag File Loading Logic ---
 
