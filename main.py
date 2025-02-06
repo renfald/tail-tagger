@@ -261,7 +261,7 @@ class MainWindow(QMainWindow):
             self.next_button.setEnabled(False)
 
     def _load_and_display_image(self, image_path):
-        """Loads and displays an image, and now loads associated tags and clears previous selections."""
+        """Loads and displays an image, loads tags, identifies unknown tags, and updates UI with correct order."""
         # --- Clear Left Panel Selections ---
         print("  Clearing left panel selections...") # Debug message
         for tag_name, tag_widget in self.tag_widgets_by_name.items(): # Iterate through all TagWidgets
@@ -286,21 +286,32 @@ class MainWindow(QMainWindow):
         else:
             tag_file_to_use = None # No tag file found
 
-        if tag_file_to_use:
+        if tag_file_to_use: # If tag file found
             print(f"  Loading tags from: {tag_file_to_use}") # Indicate tag file loading
             try:
                 with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
                     tag_content = tag_file.readline().strip() # Read the first line and strip whitespace
                     loaded_tags = [tag.strip() for tag in tag_content.split(',')] # Split by comma and space, strip tags
-                    print(f"  Loaded tags: {loaded_tags}") # Print the loaded tags to console
+                    print(f"  Loaded tags: {loaded_tags}") # Print loaded tags to console
             except Exception as e: # Catch any potential errors during file reading
                 print(f"  Error reading tag file: {e}") # Print error message if something goes wrong
-        else:
+        else: # If no tag file found
             print("  No tag file found for this image.") # Indicate no tag file found
             loaded_tags = [] # Ensure loaded_tags is empty if no file
 
-        self._update_selected_tags(loaded_tags) # Use central function to set loaded tags and update UI
+        unknown_tags_for_current_image = [] # Initialize list to store unknown tags
+        known_tag_names = set(self.tag_widgets_by_name.keys()) # Create a set of known tag names for efficient lookup
 
+        for tag_name in loaded_tags: # Check each loaded tag
+            if tag_name not in known_tag_names: # If loaded tag is NOT in our known tag list
+                unknown_tags_for_current_image.append(tag_name) # Add to unknown tags list
+                print(f"  Unknown tag loaded: '{tag_name}'") # Debug message
+
+        print(f"  Known tags loaded: {[tag for tag in loaded_tags if tag not in unknown_tags_for_current_image]}") # Debug known tags
+        self.unknown_tags_for_current_image = unknown_tags_for_current_image # Store the list of unknown tags
+
+        self._update_selected_tags(loaded_tags) # Use central function to set loaded tags and update UI
+    
     def _update_index_label(self):
         """Updates the image index label in the bottom panel."""
         if self.image_paths:
@@ -366,13 +377,14 @@ class MainWindow(QMainWindow):
         self._update_selected_tags(current_selected_tags) # Call the central update function!
 
     def _update_right_panel_display(self):
-        """Updates the right panel to display the currently selected tags."""
+        """Updates the right panel to display the currently selected tags, with visual distinction for unknown tags."""
         layout = self.right_panel_layout
         for i in reversed(range(layout.count())):  # Clear existing widgets in layout
             layout.itemAt(i).widget().setParent(None)  # Remove widget from layout and set parent to None for cleanup
 
         for tag_name in self.selected_tags_for_current_image:
-            tag_widget = TagWidget(tag_name)  # Create a TagWidget instance for each tag
+            is_known = tag_name in self.tag_widgets_by_name # Check if tag is in known tag list (left panel)
+            tag_widget = TagWidget(tag_name, is_known_tag=is_known) # Create TagWidget, set is_known_tag
             tag_widget.tag_clicked.connect(self._handle_tag_clicked_right_panel_tag_widget)
             layout.addWidget(tag_widget)  # Add TagWidget to the right panel layout
         print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}")  # Debug

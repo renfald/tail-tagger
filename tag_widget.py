@@ -6,13 +6,20 @@ class TagWidget(QFrame):
     
     tag_clicked = Signal(str)
     
-    def __init__(self, tag_name):
+    def __init__(self, tag_name, is_known_tag=True):
         super().__init__()
         self.tag_name = tag_name
         self.is_selected = False
-
+        self.is_known_tag = is_known_tag
         self._setup_ui()
+        self._update_style()
 
+    # Not currently used, but may be leveraged when we add the feature to add new tags while application is running
+    def set_is_known_tag(self, is_known_tag):
+        """Sets the is_known_tag property and updates the style."""
+        self.is_known_tag = is_known_tag
+        self._update_style()
+    
     def _setup_ui(self):
         """Sets up the UI elements for the tag widget."""
         self.setFrameShape(QFrame.StyledPanel)
@@ -44,8 +51,10 @@ class TagWidget(QFrame):
         self._update_style()
 
     def _update_style(self):
-        """Updates the visual style of the tag based on its selection state."""
-        if self.is_selected:
+        """Updates the visual style of the tag based on its selection state and is_known_tag status."""
+        if not self.is_known_tag: # Apply "unknown" tag style if is_known_tag is False
+            self.setStyleSheet("background-color: #552121; color: #855252;") # Desaturated dim red
+        elif self.is_selected: # If it's a known tag and selected
             self.setStyleSheet("background-color: #212121; color: #525252;")
         else:
             self.setStyleSheet("")
