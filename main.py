@@ -267,7 +267,7 @@ class MainWindow(QMainWindow):
         for tag_name, tag_widget in self.tag_widgets_by_name.items(): # Iterate through all TagWidgets
             tag_widget.set_selected(False) # Deselect each TagWidget
         # --- End Clear Left Panel Selections ---
-        
+
         self.center_panel.set_image_path(image_path)
         filename = os.path.basename(image_path)
         self.filename_label.setText(filename)
@@ -355,28 +355,31 @@ class MainWindow(QMainWindow):
             print(f"Warning: TagWidget not found for tag name: {tag_name}")  # Debug - should not happen, but safety check
             return
 
-        if tag_name not in self.selected_tags_for_current_image:  # Prevent duplicates
+        if tag_name not in self.selected_tags_for_current_image:  # Tag is NOT currently selected
             self.selected_tags_for_current_image.append(tag_name)  # Add tag to selected list
-            print(f"Tag '{tag_name}' selected and added to right panel.")  # Debug
-            self._update_right_panel_display()  # Update right panel after adding tag
+            print(f"Tag '{tag_name}' selected and added to right panel (via left panel click).")  # Debug
             tag_widget.set_selected(True)  # Visually mark tag as selected in left panel
-        else:  # Tag was already selected, so deselect it
+        else:  # Tag IS already selected (deselecting)
             self.selected_tags_for_current_image.remove(tag_name)  # Remove tag from selected list
-            print(f"Tag '{tag_name}' deselected and removed from right panel.")  # Debug
-            self._update_right_panel_display()  # Update right panel after removing tag
+            print(f"Tag '{tag_name}' deselected and removed from right panel (via left panel click).")  # Debug
             tag_widget.set_selected(False)  # Visually mark tag as unselected in left panel
 
+        self._update_right_panel_display()  # Update right panel AFTER any changes
+
     def _handle_tag_clicked_right_panel_tag_widget(self, tag_name):
-        """Handles clicks on TagWidgets in the right panel. Deselects and removes the tag."""
+        """Handles clicks on TagWidgets in the right panel. Deselects and removes the tag, and deselects in left panel."""
         if tag_name in self.selected_tags_for_current_image:
             self.selected_tags_for_current_image.remove(tag_name)  # Remove tag from selected list
             print(f"Tag '{tag_name}' deselected and removed from right panel (via TagWidget click).")  # Debug
-            self._update_right_panel_display()  # Update right panel after removing tag
-            tag_widget = self.tag_widgets_by_name.get(tag_name)  # Get TagWidget instance from left panel
-            if tag_widget:
-                tag_widget.set_selected(False)  # Visually mark tag as unselected in left panel
+
+            tag_widget_left_panel = self.tag_widgets_by_name.get(tag_name)  # Get TagWidget instance from left panel
+            if tag_widget_left_panel:
+                tag_widget_left_panel.set_selected(False)  # Visually mark tag as unselected in left panel
+                print(f"  Synchronized left panel: Tag '{tag_name}' deselected (via right panel click).") # Debug
             else:
-                print(f"Warning: TagWidget not found for tag name: {tag_name} (right panel TagWidget click).")  # Debug - should not happen
+                print(f"  Warning: TagWidget not found in left panel for tag name: {tag_name} (right panel TagWidget click).")  # Debug - should not happen
+
+            self._update_right_panel_display()  # Update right panel AFTER removing tag
         else:
             print(f"Tag '{tag_name}' not in selected tags (right panel TagWidget click issue?).")  # Debug - should not happen
 
