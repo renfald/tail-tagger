@@ -12,24 +12,28 @@ class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
 
     def __init__(self):
+        """Initializes the main application window."""
         super().__init__()
         self.setWindowTitle("Image Tagger")
         self.resize(1024, 768)
 
-        self.image_paths = []  # List of image file paths in the loaded folder
-        self.current_image_index = 0  # Index of the currently displayed image
-        self.last_folder_path = None  # Path of the last loaded folder (for persistence)
-        self.selected_tags_for_current_image = []  # List of tags selected for the current image (tag names)
-        self.tag_widgets_by_name = {}  # Dictionary to store TagWidget instances by tag name (for left panel)
+        # --- Instance Variables ---
+        self.image_paths = []  # List of image file paths in the currently loaded folder.
+        self.current_image_index = 0  # Index of the currently displayed image.
+        self.last_folder_path = None  # Path of the last loaded folder (for persistence).
+        self.selected_tags_for_current_image = []  # List of tags selected for the current image.
+        self.unknown_tags_for_current_image = []  # List of 'unknown' tags for the current image (loaded from file but not in tag_list.csv).
+        self.tag_widgets_by_name = {}  # Dictionary to store TagWidget instances by tag name (for left panel lookup).
 
+        # --- Setup ---
         self._setup_dark_mode_theme()
         self._setup_ui()
-        self._load_tags()
-        self._load_initial_directory()
+        self._load_tags()  # Load tags from tag_list.csv
+        self._load_initial_directory()  # Load an initial directory for development convenience.
 
     def _setup_dark_mode_theme(self):
         """Sets up the application-wide dark mode theme."""
-        app.setStyle("Fusion")
+        app.setStyle("Fusion")  # Use the Fusion style for a consistent look.
         dark_palette = QPalette()
         dark_color = QColor(53, 53, 53)
         dark_disabled_color = QColor(127, 127, 127)
@@ -60,77 +64,78 @@ class MainWindow(QMainWindow):
 
         # --- Menu Bar ---
         menu_bar = self.menuBar()
-        file_menu = menu_bar.addMenu("&File")
+        file_menu = menu_bar.addMenu("&File")  # '&' creates a keyboard shortcut (Alt+F)
         open_folder_action = file_menu.addAction("Open Folder...")
         open_folder_action.triggered.connect(self._open_folder_dialog)
         # --- End Menu Bar ---
 
         main_layout = QVBoxLayout()
-        main_layout.setSpacing(0)
+        main_layout.setSpacing(0)  # Remove spacing between layout elements.
         central_widget.setLayout(main_layout)
 
-        panels_layout = QHBoxLayout()
+        panels_layout = QHBoxLayout()  # Horizontal layout for the three main panels.
         panels_layout.setSpacing(0)
         main_layout.addLayout(panels_layout)
 
-        # Left Panel - Tag List
+        # --- Left Panel (Tag List) ---
         left_scroll_area = QScrollArea()
-        left_scroll_area.setWidgetResizable(True)
-        left_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        left_scroll_area.setWidgetResizable(True)  # Allow the scroll area to resize its contents.
+        left_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding) # Allow vertical expansion, fixed width.
         left_scroll_area.setFixedWidth(200)
 
         left_panel = QFrame()
         left_panel.setFrameShape(QFrame.StyledPanel)
         left_layout = QVBoxLayout()
-        left_layout.setAlignment(Qt.AlignTop)
+        left_layout.setAlignment(Qt.AlignTop)  # Align widgets to the top of the panel.
         left_layout.setSpacing(0)
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins around the layout.
         left_panel.setLayout(left_layout)
-        self.tag_list_layout = left_layout
+        self.tag_list_layout = left_layout  # Store the layout for later use (adding tags).
 
         # Search Bar for Left Panel
-        self.tag_search_bar = QLineEdit()  # Search input field
+        self.tag_search_bar = QLineEdit()
         self.tag_search_bar.setPlaceholderText("Search tags...")
-        self.tag_search_bar.setStyleSheet("color: #858585; background-color: #252525;")  # Style to match dark theme
+        self.tag_search_bar.setStyleSheet("color: #858585; background-color: #252525;")  # Dark theme styling.
         left_layout.addWidget(self.tag_search_bar)
         self.tag_search_bar.textChanged.connect(self._filter_tags)
 
         left_scroll_area.setWidget(left_panel)
         panels_layout.addWidget(left_scroll_area)
 
-        # Center Panel - Image Display
+        # --- Center Panel (Image Display) ---
         self.center_panel = CenterPanel()
         self.center_panel.setFrameShape(QFrame.StyledPanel)
-        self.center_panel.setMinimumSize(100, 100)
+        self.center_panel.setMinimumSize(100, 100)  # Ensure the panel has a minimum size.
         panels_layout.addWidget(self.center_panel)
 
-        # Right Panel - Selected Tags
+        # --- Right Panel (Selected Tags) ---
         right_scroll_area = QScrollArea()
         right_scroll_area.setWidgetResizable(True)
         right_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         right_scroll_area.setFixedWidth(200)
 
-        self.right_panel = QFrame()  # Container for selected tags
+        self.right_panel = QFrame()  # Container for selected tags.
         self.right_panel.setFrameShape(QFrame.StyledPanel)
         right_layout = QVBoxLayout()
         right_layout.setAlignment(Qt.AlignTop)
         right_layout.setSpacing(0)
         right_layout.setContentsMargins(0, 0, 0, 0)
         self.right_panel.setLayout(right_layout)
-        self.right_panel_layout = right_layout
+        self.right_panel_layout = right_layout  # Store the layout for later use (adding/removing tags).
 
         right_scroll_area.setWidget(self.right_panel)
         panels_layout.addWidget(right_scroll_area)
 
-        # Bottom Panel - Image Info and Buttons
+        # --- Bottom Panel (Image Info and Buttons) ---
         bottom_panel = QFrame()
         bottom_panel.setFrameShape(QFrame.StyledPanel)
-        bottom_panel.setFixedHeight(50)
+        bottom_panel.setFixedHeight(50)  # Fixed height for the bottom panel.
         bottom_layout = QHBoxLayout()
         bottom_layout.setSpacing(10)
-        bottom_layout.setContentsMargins(10, 5, 10, 5)
+        bottom_layout.setContentsMargins(10, 5, 10, 5)  # Add some margins for visual spacing.
         bottom_panel.setLayout(bottom_layout)
 
+        # Add spacers and labels for a cleaner layout.
         left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         bottom_layout.addItem(left_spacer)
 
@@ -152,91 +157,90 @@ class MainWindow(QMainWindow):
         bottom_layout.addWidget(self.next_button)
 
         main_layout.addWidget(bottom_panel)
-        self.bottom_panel_layout = bottom_layout
+        self.bottom_panel_layout = bottom_layout  # Store the layout (though we don't directly modify it later).
 
     def _load_tags(self):
-        """Loads tags from CSV file and populates the left panel."""
+        """Loads tags from the CSV file (tag_list.csv) and populates the left panel."""
         layout = self.tag_list_layout
         tags_file_path = os.path.join("data", "tag_list.csv")
         try:
             with open(tags_file_path, 'r', encoding='utf-8') as file:
-                next(file)  # Skip header line
+                next(file)  # Skip the header line in the CSV.
                 for line in file:
-                    tag_name = line.strip()
-                    tag_widget = TagWidget(tag_name)
+                    tag_name = line.strip()  # Remove leading/trailing whitespace.
+                    tag_widget = TagWidget(tag_name)  # Create a TagWidget for each tag.
                     tag_widget.tag_clicked.connect(self._handle_tag_clicked_left_panel)
                     layout.addWidget(tag_widget)
-                    self.tag_widgets_by_name[tag_name] = tag_widget  # Store TagWidget instance by name
+                    self.tag_widgets_by_name[tag_name] = tag_widget  # Store the TagWidget instance for later lookup.
         except FileNotFoundError:
             error_label = QLabel("Error: tag_list.csv not found in 'data' folder.")
             layout.addWidget(error_label)
 
     def _filter_tags(self, text):
-        """Filters the tags in the left panel and highlights the search term in light yellow."""
-        search_text = text.lower()
-        highlight_color = "darkorange"  # Define the highlight color here
+        """Filters the tags in the left panel based on the search bar text and highlights matches."""
+        search_text = text.lower()  # Convert search text to lowercase for case-insensitive matching.
+        highlight_color = "darkorange"
         for tag_name, tag_widget in self.tag_widgets_by_name.items():
             tag_lower = tag_name.lower()
-            if search_text and search_text in tag_lower:
+            if search_text and search_text in tag_lower:  # Check if search text is present and not empty.
+                # Construct HTML string with highlighting.
                 start_index = tag_lower.find(search_text)
                 end_index = start_index + len(search_text)
-
                 highlighted_tag_name = (
                     tag_name[:start_index] +
                     f'<span style="color: {highlight_color};"><b>{tag_name[start_index:end_index]}</b></span>' +
                     tag_name[end_index:]
                 )
-                tag_widget.tag_label.setText(highlighted_tag_name)
-                tag_widget.show()
-            elif search_text:
+                tag_widget.tag_label.setText(highlighted_tag_name)  # Set the QLabel text with HTML formatting.
+                tag_widget.show()  # Show the TagWidget if it matches.
+            elif search_text:  # If there's search text but no match, hide the tag.
                 tag_widget.hide()
-            else:
+            else:  # If the search text is empty, reset to the plain tag name and show all.
                 tag_widget.tag_label.setText(tag_name)
                 tag_widget.show()
-    
+
     def _load_initial_directory(self):
-        """Loads images from a hardcoded initial directory for development."""
-        sample_directory = r"J:\Repositories\image_tagger_app\input"  # <--- !!!  Set your sample directory here
+        """Loads images from a hardcoded initial directory on startup (for development convenience)."""
+        sample_directory = r"J:\Repositories\image_tagger_app\input"  # !!!  Set your sample directory here.
         if os.path.isdir(sample_directory):
             print(f"Loading initial directory: {sample_directory}")
             self._load_image_folder(sample_directory)
-            self.last_folder_path = sample_directory  # Set last_folder_path for folder persistence
+            self.last_folder_path = sample_directory  # Set last_folder_path for folder persistence.
         else:
             print(f"Initial directory not found: {sample_directory}")
-            self._load_image_folder(None)
+            self._load_image_folder(None)  # Load with no images if the directory doesn't exist.
 
     def _open_folder_dialog(self):
-        """Opens a folder selection dialog, loads images, and updates UI.
-        Preserves and reuses the last selected folder path."""
-        start_directory = os.path.expanduser("~")  # Default to home directory
+        """Opens a folder selection dialog and loads images from the selected folder."""
+        start_directory = os.path.expanduser("~")  # Default to the user's home directory.
         if self.last_folder_path and os.path.isdir(self.last_folder_path):
-            start_directory = self.last_folder_path  # Use last folder path if valid
+            start_directory = self.last_folder_path  # Use the last folder path if it's valid.
 
         folder_path = QFileDialog.getExistingDirectory(
             self,
             "Select Image Folder",
-            start_directory,  # Use start_directory (either last path or home dir)
-            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
+            start_directory,  # Start in the home directory or the last used directory.
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks  # Only show directories.
         )
 
         if folder_path:
-            self.last_folder_path = folder_path  # Update last_folder_path with newly selected path
-            self._load_image_folder(folder_path)  # Call the new method to load images and update UI
+            self.last_folder_path = folder_path  # Update last_folder_path.
+            self._load_image_folder(folder_path)  # Load images from the selected folder.
 
     def _load_image_folder(self, folder_path):
         """Loads images from the given folder path and updates the UI."""
-        if not folder_path:  # Handle None folder_path (e.g., invalid initial directory)
+        if not folder_path:
             print("No folder path provided to _load_image_folder, handling as no images.")
             self.image_paths = []
             self.center_panel.clear()
-            self.center_panel.setText("Initial directory not found:\ninput")  # Using "input" as placeholder
+            self.center_panel.setText("Initial directory not found:\ninput")  # Display an error message.
             self.filename_label.setText("No Image")
             self.index_label.setText("0 of 0")
             self.prev_button.setEnabled(False)
             self.next_button.setEnabled(False)
             return
 
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']  # Common image extensions
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']  # Supported image extensions.
         self.image_paths = []
 
         for filename in os.listdir(folder_path):
@@ -247,9 +251,9 @@ class MainWindow(QMainWindow):
         if self.image_paths:
             print(f"Found {len(self.image_paths)} images in folder: {folder_path}")
             self.current_image_index = 0
-            self._load_and_display_image(self.image_paths[0])
+            self._load_and_display_image(self.image_paths[0])  # Load and display the first image.
             self._update_index_label()
-            self.prev_button.setEnabled(True)
+            self.prev_button.setEnabled(True)  # Enable navigation buttons.
             self.next_button.setEnabled(True)
         else:
             print(f"No images found in folder: {folder_path}")
@@ -257,15 +261,15 @@ class MainWindow(QMainWindow):
             self.center_panel.setText("No images found in this folder.")
             self.filename_label.setText("No Image")
             self.index_label.setText("0 of 0")
-            self.prev_button.setEnabled(False)
+            self.prev_button.setEnabled(False)  # Disable navigation buttons.
             self.next_button.setEnabled(False)
 
     def _load_and_display_image(self, image_path):
-        """Loads and displays an image, loads tags, identifies unknown tags, and updates UI with correct order."""
+        """Loads and displays an image, loads associated tags, identifies unknown tags."""
         # --- Clear Left Panel Selections ---
-        print("  Clearing left panel selections...") # Debug message
-        for tag_name, tag_widget in self.tag_widgets_by_name.items(): # Iterate through all TagWidgets
-            tag_widget.set_selected(False) # Deselect each TagWidget
+        print("  Clearing left panel selections...")
+        for _, tag_widget in self.tag_widgets_by_name.items():  # Iterate through all TagWidgets.
+            tag_widget.set_selected(False)  # Deselect each TagWidget.
         # --- End Clear Left Panel Selections ---
 
         self.center_panel.set_image_path(image_path)
@@ -273,51 +277,54 @@ class MainWindow(QMainWindow):
         self.filename_label.setText(filename)
 
         # --- Tag File Loading Logic ---
-        tag_file_path_no_ext = os.path.splitext(image_path)[0] # Path without image extension
-        tag_file_path_txt = tag_file_path_no_ext + ".txt"      # Try .txt extension
-        tag_file_path_ext_txt = image_path + ".txt"           # Try .jpg.txt extension (or .png.txt etc.)
+        tag_file_path_no_ext = os.path.splitext(image_path)[0]  # Get path without extension.
+        tag_file_path_txt = tag_file_path_no_ext + ".txt"  # Path with .txt extension.
+        tag_file_path_ext_txt = image_path + ".txt"  # Path with .jpg.txt (or other image extension) + .txt.
 
-        loaded_tags = [] # Initialize an empty list to store loaded tags
+        loaded_tags = []
 
-        if os.path.exists(tag_file_path_txt): # Check for .txt tag file first
+        if os.path.exists(tag_file_path_txt):
             tag_file_to_use = tag_file_path_txt
-        elif os.path.exists(tag_file_path_ext_txt): # If not, check for .jpg.txt style
+        elif os.path.exists(tag_file_path_ext_txt):
             tag_file_to_use = tag_file_path_ext_txt
         else:
-            tag_file_to_use = None # No tag file found
+            tag_file_to_use = None
 
-        if tag_file_to_use: # If tag file found
-            print(f"  Loading tags from: {tag_file_to_use}") # Indicate tag file loading
+        if tag_file_to_use:
+            print(f"  Loading tags from: {tag_file_to_use}")
             try:
                 with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
-                    tag_content = tag_file.readline().strip() # Read the first line and strip whitespace
-                    loaded_tags = [tag.strip() for tag in tag_content.split(',')] # Split by comma and space, strip tags
-                    print(f"  Loaded tags: {loaded_tags}") # Print loaded tags to console
-            except Exception as e: # Catch any potential errors during file reading
-                print(f"  Error reading tag file: {e}") # Print error message if something goes wrong
-        else: # If no tag file found
-            print("  No tag file found for this image.") # Indicate no tag file found
-            loaded_tags = [] # Ensure loaded_tags is empty if no file
+                    tag_content = tag_file.readline().strip()  # Read the first line and remove whitespace.
+                    loaded_tags = [tag.strip() for tag in tag_content.split(',')]  # Split by comma, strip each tag.
+                    print(f"  Loaded tags: {loaded_tags}")
+            except Exception as e:
+                print(f"  Error reading tag file: {e}")
+                loaded_tags = []  # Ensure loaded_tags is empty on error.
+        else:
+            print("  No tag file found for this image.")
+            loaded_tags = []  # Ensure loaded_tags is empty if no file is found.
 
-        unknown_tags_for_current_image = [] # Initialize list to store unknown tags
-        known_tag_names = set(self.tag_widgets_by_name.keys()) # Create a set of known tag names for efficient lookup
+        # --- Identify Unknown Tags ---
+        unknown_tags_for_current_image = []
+        known_tag_names = set(self.tag_widgets_by_name.keys()) # Efficient lookup for known tags.
 
-        for tag_name in loaded_tags: # Check each loaded tag
-            if tag_name not in known_tag_names: # If loaded tag is NOT in our known tag list
-                unknown_tags_for_current_image.append(tag_name) # Add to unknown tags list
-                print(f"  Unknown tag loaded: '{tag_name}'") # Debug message
+        for tag_name in loaded_tags:
+            if tag_name not in known_tag_names:
+                unknown_tags_for_current_image.append(tag_name)
+                print(f"  Unknown tag loaded: '{tag_name}'")
 
-        print(f"  Known tags loaded: {[tag for tag in loaded_tags if tag not in unknown_tags_for_current_image]}") # Debug known tags
-        self.unknown_tags_for_current_image = unknown_tags_for_current_image # Store the list of unknown tags
+        print(f"  Known tags loaded: {[tag for tag in loaded_tags if tag not in unknown_tags_for_current_image]}")
+        self.unknown_tags_for_current_image = unknown_tags_for_current_image  # Store unknown tags.
 
-        self._update_selected_tags(loaded_tags) # Use central function to set loaded tags and update UI
-    
+        # --- Update Selected Tags and UI ---
+        self._update_selected_tags(loaded_tags)  # Use the central update function.
+
     def _update_index_label(self):
         """Updates the image index label in the bottom panel."""
         if self.image_paths:
             index_text = f"{self.current_image_index + 1} of {len(self.image_paths)}"
         else:
-            index_text = "0 of 0"  # No images loaded
+            index_text = "0 of 0"  # If no images are loaded.
         self.index_label.setText(index_text)
 
     def _prev_image(self):
@@ -326,13 +333,12 @@ class MainWindow(QMainWindow):
             return
 
         self.current_image_index -= 1
-
         if self.current_image_index < 0:
-            self.current_image_index = len(self.image_paths) - 1
+            self.current_image_index = len(self.image_paths) - 1  # Wrap around to the last image.
 
         image_path = self.image_paths[self.current_image_index]
-        self._load_and_display_image(image_path)
-        self._update_index_label()
+        self._load_and_display_image(image_path)  # Load and display the previous image.
+        self._update_index_label() # Update index
 
     def _next_image(self):
         """Navigates to the next image in the list."""
@@ -340,72 +346,71 @@ class MainWindow(QMainWindow):
             return
 
         self.current_image_index += 1
-
         if self.current_image_index >= len(self.image_paths):
-            self.current_image_index = 0
+            self.current_image_index = 0  # Wrap around to the first image.
 
         image_path = self.image_paths[self.current_image_index]
-        self._load_and_display_image(image_path)
-        self._update_index_label()
+        self._load_and_display_image(image_path)  # Load and display the next image.
+        self._update_index_label() # Update index
 
     def _handle_tag_clicked_left_panel(self, tag_name):
-        """Handles clicks on tags in the left panel. Updates selected tags list via _update_selected_tags."""
-        current_selected_tags = list(self.selected_tags_for_current_image) # Create a copy to avoid modifying directly
+        """Handles clicks on tags in the left panel (tag list)."""
+        current_selected_tags = list(self.selected_tags_for_current_image)  # Work with a *copy* of the list.
 
-        if tag_name not in current_selected_tags:  # Tag is NOT currently selected
-            current_selected_tags.append(tag_name)  # Add tag to the *copy*
-            print(f"Tag '{tag_name}' selected and added (via left panel click).")  # Debug
-        else:  # Tag IS already selected (deselecting)
-            current_selected_tags.remove(tag_name)  # Remove tag from the *copy*
-            print(f"Tag '{tag_name}' deselected and removed (via left panel click).")  # Debug
+        if tag_name not in current_selected_tags:
+            current_selected_tags.append(tag_name)
+            print(f"Tag '{tag_name}' selected and added (via left panel click).")
+        else:
+            current_selected_tags.remove(tag_name)
+            print(f"Tag '{tag_name}' deselected and removed (via left panel click).")
 
-        self._update_selected_tags(current_selected_tags) # Call the central update function!
-        tag_widget = self.tag_widgets_by_name.get(tag_name) # Get TagWidget instance (for immediate visual feedback - still needed)
-        if tag_widget: # Safety check in case tag_widget is None
-            tag_widget.set_selected(tag_name in current_selected_tags) # Set left panel tag widget's selected state directly for immediate feedback
+        self._update_selected_tags(current_selected_tags)  # Use the central update function.
+
+        # The line below is kept for immediate visual feedback on click.
+        tag_widget = self.tag_widgets_by_name.get(tag_name)
+        if tag_widget:  # Check if tag_widget is not None (it should always exist if clicked).
+            tag_widget.set_selected(tag_name in current_selected_tags)
 
     def _handle_tag_clicked_right_panel_tag_widget(self, tag_name):
-        """Handles clicks on TagWidgets in the right panel. Updates selected tags list via _update_selected_tags."""
-        current_selected_tags = list(self.selected_tags_for_current_image) # Create a copy
+        """Handles clicks on TagWidgets in the right panel (selected tags list)."""
+        current_selected_tags = list(self.selected_tags_for_current_image)  # Work with a *copy* of the list.
 
         if tag_name in current_selected_tags:
-            current_selected_tags.remove(tag_name)  # Remove tag from the *copy*
-            print(f"Tag '{tag_name}' deselected and removed (via right panel click).")  # Debug
+            current_selected_tags.remove(tag_name)
+            print(f"Tag '{tag_name}' deselected and removed (via right panel click).")
         else:
-            print(f"Tag '{tag_name}' not in selected tags (right panel TagWidget click issue?).")  # Debug - should not happen
+            print(f"Tag '{tag_name}' not in selected tags (right panel TagWidget click issue?).") # Should not happen
 
-        self._update_selected_tags(current_selected_tags) # Call the central update function!
+        self._update_selected_tags(current_selected_tags) # Use the central update function.
 
     def _update_right_panel_display(self):
-        """Updates the right panel to display the currently selected tags, with visual distinction for unknown tags."""
+        """Updates the right panel to display the currently selected tags (with styling for unknown tags)."""
         layout = self.right_panel_layout
-        for i in reversed(range(layout.count())):  # Clear existing widgets in layout
-            layout.itemAt(i).widget().setParent(None)  # Remove widget from layout and set parent to None for cleanup
+        for i in reversed(range(layout.count())):  # Clear existing widgets (efficiently).
+            layout.itemAt(i).widget().setParent(None)  # Remove and de-parent each widget.
 
         for tag_name in self.selected_tags_for_current_image:
-            is_known = tag_name in self.tag_widgets_by_name # Check if tag is in known tag list (left panel)
-            tag_widget = TagWidget(tag_name, is_known_tag=is_known) # Create TagWidget, set is_known_tag
+            is_known = tag_name in self.tag_widgets_by_name  # Check if the tag is "known" (in tag_list.csv).
+            tag_widget = TagWidget(tag_name, is_known_tag=is_known)  # Create TagWidget with known/unknown status.
             tag_widget.tag_clicked.connect(self._handle_tag_clicked_right_panel_tag_widget)
-            layout.addWidget(tag_widget)  # Add TagWidget to the right panel layout
-        print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}")  # Debug
-    
+            layout.addWidget(tag_widget)
+        print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}")
+
     def _update_selected_tags(self, new_tag_list):
-        """Updates the selected tags list and triggers UI updates for both panels."""
-        print(f"Updating selected tags to: {new_tag_list}") # Debug message
+        """Updates the selected_tags_for_current_image list and triggers UI updates.  This is the central point for all tag selection modifications."""
+        print(f"Updating selected tags to: {new_tag_list}")
 
-        self.selected_tags_for_current_image = new_tag_list  # Update the authoritative list
+        self.selected_tags_for_current_image = new_tag_list  # Update the authoritative list.
 
-        self._update_right_panel_display() # Update the right panel to reflect the new list
-        self._update_left_panel_display_based_on_selection() # Synchronize left panel selections
+        self._update_right_panel_display()  # Update the right panel.
+        self._update_left_panel_display_based_on_selection()  # Update the left panel.
+        # --- Workfile saving will go HERE ---
 
     def _update_left_panel_display_based_on_selection(self):
-        """Updates the visual selection state of tags in the left panel based on the current selected_tags_for_current_image list."""
-        print("  Updating left panel selection states...") # Debug message
+        """Updates the visual selection state of tags in the left panel based on selected_tags_for_current_image."""
+        print("  Updating left panel selection states...")
         for tag_name, tag_widget in self.tag_widgets_by_name.items():
-            if tag_name in self.selected_tags_for_current_image:
-                tag_widget.set_selected(True) # Select tag in left panel if in selected list
-            else:
-                tag_widget.set_selected(False) # Deselect tag in left panel if not in selected list
+            tag_widget.set_selected(tag_name in self.selected_tags_for_current_image)  # Select/deselect based on presence in the list.
 
 app = QApplication(sys.argv)
 window = MainWindow()
