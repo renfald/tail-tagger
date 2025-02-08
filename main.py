@@ -420,8 +420,30 @@ class MainWindow(QMainWindow):
 
         self._update_right_panel_display()  # Update the right panel.
         self._update_left_panel_display_based_on_selection()  # Update the left panel.
+        
         # --- Workfile saving will go HERE ---
+        if self.last_folder_path:  # Only save if a folder has been loaded.
+            workfile_path = self._get_workfile_path(self.last_folder_path)  # Get the workfile path.
 
+            try:
+                with open(workfile_path, 'r+', encoding='utf-8') as f:  # Open in read-write mode.
+                    data = json.load(f)  # Load existing data from the workfile.
+
+                    # Update the 'image_tags' dictionary with the current image's tags.
+                    data["image_tags"][self.image_paths[self.current_image_index]] = self.selected_tags_for_current_image
+
+                    f.seek(0)  # Rewind the file pointer to the beginning.
+                    json.dump(data, f, indent=2)  # Write the updated data back, pretty-printed.
+                    f.truncate() # needed when going from larger file to smaller file size
+
+            except FileNotFoundError:
+                print(f"Error: Workfile not found at {workfile_path}. This should not happen.")
+                # TODO: Consider creating a new workfile here, or prompting the user.
+
+            except json.JSONDecodeError:
+                print(f"Error: Corrupted workfile at {workfile_path}.")
+                # TODO: Consider prompting the user to delete or recover the workfile.
+    
     def _update_left_panel_display_based_on_selection(self):
         """Updates the visual selection state of tags in the left panel based on selected_tags_for_current_image."""
         print("  Updating left panel selection states...")
