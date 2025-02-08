@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QLineEdit)
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
@@ -19,23 +19,32 @@ class MainWindow(QMainWindow):
         self.resize(1024, 768)
 
         # --- Instance Variables ---
+        self.settings = QSettings("RenWare", "ImageTagger")  # Organization name, Application name
         self.image_paths = []  # List of image file paths in the currently loaded folder.
         self.current_image_index = 0  # Index of the currently displayed image.
-        self.last_folder_path = None  # Path of the last loaded folder (for persistence).
+        self.last_folder_path = None # Initialize self.last_folder_path *before* potentially loading from settings
         self.selected_tags_for_current_image = []  # List of tags selected for the current image.
         self.unknown_tags_for_current_image = []  # List of 'unknown' tags for the current image (loaded from file but not in tag_list.csv).
         self.tag_widgets_by_name = {}  # Dictionary to store TagWidget instances by tag name (for left panel lookup).
-
         # --- Staging Folder ---
         self.staging_folder_path = os.path.join(os.getcwd(), "staging")
         if not os.path.isdir(self.staging_folder_path):
             os.makedirs(self.staging_folder_path, exist_ok=True)
 
-        # --- Setup ---
+        # --- Setup UI and Load Tags ---
         self._setup_dark_mode_theme()
         self._setup_ui()
         self._load_tags()  # Load tags from tag_list.csv
-        self._load_initial_directory()  # Load an initial directory for development convenience.
+
+        # --- Load last folder path from settings ---
+        last_folder = self.settings.value("last_opened_folder", "") # "" is the default value if not found
+        if last_folder and os.path.isdir(last_folder): # Check if path exists and is a directory
+            self.last_folder_path = last_folder # Set instance variable
+            print(f"Loading last opened folder from settings: {self.last_folder_path}")
+            self._load_image_folder(self.last_folder_path) # Load the folder
+        else:
+            print("No valid last opened folder found in settings.")
+            self._load_image_folder(None) # Load with no images initially
 
     def _setup_dark_mode_theme(self):
         """Sets up the application-wide dark mode theme."""
@@ -236,6 +245,7 @@ class MainWindow(QMainWindow):
 
         if folder_path:
             self.last_folder_path = os.path.normpath(folder_path)  # Update last_folder_path with normalized path.
+            self.settings.setValue("last_opened_folder", self.last_folder_path)
             self._load_image_folder(os.path.normpath(folder_path))  # Load images from the selected folder with normalized path.
 
     def _load_image_folder(self, folder_path):
