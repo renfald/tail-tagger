@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 from tag_widget import TagWidget
 from center_panel import CenterPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
@@ -24,6 +25,11 @@ class MainWindow(QMainWindow):
         self.selected_tags_for_current_image = []  # List of tags selected for the current image.
         self.unknown_tags_for_current_image = []  # List of 'unknown' tags for the current image (loaded from file but not in tag_list.csv).
         self.tag_widgets_by_name = {}  # Dictionary to store TagWidget instances by tag name (for left panel lookup).
+        self.staging_folder_path = os.path.join(os.getcwd(), "staging") # Expected folder path for workfiles.
+        
+        # Ensure the staging folder exists. If not, create it.
+        if not os.path.isdir(self.staging_folder_path):
+            os.makedirs(self.staging_folder_path, exist_ok=True)
 
         # --- Setup ---
         self._setup_dark_mode_theme()
@@ -224,8 +230,8 @@ class MainWindow(QMainWindow):
         )
 
         if folder_path:
-            self.last_folder_path = folder_path  # Update last_folder_path.
-            self._load_image_folder(folder_path)  # Load images from the selected folder.
+            self.last_folder_path = os.path.normpath(folder_path)  # Update last_folder_path with normalized path.
+            self._load_image_folder(os.path.normpath(folder_path))  # Load images from the selected folder with normalized path.
 
     def _load_image_folder(self, folder_path):
         """Loads images from the given folder path and updates the UI."""
@@ -239,7 +245,16 @@ class MainWindow(QMainWindow):
             self.prev_button.setEnabled(False)
             self.next_button.setEnabled(False)
             return
-
+        
+        workfile_path = self._get_workfile_path(folder_path)
+        if not os.path.exists(workfile_path):
+            # Create a new, empty workfile
+            try:
+                with open(workfile_path, 'w', encoding='utf-8') as f:
+                    json.dump({"image_tags": {}}, f)
+            except Exception as e:
+                print("error creating workfile")
+        
         image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']  # Supported image extensions.
         self.image_paths = []
 
@@ -283,6 +298,7 @@ class MainWindow(QMainWindow):
 
         loaded_tags = []
 
+        # Tag files may have the image file extension appended to the name (e.g., image.jpg.txt) or not. We check both.
         if os.path.exists(tag_file_path_txt):
             tag_file_to_use = tag_file_path_txt
         elif os.path.exists(tag_file_path_ext_txt):
@@ -411,6 +427,11 @@ class MainWindow(QMainWindow):
         print("  Updating left panel selection states...")
         for tag_name, tag_widget in self.tag_widgets_by_name.items():
             tag_widget.set_selected(tag_name in self.selected_tags_for_current_image)  # Select/deselect based on presence in the list.
+
+    def _get_workfile_path(self, folder_path):
+        """Generates a valid workfile path based on the image folder path."""
+        filename_safe_string = folder_path.replace(os.sep, '_').replace(':', '_') + ".json"
+        return os.path.join(self.staging_folder_path, filename_safe_string) 
 
 app = QApplication(sys.argv)
 window = MainWindow()
