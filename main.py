@@ -215,8 +215,8 @@ class MainWindow(QMainWindow):
         sample_directory = r"J:\Repositories\image_tagger_app\input"  # !!!  Set your sample directory here.
         if os.path.isdir(sample_directory):
             print(f"Loading initial directory: {sample_directory}")
-            self._load_image_folder(sample_directory)
             self.last_folder_path = sample_directory  # Set last_folder_path for folder persistence.
+            self._load_image_folder(sample_directory)
         else:
             print(f"Initial directory not found: {sample_directory}")
             self._load_image_folder(None)  # Load with no images if the directory doesn't exist.
@@ -296,34 +296,59 @@ class MainWindow(QMainWindow):
         filename = os.path.basename(image_path)
         self.filename_label.setText(filename)
 
-        # --- Tag File Loading Logic ---
-        tag_file_path_no_ext = os.path.splitext(image_path)[0]  # Get path without extension.
-        tag_file_path_txt = tag_file_path_no_ext + ".txt"  # Path with .txt extension.
-        tag_file_path_ext_txt = image_path + ".txt"  # Path with .jpg.txt (or other image extension) + .txt.
+        loaded_tags_from_workfile = False  # Flag to track if tags were loaded from workfile.
+        workfile_path = self._get_workfile_path(self.last_folder_path) # Get workfile path
 
-        loaded_tags = []
-
-        # Tag files may have the image file extension appended to the name (e.g., image.jpg.txt) or not. We check both.
-        if os.path.exists(tag_file_path_txt):
-            tag_file_to_use = tag_file_path_txt
-        elif os.path.exists(tag_file_path_ext_txt):
-            tag_file_to_use = tag_file_path_ext_txt
-        else:
-            tag_file_to_use = None
-
-        if tag_file_to_use:
-            print(f"  Loading tags from: {tag_file_to_use}")
+        if os.path.exists(workfile_path): # Check if workfile exists
             try:
-                with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
-                    tag_content = tag_file.readline().strip()  # Read the first line and remove whitespace.
-                    loaded_tags = [tag.strip() for tag in tag_content.split(',')]  # Split by comma, strip each tag.
-                    print(f"  Loaded tags: {loaded_tags}")
-            except Exception as e:
-                print(f"  Error reading tag file: {e}")
-                loaded_tags = []  # Ensure loaded_tags is empty on error.
+                with open(workfile_path, 'r', encoding='utf-8') as f:
+                    workfile_data = json.load(f) # Load workfile JSON
+
+                    image_key = image_path # Use full image path as key
+                    if image_key in workfile_data["image_tags"]: # Check if image has tags in workfile
+                        loaded_tags = workfile_data["image_tags"][image_key] # Load tags from workfile
+                        print(f"  Loaded tags from workfile: {loaded_tags}")
+                        loaded_tags_from_workfile = True # Set the flag
+                    else:
+                        print("  No tags found in workfile for this image. (Falling back to .txt or empty)")
+            except FileNotFoundError:
+                print(f"  Workfile not found (though existence was just checked). This is unexpected.") # Should not happen
+            except json.JSONDecodeError:
+                print(f"  Error reading workfile (JSON error). Falling back to .txt or empty.")
         else:
-            print("  No tag file found for this image.")
-            loaded_tags = []  # Ensure loaded_tags is empty if no file is found.
+            print("  No workfile found. Falling back to .txt or empty.")
+
+        if loaded_tags_from_workfile:
+            print("  Skipping .txt file loading because tags were loaded from workfile.")
+            pass # Skip the .txt loading logic below
+        else:
+            # --- Tag File Loading Logic (Existing - will only execute if not loaded from workfile) ---
+            tag_file_path_no_ext = os.path.splitext(image_path)[0]  # Get path without extension.
+            tag_file_path_txt = tag_file_path_no_ext + ".txt"  # Path with .txt extension.
+            tag_file_path_ext_txt = image_path + ".txt"  # Path with .jpg.txt (or other image extension) + .txt.
+
+            loaded_tags = [] # Initialize loaded_tags again here for .txt loading fallback
+
+            if os.path.exists(tag_file_path_txt):
+                tag_file_to_use = tag_file_path_txt
+            elif os.path.exists(tag_file_path_ext_txt):
+                tag_file_to_use = tag_file_path_ext_txt
+            else:
+                tag_file_to_use = None
+
+            if tag_file_to_use:
+                print(f"  Loading tags from: {tag_file_to_use}")
+                try:
+                    with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
+                        tag_content = tag_file.readline().strip()  # Read the first line and remove whitespace.
+                        loaded_tags = [tag.strip() for tag in tag_content.split(',')]  # Split by comma, strip each tag.
+                        print(f"  Loaded tags from .txt file: {loaded_tags}")
+                except Exception as e:
+                    print(f"  Error reading tag file: {e}")
+                    loaded_tags = []  # Ensure loaded_tags is empty on error.
+            else:
+                print("  No tag file found for this image.")
+                loaded_tags = []  # Ensure loaded_tags is empty if no file is found.
 
         # --- Identify Unknown Tags ---
         unknown_tags_for_current_image = []
