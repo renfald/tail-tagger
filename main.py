@@ -12,6 +12,43 @@ from PySide6.QtCore import Qt, QSettings
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
 
+    @staticmethod
+    def load_config():
+        """Loads the configuration from config.json, creating it with defaults if it doesn't exist."""
+        config_path = os.path.join(os.getcwd(), "config.json")
+        default_config = {
+            "last_opened_folder": ""
+        }
+
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                # Ensure all expected keys are present, using defaults if needed
+                for key, value in default_config.items():
+                    if key not in config:
+                        config[key] = value
+                return config
+        except FileNotFoundError:
+            print("config.json not found, creating with defaults.")
+            # Create the file with default values
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(default_config, f, indent=2)  # Use indent for readability.
+            return default_config
+        except json.JSONDecodeError:
+            print("Error decoding config.json. Using default values.")
+            return default_config
+        
+    @staticmethod
+    def save_config(config):
+        """Saves the configuration to config.json."""
+        config_path = os.path.join(os.getcwd(), "config.json")
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+        except Exception as e:
+            print(f"Error saving config: {e}")
+
+
     def __init__(self):
         """Initializes the main application window."""
         super().__init__()
@@ -19,13 +56,17 @@ class MainWindow(QMainWindow):
         self.resize(1024, 768)
 
         # --- Instance Variables ---
-        self.settings = QSettings("RenWare", "ImageTagger")  # Organization name, Application name
         self.image_paths = []  # List of image file paths in the currently loaded folder.
         self.current_image_index = 0  # Index of the currently displayed image.
         self.last_folder_path = None # Initialize self.last_folder_path *before* potentially loading from settings
         self.selected_tags_for_current_image = []  # List of tags selected for the current image.
         self.unknown_tags_for_current_image = []  # List of 'unknown' tags for the current image (loaded from file but not in tag_list.csv).
         self.tag_widgets_by_name = {}  # Dictionary to store TagWidget instances by tag name (for left panel lookup).
+        
+        # --- Load Configuration ---
+        config = MainWindow.load_config()  # Load configuration using the static method.
+        self.last_folder_path = config.get("last_opened_folder") # Set last folder from config
+        
         # --- Staging Folder ---
         self.staging_folder_path = os.path.join(os.getcwd(), "staging")
         if not os.path.isdir(self.staging_folder_path):
@@ -36,14 +77,9 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._load_tags()  # Load tags from tag_list.csv
 
-        # --- Load last folder path from settings ---
-        last_folder = self.settings.value("last_opened_folder", "") # "" is the default value if not found
-        if last_folder and os.path.isdir(last_folder): # Check if path exists and is a directory
-            self.last_folder_path = last_folder # Set instance variable
-            print(f"Loading last opened folder from settings: {self.last_folder_path}")
+        if (self.last_folder_path):
             self._load_image_folder(self.last_folder_path) # Load the folder
         else:
-            print("No valid last opened folder found in settings.")
             self._load_image_folder(None) # Load with no images initially
 
     def _setup_dark_mode_theme(self):
@@ -244,9 +280,14 @@ class MainWindow(QMainWindow):
         )
 
         if folder_path:
-            self.last_folder_path = os.path.normpath(folder_path)  # Update last_folder_path with normalized path.
-            self.settings.setValue("last_opened_folder", self.last_folder_path)
-            self._load_image_folder(os.path.normpath(folder_path))  # Load images from the selected folder with normalized path.
+            folder_path = os.path.normpath(folder_path)
+            self.last_folder_path = folder_path  # Update last_folder_path.
+
+            # --- Save Configuration ---
+            config = MainWindow.load_config() # Load config
+            config["last_opened_folder"] = self.last_folder_path # Update last_opened_folder in config
+            MainWindow.save_config(config) # Save config
+            self._load_image_folder(folder_path)
 
     def _load_image_folder(self, folder_path):
         """Loads images from the given folder path and updates the UI."""
