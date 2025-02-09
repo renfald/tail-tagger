@@ -48,7 +48,18 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Error saving config: {e}")
 
+    @staticmethod
+    def set_config_value(key, value):
+        """Sets a configuration value and saves the config file.
 
+        Args:
+            key (str): The configuration key to set.
+            value (any): The value to set for the key.
+        """
+        config = MainWindow.load_config()  # Load existing config.
+        config[key] = value  # Set the new value.
+        MainWindow.save_config(config)  # Save the updated config.
+            
     def __init__(self):
         """Initializes the main application window."""
         super().__init__()
@@ -78,9 +89,12 @@ class MainWindow(QMainWindow):
         self._load_tags()  # Load tags from tag_list.csv
 
         if (self.last_folder_path):
-            self._load_image_folder(self.last_folder_path) # Load the folder
+            print(f"Loading last opened folder: {self.last_folder_path}")
+            self._load_image_folder(self.last_folder_path)  # Load last opened folder.
         else:
-            self._load_image_folder(None) # Load with no images initially
+            print("No valid last opened folder, attempting to load initial directory.")
+            self._load_initial_directory()  # Fallback to initial directory.
+            # self._load_image_folder(None) May deprecate _load_initial_directory later and replace with this!
 
     def _setup_dark_mode_theme(self):
         """Sets up the application-wide dark mode theme."""
@@ -256,15 +270,24 @@ class MainWindow(QMainWindow):
                 tag_widget.show()
 
     def _load_initial_directory(self):
-        """Loads images from a hardcoded initial directory on startup (for development convenience)."""
-        sample_directory = r"J:\Repositories\image_tagger_app\input"  # !!!  Set your sample directory here.
-        if os.path.isdir(sample_directory):
-            print(f"Loading initial directory: {sample_directory}")
-            self.last_folder_path = sample_directory  # Set last_folder_path for folder persistence.
-            self._load_image_folder(sample_directory)
-        else:
-            print(f"Initial directory not found: {sample_directory}")
-            self._load_image_folder(None)  # Load with no images if the directory doesn't exist.
+        """Loads images from an initial directory specified via an environment variable (for development)."""
+        # --- TEMPORARY - For Development Convenience ---
+        initial_directory = os.environ.get("IMAGE_TAGGER_INITIAL_DIR")
+
+        if initial_directory:
+            initial_directory = os.path.normpath(initial_directory)  # Normalize the path
+            if os.path.isdir(initial_directory):
+                print(f"Loading initial directory from environment variable: {initial_directory}")
+                self._load_image_folder(initial_directory)
+                self.last_folder_path = initial_directory  # Set for folder persistence.
+                MainWindow.set_config_value("last_opened_folder", self.last_folder_path) # Save to config
+            else:
+                print("No valid initial directory found in IMAGE_TAGGER_INITIAL_DIR environment variable.")
+                self._load_image_folder(None)
+        else: #added else to account for None
+            print("No valid initial directory found in IMAGE_TAGGER_INITIAL_DIR environment variable.")
+            self._load_image_folder(None)
+        # --- END TEMPORARY ---
 
     def _open_folder_dialog(self):
         """Opens a folder selection dialog and loads images from the selected folder."""
@@ -282,11 +305,7 @@ class MainWindow(QMainWindow):
         if folder_path:
             folder_path = os.path.normpath(folder_path)
             self.last_folder_path = folder_path  # Update last_folder_path.
-
-            # --- Save Configuration ---
-            config = MainWindow.load_config() # Load config
-            config["last_opened_folder"] = self.last_folder_path # Update last_opened_folder in config
-            MainWindow.save_config(config) # Save config
+            MainWindow.set_config_value("last_opened_folder", self.last_folder_path) 
             self._load_image_folder(folder_path)
 
     def _load_image_folder(self, folder_path):
