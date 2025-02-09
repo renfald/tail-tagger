@@ -59,7 +59,106 @@ class MainWindow(QMainWindow):
         config = MainWindow.load_config()  # Load existing config.
         config[key] = value  # Set the new value.
         MainWindow.save_config(config)  # Save the updated config.
-            
+    
+    def _gather_all_tags(self, folder_path):
+        """Gathers tag data for all images in the specified folder.
+
+        Prioritizes loading from the workfile. Falls back to .txt files if
+        workfile data is missing. Returns a dictionary where keys are image
+        paths and values are lists of tags.
+        """
+        all_tags = {}  # Initialize an empty dictionary to store the results.
+        workfile_path = self._get_workfile_path(folder_path)
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        image_paths = []
+
+        for filename in os.listdir(folder_path):
+            if any(filename.lower().endswith(ext) for ext in image_extensions):
+                image_path = os.path.join(folder_path, filename)
+                image_paths.append(image_path)
+
+        try:
+            with open(workfile_path, 'r', encoding='utf-8') as f:
+                workfile_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            workfile_data = {"image_tags": {}} # Initialize as though a blank workfile
+
+        for image_path in image_paths:
+            loaded_tags = [] # Initialize loaded tags
+
+            if workfile_data:
+                if image_path in workfile_data["image_tags"]:
+                    loaded_tags = workfile_data["image_tags"][image_path]
+                    print(f"  Loaded tags from workfile for {image_path}: {loaded_tags}")
+
+            if not loaded_tags: # If no tags loaded from workfile (or workfile missing/corrupt)
+                tag_file_path_no_ext = os.path.splitext(image_path)[0]
+                tag_file_path_txt = tag_file_path_no_ext + ".txt"
+                tag_file_path_ext_txt = image_path + ".txt"
+
+                if os.path.exists(tag_file_path_txt):
+                    tag_file_to_use = tag_file_path_txt
+                elif os.path.exists(tag_file_path_ext_txt):
+                    tag_file_to_use = tag_file_path_ext_txt
+                else:
+                    tag_file_to_use = None
+
+                if tag_file_to_use:
+                    print(f"  Loading tags from .txt for {image_path}")
+                    try:
+                        with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
+                            tag_content = tag_file.readline().strip()
+                            loaded_tags = [tag.strip() for tag in tag_content.split(',')]
+                    except Exception as e:
+                        print(f"  Error reading tag file {tag_file_to_use}: {e}")
+                        # loaded_tags remains an empty list
+
+            all_tags[image_path] = loaded_tags  # Store the tags (even if empty)
+
+        return all_tags
+    
+    def _export_tags(self):
+        """Handles the export process: prompts for export directory, gathers tags, and writes files."""
+
+        # Create the 'output' directory if it doesn't exist
+        output_dir = os.path.join(os.getcwd(), "output")
+        if not os.path.isdir(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+
+        # Get the export directory from the user.
+        export_dir = QFileDialog.getExistingDirectory(self, "Select Export Directory", output_dir)
+
+        if export_dir:  # Proceed only if the user selected a directory.
+            export_dir = os.path.normpath(export_dir)
+            print(f"Exporting tags to: {export_dir}")
+
+            all_tags = self._gather_all_tags(self.last_folder_path) #we assume if they are exporting, that they have opened a dir
+
+            for image_path, tags in all_tags.items():
+                filename = os.path.basename(image_path)
+                base_filename, _ = os.path.splitext(filename)  # Remove extension
+                txt_filename = base_filename + ".txt"
+                txt_filepath = os.path.join(export_dir, txt_filename)
+
+                try:
+                    with open(txt_filepath, 'w', encoding='utf-8') as f:
+                        f.write(", ".join(tags))  # Join tags with comma and space.
+                    print(f"  Wrote tags for {filename} to {txt_filepath}")
+                except Exception as e:
+                    print(f"  Error writing to {txt_filepath}: {e}")
+                    # Consider showing an error message to the user (QMessageBox).
+
+            # Open the export directory in the file explorer.
+            if sys.platform == 'win32':
+                os.startfile(export_dir)
+            elif sys.platform == 'darwin':  # macOS
+                subprocess.Popen(['open', export_dir])
+            else:  # Linux and other Unix-like
+                subprocess.Popen(['xdg-open', export_dir]) # Try xdg-open (common on Linux)
+        else:
+            print("Export cancelled by user.")
+    
+    
     def __init__(self):
         """Initializes the main application window."""
         super().__init__()
@@ -132,6 +231,9 @@ class MainWindow(QMainWindow):
         file_menu = menu_bar.addMenu("&File")  # '&' creates a keyboard shortcut (Alt+F)
         open_folder_action = file_menu.addAction("Open Folder...")
         open_folder_action.triggered.connect(self._open_folder_dialog)
+        
+        export_action = file_menu.addAction("Export Tags...")  # Add the Export action
+        export_action.triggered.connect(self._export_tags)  # Connect it to _export_tags
         # --- End Menu Bar ---
 
         main_layout = QVBoxLayout()
