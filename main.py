@@ -3,11 +3,49 @@ import os
 import json
 from tag_widget import TagWidget
 from center_panel import CenterPanel
+from tag_list_panel import TagListPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QLineEdit)
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtCore import Qt, QSettings
+
+class SelectionPanel(TagListPanel):
+    """Panel for displaying and managing selected tags."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.tag_names = []  # Store tag NAMES, not widgets.
+
+    def add_tag(self, tag_name, is_known=True):
+        if tag_name not in self.tag_names:
+            self.tag_names.append(tag_name)
+
+    def remove_tag(self, tag_name):
+        if tag_name in self.tag_names:
+            self.tag_names.remove(tag_name)
+
+    def clear_tags(self):
+        self.tag_names = []
+
+    def get_tags(self):
+        return self.tag_names
+
+    def set_tags(self, tags):
+        self.tag_names = tags[:]  # Create a *copy* of the list.
+
+    def set_tag_selected(self, tag_name, is_selected):
+        for i in reversed(range(self.layout.count())):
+            widget = self.layout.itemAt(i).widget()
+            if isinstance(widget, TagWidget) and widget.tag_name == tag_name:
+                widget.set_selected(is_selected)
+                break
+
+    def is_tag_draggable(self, tag_name):
+        return True  # Tags in the RightPanel ARE draggable.
+
+    def dropEvent(self, event):
+        pass  # Implement drag-and-drop reordering later
 
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
@@ -281,14 +319,7 @@ class MainWindow(QMainWindow):
         right_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         right_scroll_area.setFixedWidth(200)
 
-        self.right_panel = QFrame()  # Container for selected tags.
-        self.right_panel.setFrameShape(QFrame.StyledPanel)
-        right_layout = QVBoxLayout()
-        right_layout.setAlignment(Qt.AlignTop)
-        right_layout.setSpacing(0)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        self.right_panel.setLayout(right_layout)
-        self.right_panel_layout = right_layout  # Store the layout for later use (adding/removing tags).
+        self.right_panel = SelectionPanel(parent=self)
 
         right_scroll_area.setWidget(self.right_panel)
         panels_layout.addWidget(right_scroll_area)
@@ -341,7 +372,7 @@ class MainWindow(QMainWindow):
                 for line in file:
                     tag_name = line.strip()  # Remove leading/trailing whitespace.
                     tag_widget = TagWidget(tag_name)  # Create a TagWidget for each tag.
-                    tag_widget.tag_clicked.connect(self._handle_tag_clicked_left_panel)
+                    tag_widget.tag_clicked.connect(self._handle_tag_clicked)
                     layout.addWidget(tag_widget)
                     self.tag_widgets_by_name[tag_name] = tag_widget  # Store the TagWidget instance for later lookup.
         except FileNotFoundError:
@@ -571,7 +602,7 @@ class MainWindow(QMainWindow):
         self._load_and_display_image(image_path)  # Load and display the next image.
         self._update_index_label() # Update index
 
-    def _handle_tag_clicked_left_panel(self, tag_name):
+    def _handle_tag_clicked(self, tag_name):
         """Handles clicks on tags in the left panel (tag list)."""
         current_selected_tags = list(self.selected_tags_for_current_image)  # Work with a *copy* of the list.
 
@@ -583,35 +614,27 @@ class MainWindow(QMainWindow):
             print(f"Tag '{tag_name}' deselected and removed (via left panel click).")
 
         self._update_selected_tags(current_selected_tags)  # Use the central update function.
-
-        # The line below is kept for immediate visual feedback on click.
-        tag_widget = self.tag_widgets_by_name.get(tag_name)
-        if tag_widget:  # Check if tag_widget is not None (it should always exist if clicked).
-            tag_widget.set_selected(tag_name in current_selected_tags)
-
+    
     def _handle_tag_clicked_right_panel_tag_widget(self, tag_name):
-        """Handles clicks on TagWidgets in the right panel (selected tags list)."""
-        current_selected_tags = list(self.selected_tags_for_current_image)  # Work with a *copy* of the list.
-
-        if tag_name in current_selected_tags:
-            current_selected_tags.remove(tag_name)
-            print(f"Tag '{tag_name}' deselected and removed (via right panel click).")
-        else:
-            print(f"Tag '{tag_name}' not in selected tags (right panel TagWidget click issue?).") # Should not happen
-
-        self._update_selected_tags(current_selected_tags) # Use the central update function.
-
+            """Handles clicks on TagWidgets in the right panel (selected tags list)."""
+            self._handle_tag_clicked(tag_name)
+    
     def _update_right_panel_display(self):
-        """Updates the right panel to display the currently selected tags (with styling for unknown tags)."""
-        layout = self.right_panel_layout
-        for i in reversed(range(layout.count())):  # Clear existing widgets (efficiently).
-            layout.itemAt(i).widget().setParent(None)  # Remove and de-parent each widget.
+        """Updates the right panel to display the currently selected tags."""
+        # Clear existing widgets:
+        for i in reversed(range(self.right_panel.layout.count())):
+            widget = self.right_panel.layout.itemAt(i).widget()
+            if isinstance(widget, TagWidget):  # Only remove TagWidgets
+                widget.setParent(None)
+                widget.deleteLater()
 
+        # Add new widgets based on selected tag *names*:
         for tag_name in self.selected_tags_for_current_image:
-            is_known = tag_name in self.tag_widgets_by_name  # Check if the tag is "known" (in tag_list.csv).
-            tag_widget = TagWidget(tag_name, is_known_tag=is_known)  # Create TagWidget with known/unknown status.
-            tag_widget.tag_clicked.connect(self._handle_tag_clicked_right_panel_tag_widget)
-            layout.addWidget(tag_widget)
+            is_known = tag_name in self.tag_widgets_by_name
+            tag_widget = TagWidget(tag_name, is_known_tag=is_known)
+            tag_widget.tag_clicked.connect(self._handle_tag_clicked) # we now route ALL clicks through this
+            self.right_panel.layout.addWidget(tag_widget)
+
         print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}")
 
     def _update_selected_tags(self, new_tag_list):
