@@ -615,10 +615,6 @@ class MainWindow(QMainWindow):
 
         self._update_selected_tags(current_selected_tags)  # Use the central update function.
     
-    def _handle_tag_clicked_right_panel_tag_widget(self, tag_name):
-            """Handles clicks on TagWidgets in the right panel (selected tags list)."""
-            self._handle_tag_clicked(tag_name)
-    
     def _update_right_panel_display(self):
         """Updates the right panel to display the currently selected tags."""
         # Clear existing widgets:
