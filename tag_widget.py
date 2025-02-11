@@ -1,5 +1,7 @@
 from PySide6.QtWidgets import QLabel, QFrame, QSizePolicy, QHBoxLayout
-from PySide6.QtCore import Qt, QSize, Signal
+from PySide6.QtCore import Qt, QSize, Signal, QMimeData
+from PySide6.QtGui import QDrag
+from math import sqrt
 
 class TagWidget(QFrame):
     """Widget to display a tag with selection and known/unknown status."""
@@ -17,6 +19,7 @@ class TagWidget(QFrame):
         self.tag_name = tag_name
         self.is_selected = False  # Initially, the tag is not selected.
         self.is_known_tag = is_known_tag  # Initially, assume the tag is known.
+        self.drag_allowed = False # Initially, dragging is not allowed.
         self._setup_ui()
         self._update_style() # Apply initial style based on is_known_tag and is_selected.
 
@@ -53,9 +56,52 @@ class TagWidget(QFrame):
     def mousePressEvent(self, event):
         """Handles mouse press events to toggle tag selection."""
         super().mousePressEvent(event)  # Call the base class implementation.
-        self.toggle_selection()  # Toggle the selection state.
-        self.tag_clicked.emit(self.tag_name)  # Emit the tag_clicked signal.
+        # self.toggle_selection()  # Toggle the selection state.  <- REMOVE/COMMENT OUT THIS LINE
+        # self.tag_clicked.emit(self.tag_name)  # Emit the tag_clicked signal. <- REMOVE/COMMENT OUT THIS LINE
+        self.start_drag_pos = event.pos()  # Store widget-relative position.  <-- ADD THIS LINE
+        self.start_drag_global_pos = event.globalPos()  # Store global position. <-- ADD THIS LINE
+        print(f"Mouse press event. tag: {self.tag_name}, pos: {self.start_drag_pos}, global: {self.start_drag_global_pos}") #TEMP PRINT
 
+
+    def mouseMoveEvent(self, event):
+        """Handles mouse move events to initiate drag if threshold is exceeded."""
+        if event.buttons() != Qt.LeftButton:  # Only handle left-button drags
+            return
+
+        if not self.drag_allowed:
+            return
+
+        # Calculate distance moved from initial press position.
+        dx = event.globalPos().x() - self.start_drag_global_pos.x()
+        dy = event.globalPos().y() - self.start_drag_global_pos.y()
+        distance = sqrt(dx * dx + dy * dy)
+        # print(f"drag distance: {distance}")
+
+        if distance > 8:  # Drag threshold (adjust as needed).
+            print(f"Initiating drag for tag: {self.tag_name}") #TEMP PRINT
+            drag = QDrag(self)
+            mime_data = QMimeData()
+            mime_data.setText(self.tag_name)
+            drag.setMimeData(mime_data)
+            # drag.setPixmap(self.grab())  # Optional: Set a pixmap for the drag.
+            drag.exec(Qt.MoveAction)  # Start the drag operation.
+    
+    
+    def mouseReleaseEvent(self, event):
+        """Handles mouse release events, completing click or drag"""
+        # Calculate distance moved from initial press position.
+        dx = event.globalPos().x() - self.start_drag_global_pos.x()
+        dy = event.globalPos().y() - self.start_drag_global_pos.y()
+        distance = sqrt(dx * dx + dy * dy)
+        print(f"release distance: {distance}")
+
+        if distance <= 8:  # Click threshold (adjust as needed).
+            print(f"toggle selection: {self.tag_name}") #TEMP PRINT
+            self.is_selected = not self.is_selected  # Toggle the selection state.
+            self._update_style() # Update style
+            self.tag_clicked.emit(self.tag_name)
+    
+    
     def toggle_selection(self):
         """Toggles the selection state of the tag (selected/deselected)."""
         self._update_style()  # Update the style to reflect the new selection state.
@@ -73,3 +119,10 @@ class TagWidget(QFrame):
         """Sets the selection state of the tag and updates its visual style."""
         self.is_selected = is_selected
         self._update_style()
+
+    def set_drag_allowed(self, allowed):
+        self.drag_allowed = allowed
+    
+    def get_drag_allowed(self):
+        return self.drag_allowed
+    
