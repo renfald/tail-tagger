@@ -16,7 +16,8 @@ class SelectionPanel(TagListPanel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.tag_names = []  # Store tag NAMES, not widgets.
-        print(f"SelectionPanel drag_allowed: {self.is_tag_draggable('')}") # Added for debugging
+        self.setAcceptDrops(True)  # Ensure the panel accepts drops.
+        print(f"SelectionPanel drag_allowed: {self.is_tag_draggable('')}")  # Added for debugging
 
     def add_tag(self, tag_name, is_known=True):
         if tag_name not in self.tag_names:
@@ -46,13 +47,27 @@ class SelectionPanel(TagListPanel):
         return True  # Tags in the RightPanel ARE draggable.
 
     def dropEvent(self, event):
-        pass  # Implement drag-and-drop reordering later
-    
+        if isinstance(event.source(), TagWidget):
+            print("SelectionPanel: dropEvent")  # DEBUG
+            event.acceptProposedAction() # Add this!
+
     def dragEnterEvent(self, event):
-        if event.source() == self:
+        print("SelectionPanel: dragEnterEvent")  # DEBUG
+        if isinstance(event.source(), TagWidget):  # Check if the source is a TagWidget
+            print("SelectionPanel: dragEnterEvent-> acceptProposedAction")
             event.acceptProposedAction()
         else:
+            print("SelectionPanel: dragEnterEvent-> event.source() was NOT a TagWidget")
             event.ignore()
+
+    def dragMoveEvent(self, event):
+        print("SelectionPanel: dragMoveEvent")
+        if isinstance(event.source(), TagWidget):  # Check if the source is a TagWidget
+            print("SelectionPanel: dragMoveEvent-> acceptProposedAction")
+            event.acceptProposedAction()
+        else: # Not needed, but good practice.
+            event.ignore()
+
 
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
