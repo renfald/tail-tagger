@@ -55,7 +55,6 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             event.ignore()
 
     def dragMoveEvent(self, event):
-        # Basic move event. Subclasses can customize this.
         if event.source() == self:
             event.acceptProposedAction()
 

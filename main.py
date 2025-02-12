@@ -16,6 +16,7 @@ class SelectionPanel(TagListPanel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.tag_names = []  # Store tag NAMES, not widgets.
+        print(f"SelectionPanel drag_allowed: {self.is_tag_draggable('')}") # Added for debugging
 
     def add_tag(self, tag_name, is_known=True):
         if tag_name not in self.tag_names:
@@ -46,6 +47,12 @@ class SelectionPanel(TagListPanel):
 
     def dropEvent(self, event):
         pass  # Implement drag-and-drop reordering later
+    
+    def dragEnterEvent(self, event):
+        if event.source() == self:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""

@@ -19,7 +19,6 @@ class TagWidget(QFrame):
         self.tag_name = tag_name
         self.is_selected = False  # Initially, the tag is not selected.
         self.is_known_tag = is_known_tag  # Initially, assume the tag is known.
-        self.drag_allowed = False # Initially, dragging is not allowed.
         self._setup_ui()
         self._update_style() # Apply initial style based on is_known_tag and is_selected.
 
@@ -65,20 +64,24 @@ class TagWidget(QFrame):
 
     def mouseMoveEvent(self, event):
         """Handles mouse move events to initiate drag if threshold is exceeded."""
+        print(f"mouseMoveEvent called for tag: {self.tag_name}")  # Debug print
+
         if event.buttons() != Qt.LeftButton:  # Only handle left-button drags
+            print(f"mouseMoveEvent: Ignoring because left button is not pressed.")
             return
 
-        if not self.drag_allowed:
+        if not self.parent().is_tag_draggable(self.tag_name):  # Check parent's is_tag_draggable
+            print("drag not allowed")
             return
 
         # Calculate distance moved from initial press position.
         dx = event.globalPos().x() - self.start_drag_global_pos.x()
         dy = event.globalPos().y() - self.start_drag_global_pos.y()
         distance = sqrt(dx * dx + dy * dy)
-        # print(f"drag distance: {distance}")
+        print(f"mouseMoveEvent: tag={self.tag_name}, distance={distance:.2f}, drag_allowed={self.parent().is_tag_draggable(self.tag_name)}")
 
         if distance > 8:  # Drag threshold (adjust as needed).
-            print(f"Initiating drag for tag: {self.tag_name}") #TEMP PRINT
+            print(f"Initiating drag for tag: {self.tag_name}")
             drag = QDrag(self)
             mime_data = QMimeData()
             mime_data.setText(self.tag_name)
@@ -119,10 +122,3 @@ class TagWidget(QFrame):
         """Sets the selection state of the tag and updates its visual style."""
         self.is_selected = is_selected
         self._update_style()
-
-    def set_drag_allowed(self, allowed):
-        self.drag_allowed = allowed
-    
-    def get_drag_allowed(self):
-        return self.drag_allowed
-    
