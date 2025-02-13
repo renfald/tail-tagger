@@ -4,6 +4,7 @@ import json
 from tag_widget import TagWidget
 from center_panel import CenterPanel
 from tag_list_panel import TagListPanel
+from tag_list_model import TagListModel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QLineEdit)
@@ -232,20 +233,34 @@ class MainWindow(QMainWindow):
         self.selected_tags_for_current_image = []  # List of tags selected for the current image.
         self.unknown_tags_for_current_image = []  # List of 'unknown' tags for the current image (loaded from file but not in tag_list.csv).
         self.tag_widgets_by_name = {}  # Dictionary to store TagWidget instances by tag name (for left panel lookup).
-        
+        self.tag_list_model = TagListModel() # Create the model
+
         # --- Load Configuration ---
         config = MainWindow.load_config()  # Load configuration using the static method.
         self.last_folder_path = config.get("last_opened_folder") # Set last folder from config
-        
+
         # --- Staging Folder ---
         self.staging_folder_path = os.path.join(os.getcwd(), "staging")
         if not os.path.isdir(self.staging_folder_path):
             os.makedirs(self.staging_folder_path, exist_ok=True)
 
-        # --- Setup UI and Load Tags ---
+        # --- Setup UI and Load Tags/Images ---
         self._setup_dark_mode_theme()
         self._setup_ui()
         self._load_tags()  # Load tags from tag_list.csv
+
+        # --- TEST TagListModel ---
+        print("Testing TagListModel:")
+        self.tag_list_model.add_tag("test_tag_1")
+        self.tag_list_model.add_tag("test_tag_2")
+        print(f"  Current tags: {self.tag_list_model.get_tags()}")
+        self.tag_list_model.remove_tag("test_tag_1")
+        print(f"  Current tags: {self.tag_list_model.get_tags()}")
+        self.tag_list_model.set_tags(["new_tag_1", "new_tag_2", "new_tag_3"])
+        print(f"  Current tags: {self.tag_list_model.get_tags()}")
+        self.tag_list_model.clear_tags()
+        print(f"  Current tags: {self.tag_list_model.get_tags()}")
+        # --- END TEST ---
 
         if (self.last_folder_path):
             print(f"Loading last opened folder: {self.last_folder_path}")
