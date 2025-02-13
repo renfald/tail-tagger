@@ -7,41 +7,41 @@ from tag_list_panel import TagListPanel
 from tag_list_model import TagListModel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
-                             QFileDialog, QLineEdit)
+                             QFileDialog, QLineEdit, QListView)
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt 
 
 class SelectionPanel(TagListPanel):
     """Panel for displaying and managing selected tags."""
 
-    def __init__(self, parent=None):
+    def __init__(self, model, parent=None):
         super().__init__(parent)
-        self.tag_names = []  # Store tag NAMES, not widgets.
+        self.model = model # Store a reference to the model.
+        self.listView = QListView(self)  # Create the QListView.
+        self.listView.setModel(self.model)  # Set the model on the QListView.
+        self.layout.addWidget(self.listView) # Use existing layout
+        self.listView.clicked.connect(self._handle_item_clicked) #NEW
         self.setAcceptDrops(True)  # Ensure the panel accepts drops.
         print(f"SelectionPanel drag_allowed: {self.is_tag_draggable('')}")  # Added for debugging
 
-    def add_tag(self, tag_name, is_known=True):
-        if tag_name not in self.tag_names:
-            self.tag_names.append(tag_name)
-
-    def remove_tag(self, tag_name):
-        if tag_name in self.tag_names:
-            self.tag_names.remove(tag_name)
-
-    def clear_tags(self):
-        self.tag_names = []
-
-    def get_tags(self):
-        return self.tag_names
-
-    def set_tags(self, tags):
-        self.tag_names = tags[:]  # Create a *copy* of the list.
-
+    def _handle_item_clicked(self, index):
+        """Handles clicks on items in the QListView (for deselection)."""
+        tag_data = self.model.data(index, Qt.UserRole) # Get the full tag data.
+        tag_name = tag_data['name']
+        main_window = self.window()  # Get the main window instance.
+        if hasattr(main_window, '_handle_tag_clicked'):
+            main_window._handle_tag_clicked(tag_name)  # Delegate to MainWindow.
+        else:
+            print("Error: Main window does not have '_handle_tag_clicked' method.")
+    
     def set_tag_selected(self, tag_name, is_selected):
-        for i in reversed(range(self.layout.count())):
-            widget = self.layout.itemAt(i).widget()
-            if isinstance(widget, TagWidget) and widget.tag_name == tag_name:
-                widget.set_selected(is_selected)
+        # Find the index of the tag with the given name in the model.
+        for row in range(self.model.rowCount()):
+            index = self.model.index(row, 0)
+            tag_data = self.model.data(index, Qt.UserRole)  # Get the full tag data.
+            if tag_data['name'] == tag_name:
+                # We've found the tag. Now, update its selection state in the *model*.
+                self.model.setData(index, is_selected, Qt.UserRole) # Assuming you have a way to set
                 break
 
     def is_tag_draggable(self, tag_name):
@@ -233,7 +233,7 @@ class MainWindow(QMainWindow):
         self.selected_tags_for_current_image = []  # List of tags selected for the current image.
         self.unknown_tags_for_current_image = []  # List of 'unknown' tags for the current image (loaded from file but not in tag_list.csv).
         self.tag_widgets_by_name = {}  # Dictionary to store TagWidget instances by tag name (for left panel lookup).
-        self.tag_list_model = TagListModel() # Create the model
+        self.tag_list_model = TagListModel(self) # Create the model and pass in mainwindow as parent
 
         # --- Load Configuration ---
         config = MainWindow.load_config()  # Load configuration using the static method.
@@ -248,19 +248,6 @@ class MainWindow(QMainWindow):
         self._setup_dark_mode_theme()
         self._setup_ui()
         self._load_tags()  # Load tags from tag_list.csv
-
-        # --- TEST TagListModel ---
-        print("Testing TagListModel:")
-        self.tag_list_model.add_tag("test_tag_1")
-        self.tag_list_model.add_tag("test_tag_2")
-        print(f"  Current tags: {self.tag_list_model.get_tags()}")
-        self.tag_list_model.remove_tag("test_tag_1")
-        print(f"  Current tags: {self.tag_list_model.get_tags()}")
-        self.tag_list_model.set_tags(["new_tag_1", "new_tag_2", "new_tag_3"])
-        print(f"  Current tags: {self.tag_list_model.get_tags()}")
-        self.tag_list_model.clear_tags()
-        print(f"  Current tags: {self.tag_list_model.get_tags()}")
-        # --- END TEST ---
 
         if (self.last_folder_path):
             print(f"Loading last opened folder: {self.last_folder_path}")
@@ -356,8 +343,8 @@ class MainWindow(QMainWindow):
         right_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         right_scroll_area.setFixedWidth(200)
 
-        self.right_panel = SelectionPanel(parent=self)
-
+        self.right_panel = SelectionPanel(model = self.tag_list_model, parent=self)  # Create instance, and provide model
+        
         right_scroll_area.setWidget(self.right_panel)
         panels_layout.addWidget(right_scroll_area)
 
@@ -640,45 +627,42 @@ class MainWindow(QMainWindow):
         self._update_index_label() # Update index
 
     def _handle_tag_clicked(self, tag_name):
-        """Handles clicks on tags in the left panel (tag list)."""
-        current_selected_tags = list(self.selected_tags_for_current_image)  # Work with a *copy* of the list.
+        """Handles clicks on tags (in any panel)."""
+        current_selected_tags = list(self.selected_tags_for_current_image)
 
         if tag_name not in current_selected_tags:
             current_selected_tags.append(tag_name)
-            print(f"Tag '{tag_name}' selected and added (via left panel click).")
+            print(f"Tag '{tag_name}' selected and added.")
         else:
             current_selected_tags.remove(tag_name)
-            print(f"Tag '{tag_name}' deselected and removed (via left panel click).")
+            print(f"Tag '{tag_name}' deselected and removed.")
 
-        self._update_selected_tags(current_selected_tags)  # Use the central update function.
+        self._update_selected_tags(current_selected_tags)  # Central update function.
     
     def _update_right_panel_display(self):
         """Updates the right panel to display the currently selected tags."""
-        # Clear existing widgets:
-        for i in reversed(range(self.right_panel.layout.count())):
-            widget = self.right_panel.layout.itemAt(i).widget()
-            if isinstance(widget, TagWidget):  # Only remove TagWidgets
-                widget.setParent(None)
-                widget.deleteLater()
-
-        # Add new widgets based on selected tag *names*:
-        for tag_name in self.selected_tags_for_current_image:
-            is_known = tag_name in self.tag_widgets_by_name
-            tag_widget = TagWidget(tag_name, is_known_tag=is_known)
-            tag_widget.tag_clicked.connect(self._handle_tag_clicked) # we now route ALL clicks through this
-            self.right_panel.layout.addWidget(tag_widget)
+        self.right_panel.model.set_tags(self.selected_tags_for_current_image) # Update model!
 
         print(f"Right panel updated. Selected tags: {self.selected_tags_for_current_image}")
 
     def _update_selected_tags(self, new_tag_list):
-        """Updates the selected_tags_for_current_image list and triggers UI updates.  This is the central point for all tag selection modifications."""
+        """Updates the selected_tags_for_current_image list and triggers UI updates."""
         print(f"Updating selected tags to: {new_tag_list}")
 
-        self.selected_tags_for_current_image = new_tag_list  # Update the authoritative list.
+        self.selected_tags_for_current_image = new_tag_list  # Update the list.
 
-        self._update_right_panel_display()  # Update the right panel.
-        self._update_left_panel_display_based_on_selection()  # Update the left panel.
+        # Update the model directly.
+        self.tag_list_model.set_tags(self.selected_tags_for_current_image) # NEW
+        self._update_left_panel_display_based_on_selection() # update left panel
+        self._update_workfile() # update workfile!
 
+    def _update_left_panel_display_based_on_selection(self):
+        """Updates the visual selection state of tags in the left panel based on selected_tags_for_current_image."""
+        print("  Updating left panel selection states...")
+        for tag_name, tag_widget in self.tag_widgets_by_name.items():
+            tag_widget.set_selected(tag_name in self.selected_tags_for_current_image)  # Select/deselect based on presence in the list.
+
+    def _update_workfile(self):
         # --- Workfile saving ---
         if self.last_folder_path:  # Only save if a folder has been loaded.
             workfile_path = self._get_workfile_path(self.last_folder_path)  # Get the workfile path.
@@ -701,12 +685,6 @@ class MainWindow(QMainWindow):
             except json.JSONDecodeError:
                 print(f"Error: Corrupted workfile at {workfile_path}.")
                 # TODO: Consider prompting the user to delete or recover the workfile.
-
-    def _update_left_panel_display_based_on_selection(self):
-        """Updates the visual selection state of tags in the left panel based on selected_tags_for_current_image."""
-        print("  Updating left panel selection states...")
-        for tag_name, tag_widget in self.tag_widgets_by_name.items():
-            tag_widget.set_selected(tag_name in self.selected_tags_for_current_image)  # Select/deselect based on presence in the list.
 
 app = QApplication(sys.argv)
 window = MainWindow()
