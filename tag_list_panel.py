@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtCore import Qt
 
 class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget), type(ABC)), {})):  # Explicit metaclass
-    """Abstract base class for panels that display a list of TagWidgets."""
+    """Abstract base class for panels."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -11,54 +11,44 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         self.layout.setAlignment(Qt.AlignTop)
         self.layout.setSpacing(0)
         self.layout.setContentsMargins(0, 0, 0, 0)
-        self.setAcceptDrops(True) # Important: Enable drop events.
+        # self.setAcceptDrops(True) # Removed
 
     @abstractmethod
     def add_tag(self, tag_name, is_known=True):
-        """Adds a tag to the panel. Must be implemented by subclasses."""
-        pass
+        """Adds a tag."""
+        pass # Modified
 
     @abstractmethod
     def remove_tag(self, tag_name):
-        """Removes a tag from the panel.  Must be implemented by subclasses."""
-        pass
+        """Removes a tag."""
+        pass # Modified
 
     @abstractmethod
     def clear_tags(self):
-        """Clears all tags from the panel. Must be implemented by subclasses."""
-        pass
+        """Clears all tags."""
+        pass # Modified
 
     @abstractmethod
     def get_tags(self):
-        """Returns a list of all tags in the panel (in their current order). Must be implemented by subclasses."""
-        return [] # Return empty list
+        """Returns a list of all tags."""
+        return []
 
     @abstractmethod
     def set_tags(self, tags):
-        """Sets the tags in the panel, replacing any existing tags. Must be implemented by subclasses."""
-        pass
+        """Sets the tags."""
+        pass # Modified
 
     @abstractmethod
     def set_tag_selected(self, tag_name, is_selected):
-        """Sets the selection state of a specific tag. Must be implemented by subclasses."""
-        pass
+        """Sets the selection state."""
+        pass # Modified
 
     @abstractmethod
     def is_tag_draggable(self, tag_name):
-        """Returns True if the tag can be dragged, False otherwise. Must be implemented by subclasses."""
-        return False  # Default: not draggable.
-
-    def dragEnterEvent(self, event):
-        if event.source() == self:
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-    def dragMoveEvent(self, event):
-        if event.source() == self:
-            event.acceptProposedAction()
+        """Returns True if draggable, False otherwise."""
+        return False
 
     @abstractmethod
     def dropEvent(self, event):
-        """Handles drop events (reordering). Must be implemented by subclasses if dragging is allowed."""
-        pass
+        """Handles drop events."""
+        pass # Modified
