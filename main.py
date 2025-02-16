@@ -6,7 +6,7 @@ from config_manager import ConfigManager
 from file_operations import FileOperations
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
-                             QFileDialog, QListView)
+                             QFileDialog, QListView, QSplitter)
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtCore import Qt
 from center_panel import CenterPanel #Added back import
@@ -67,56 +67,106 @@ class MainWindow(QMainWindow):
         export_action.triggered.connect(self._export_tags)
         # --- End Menu Bar ---
 
-        main_layout = QVBoxLayout()
+        main_layout = QVBoxLayout(central_widget) # Set layout on central widget
         main_layout.setSpacing(0)
-        central_widget.setLayout(main_layout)
+        # central_widget.setLayout(main_layout) # Removed
 
-        panels_layout = QHBoxLayout()
-        panels_layout.setSpacing(0)
-        main_layout.addLayout(panels_layout)
+        # --- Main Horizontal Splitter (Left, Center, Right) ---
+        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter.setChildrenCollapsible(False)
+        main_layout.addWidget(main_splitter) # Add splitter to main layout
 
-        # --- Left Panel (Tag List) ---
-        left_scroll_area = QScrollArea()
-        left_scroll_area.setWidgetResizable(True)
-        left_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        left_scroll_area.setFixedWidth(200)
 
+        # --- Left Panel (Resizable) ---
         left_panel = QFrame()
         left_panel.setFrameShape(QFrame.StyledPanel)
-        left_layout = QVBoxLayout()
-        left_layout.setAlignment(Qt.AlignTop)
+        left_panel.setFixedWidth(150) # Initial width
+        left_panel.setMinimumWidth(75) # Minimum width
+        left_panel.setMaximumWidth(300) # Maximum width
+        left_layout = QVBoxLayout(left_panel)  # Add a layout
+        left_layout.setContentsMargins(0, 0, 0, 0) # Add this to remove margin
         left_layout.setSpacing(0)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_panel.setLayout(left_layout)
 
-        left_scroll_area.setWidget(left_panel)
-        panels_layout.addWidget(left_scroll_area)
+
+        # --- Vertical Splitter (Inside Left Panel) ---
+        left_splitter = QSplitter(Qt.Vertical)
+        left_splitter.setChildrenCollapsible(False)
+        left_layout.addWidget(left_splitter)
+
+        # --- All Tags Panel ---
+        all_tags_scroll_area = QScrollArea() # A QScrollArea is a scrollable area that can contain another widget.
+        all_tags_scroll_area.setWidgetResizable(True) 
+        all_tags_panel = QFrame()
+        all_tags_layout = QVBoxLayout(all_tags_panel)
+        all_tags_layout.setAlignment(Qt.AlignTop)
+        all_tags_layout.addWidget(QLabel("All Tags"))
+        all_tags_scroll_area.setWidget(all_tags_panel)
+
+        # --- Frequently Used Panel ---
+        frequently_used_scroll_area = QScrollArea()
+        frequently_used_scroll_area.setWidgetResizable(True)
+        frequently_used_panel = QFrame()
+        frequently_used_layout = QVBoxLayout(frequently_used_panel)
+        frequently_used_layout.setAlignment(Qt.AlignTop)
+        frequently_used_layout.addWidget(QLabel("Frequently Used"))
+        frequently_used_scroll_area.setWidget(frequently_used_panel)
+
+
+        # --- Favorites Panel ---
+        favorites_scroll_area = QScrollArea()
+        favorites_scroll_area.setWidgetResizable(True)
+        favorites_panel = QFrame()
+        favorites_layout = QVBoxLayout(favorites_panel)
+        favorites_layout.setAlignment(Qt.AlignTop)
+        favorites_layout.addWidget(QLabel("Favorites"))
+        favorites_scroll_area.setWidget(favorites_panel)
+        
+        # Add scroll areas to left splitter
+        left_splitter.addWidget(all_tags_scroll_area)
+        left_splitter.addWidget(frequently_used_scroll_area)
+        left_splitter.addWidget(favorites_scroll_area)
+        
+        left_splitter.setSizes([200, 200, 200])
+        
+        # Set stretch factors for the left panels 0 = fixed size, 1 = stretchable
+        left_splitter.setStretchFactor(0, 0) # All Tags
+        left_splitter.setStretchFactor(1, 0) # Frequently Used
+        left_splitter.setStretchFactor(2, 1) # Favorites
+
+        main_splitter.addWidget(left_panel) # Add to splitter
 
         # --- Center Panel (Image Display) ---
         self.center_panel = CenterPanel()
         self.center_panel.setFrameShape(QFrame.StyledPanel)
         self.center_panel.setMinimumSize(100, 100)
-        panels_layout.addWidget(self.center_panel)
+        main_splitter.addWidget(self.center_panel)  # Add to splitter
 
         # --- Right Panel (Selected Tags) ---
-        right_scroll_area = QScrollArea()
-        right_scroll_area.setWidgetResizable(True)
-        right_scroll_area.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        right_scroll_area.setFixedWidth(200)
-
+        right_panel_scroll_area = QScrollArea()
+        right_panel_scroll_area.setWidgetResizable(True) 
         self.right_panel = QFrame() # Use a basic QFrame as placeholder
+        right_layout = QVBoxLayout(self.right_panel)
+        right_layout.setAlignment(Qt.AlignTop)
+        right_layout.addWidget(QLabel("Right Panel"))
+        right_panel_scroll_area.setWidget(self.right_panel)
+        main_splitter.addWidget(right_panel_scroll_area)  # Add to splitter
 
-        right_scroll_area.setWidget(self.right_panel)
-        panels_layout.addWidget(right_scroll_area)
+        # Set initial sizes for the splitter. Essentially left and right will be fixed width between this and the set stretch factors
+        main_splitter.setSizes([150, 200, 150])
+        # Set stretch factors. 0 = fixed size, 1 = stretchable
+        main_splitter.setStretchFactor(0, 0) # Left Panel
+        main_splitter.setStretchFactor(1, 1) # Center Panel
+        main_splitter.setStretchFactor(2, 0) # Right Panel
+
 
         # --- Bottom Panel (Image Info and Buttons) ---
         bottom_panel = QFrame()
         bottom_panel.setFrameShape(QFrame.StyledPanel)
         bottom_panel.setFixedHeight(50)
-        bottom_layout = QHBoxLayout()
+        bottom_layout = QHBoxLayout(bottom_panel)
         bottom_layout.setSpacing(10)
         bottom_layout.setContentsMargins(10, 5, 10, 5)
-        bottom_panel.setLayout(bottom_layout)
+        # bottom_panel.setLayout(bottom_layout) # Removed
 
         left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         bottom_layout.addItem(left_spacer)
@@ -138,7 +188,7 @@ class MainWindow(QMainWindow):
         self.next_button.clicked.connect(self._next_image)
         bottom_layout.addWidget(self.next_button)
 
-        main_layout.addWidget(bottom_panel)
+        main_layout.addWidget(bottom_panel) # Add bottom panel to main layout
 
     def _load_initial_directory(self):
         """Loads images from an initial directory (environment variable)."""
