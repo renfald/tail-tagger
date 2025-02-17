@@ -4,6 +4,7 @@ import json
 import theme
 from config_manager import ConfigManager
 from file_operations import FileOperations
+from tag_list_model import TagListModel, TagData
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QListView, QSplitter)
@@ -25,32 +26,37 @@ class MainWindow(QMainWindow):
         self.current_image_index = 0  # Index of the currently displayed image.
         self.last_folder_path = None  # Initialize.
         self.selected_tags_for_current_image = []  # List of tags for the current image.
+        
+        # --- File Operations ---
+        self.file_operations = FileOperations()
+        self.tag_list_model = TagListModel()
 
         # --- Staging Folder ---
         self.staging_folder_path = os.path.join(os.getcwd(), "staging")
         if not os.path.isdir(self.staging_folder_path):
             os.makedirs(self.staging_folder_path, exist_ok=True)
+        self.file_operations.staging_folder_path = self.staging_folder_path
+
 
         # --- Load Configuration ---
         self.config_manager = ConfigManager()
         config = self.config_manager.config  # Get the loaded config
         self.last_folder_path = config.get("last_opened_folder") # Set last folder from config
 
-        # --- File Operations ---
-        self.file_operations = FileOperations(self.staging_folder_path)
+        # --- Load Tags from CSV ---
+        self.csv_path = os.path.join(os.getcwd(), "data", "tags-list.csv")
+        self.tag_list_model.load_tags_from_csv(self.csv_path)
 
         # --- Setup UI and Load Tags/Images ---
-        #self._setup_dark_mode_theme()
         self._setup_ui()
-        # self._load_tags()  # Removed
 
         if (self.last_folder_path):
             print(f"Loading last opened folder: {self.last_folder_path}")
             self._load_image_folder(self.last_folder_path)
         else:
             print("No valid last opened folder, attempting to load initial directory.")
-            self._load_initial_directory()
-            # self._load_image_folder(None) # May deprecate
+            self._load_initial_directory()            # self._load_image_folder(None) # May deprecate
+
 
     def _setup_ui(self):
         """Sets up the main user interface layout and elements."""
@@ -240,14 +246,7 @@ class MainWindow(QMainWindow):
             self.next_button.setEnabled(False)
             return
 
-        workfile_path = self.file_operations.get_workfile_path(folder_path)
-        if not os.path.exists(workfile_path):
-            # Create new empty workfile
-            try:
-                with open(workfile_path, 'w', encoding='utf-8') as f:
-                    json.dump({"image_tags": {}}, f)
-            except Exception as e:
-                print("error creating workfile")
+        self.file_operations.create_default_workfile(folder_path) # Create workfile if it doesn't exist
 
         image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
         self.image_paths = []
@@ -275,7 +274,6 @@ class MainWindow(QMainWindow):
 
     def _load_and_display_image(self, image_path):
         """Loads and displays an image, loads associated tags."""
-        # --- Clear Left Panel Selections --- # Removed
 
         self.center_panel.set_image_path(image_path)
         filename = os.path.basename(image_path)
@@ -283,9 +281,38 @@ class MainWindow(QMainWindow):
 
         # --- Load Tags for Image ---
         loaded_tags = self.file_operations.load_tags_for_image(image_path, self.last_folder_path)
-        self.selected_tags_for_current_image = loaded_tags  # Store loaded tags
-        print(f"Loaded Tags (for storage): {self.selected_tags_for_current_image}")
+        self.selected_tags_for_current_image = [] # Clear and repopulate
+        self.tag_list_model.clear_selected_tags() # Clear *selected* status
+        self.tag_list_model.remove_unknown_tags() # Remove any unknown tags
+        
+        for tag_name in loaded_tags:
+            # Check if the tag already exists in the model
+            existing_tag = None
+            for tag in self.tag_list_model.get_all_tags():
+                if tag.name == tag_name:
+                    existing_tag = tag
+                    break
+
+            if existing_tag:
+                # Tag exists, update selection
+                self.tag_list_model.set_tag_selected(tag_name, True)
+                self.selected_tags_for_current_image.append(existing_tag)
+            else:
+                # Tag doesn't exist, create a new one (unknown)
+                new_tag = TagData(name=tag_name, selected=True, is_known=False)
+                self.tag_list_model.add_tag(new_tag)
+                self.selected_tags_for_current_image.append(new_tag)
+        
         self.file_operations.update_workfile(self.last_folder_path, image_path, self.selected_tags_for_current_image)
+
+        # Debugging prints
+        total_tags = len(self.tag_list_model.tags)
+        selected_tags = len([tag for tag in self.tag_list_model.tags if tag.selected])
+        unknown_tags = len([tag for tag in self.tag_list_model.tags if not tag.is_known])
+
+        print(f"Total tags in model: {total_tags}")
+        print(f"Selected tags: {selected_tags}")
+        print(f"Unknown tags: {unknown_tags}")
 
     def _update_index_label(self):
         """Updates the image index label."""

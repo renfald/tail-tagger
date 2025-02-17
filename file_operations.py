@@ -4,23 +4,27 @@ import json
 class FileOperations:
     """Handles file system operations for the image tagger."""
 
-    def __init__(self, staging_folder):
-        self.staging_folder = staging_folder
+    staging_folder_path = None  # Class variable for staging folder
+
+    def __init__(self):
+        pass
 
     def get_workfile_path(self, folder_path):
         """Generates a valid workfile path based on the image folder path."""
         filename_safe_string = folder_path.replace(os.sep, '_').replace(':', '_') + ".json"
-        return os.path.join(self.staging_folder, filename_safe_string)
+        return os.path.join(self.staging_folder_path, filename_safe_string)
 
     def update_workfile(self, last_folder_path, image_path, tags):
         """Updates the workfile with the tags for the given image."""
         if last_folder_path:  # Only save if a folder has been loaded.
             workfile_path = self.get_workfile_path(last_folder_path)
 
+            tag_names = [tag.name for tag in tags]  # Extract tag names
+
             try:
                 with open(workfile_path, 'r+', encoding='utf-8') as f:
                     data = json.load(f)
-                    data["image_tags"][image_path] = tags  # Use passed arguments
+                    data["image_tags"][image_path] = tag_names  # Use extracted tag names
                     f.seek(0)
                     json.dump(data, f, indent=2)
                     f.truncate()
@@ -174,3 +178,14 @@ class FileOperations:
                 subprocess.Popen(['xdg-open', export_dir]) # Try xdg-open (common on Linux)
         else:
             print("Export cancelled by user.")
+
+    def create_default_workfile(self, folder_path):
+        """Creates a default workfile if one doesn't exist."""
+        workfile_path = self.get_workfile_path(folder_path)
+        if not os.path.exists(workfile_path):
+            try:
+                with open(workfile_path, 'w', encoding='utf-8') as f:
+                    json.dump({"image_tags": {}}, f)
+                print(f"Created default workfile at {workfile_path}")
+            except Exception as e:
+                print(f"Error creating default workfile: {e}")
