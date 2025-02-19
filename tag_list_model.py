@@ -80,3 +80,7 @@ class TagListModel(QAbstractListModel):
         for tag in self.tags:
             tag.selected = False
         self.tags_selected_changed.emit() # Notify any listeners
+
+    def get_known_tags(self):
+        """Returns a list of all known tags."""
+        return [tag for tag in self.tags if tag.is_known]

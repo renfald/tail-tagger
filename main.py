@@ -5,6 +5,7 @@ import theme
 from config_manager import ConfigManager
 from file_operations import FileOperations
 from tag_list_model import TagListModel, TagData
+from all_tags_panel import AllTagsPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QListView, QSplitter)
@@ -19,7 +20,7 @@ class MainWindow(QMainWindow):
         """Initializes the main application window."""
         super().__init__()
         self.setWindowTitle("Image Tagger")
-        self.resize(1024, 768)
+        self.resize(1280, 960)
 
         # --- Instance Variables ---
         self.image_paths = []  # List of image file paths.
@@ -98,15 +99,18 @@ class MainWindow(QMainWindow):
         left_splitter = QSplitter(Qt.Vertical)
         left_splitter.setChildrenCollapsible(False)
         left_layout.addWidget(left_splitter)
-
+        
         # --- All Tags Panel ---
+        self.all_tags_panel = AllTagsPanel(self.tag_list_model)
+        self.tag_list_model.tags_selected_changed.connect(self._update_tag_panels)
+
         all_tags_scroll_area = QScrollArea() # A QScrollArea is a scrollable area that can contain another widget.
         all_tags_scroll_area.setWidgetResizable(True) 
-        all_tags_panel = QFrame()
-        all_tags_layout = QVBoxLayout(all_tags_panel)
+        # all_tags_panel = QFrame()  # taking this out and moving the alltagspanel from init to here. unclear if we really need it to be "self"
+        all_tags_layout = QVBoxLayout(self.all_tags_panel)
         all_tags_layout.setAlignment(Qt.AlignTop)
-        all_tags_layout.addWidget(QLabel("All Tags"))
-        all_tags_scroll_area.setWidget(all_tags_panel)
+        all_tags_layout.addWidget(self.all_tags_panel)
+        all_tags_scroll_area.setWidget(self.all_tags_panel)
 
         # --- Frequently Used Panel ---
         frequently_used_scroll_area = QScrollArea()
@@ -127,12 +131,19 @@ class MainWindow(QMainWindow):
         favorites_layout.addWidget(QLabel("Favorites"))
         favorites_scroll_area.setWidget(favorites_panel)
         
+        # --- Style the viewports ---  this is temporary and will not be needed when the full panels get implemented
+        darker_background_color = "#242424"  # Darker gray.  Adjust as needed.
+        # all_tags_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};")
+        frequently_used_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};")
+        favorites_scroll_area.setStyleSheet(f"background-color: {darker_background_color};")
+
+
         # Add scroll areas to left splitter
         left_splitter.addWidget(all_tags_scroll_area)
         left_splitter.addWidget(frequently_used_scroll_area)
         left_splitter.addWidget(favorites_scroll_area)
         
-        left_splitter.setSizes([200, 200, 200])
+        left_splitter.setSizes([300, 200, 200])
         
         # Set stretch factors for the left panels 0 = fixed size, 1 = stretchable
         left_splitter.setStretchFactor(0, 0) # All Tags
@@ -304,8 +315,11 @@ class MainWindow(QMainWindow):
                 self.selected_tags_for_current_image.append(new_tag)
         
         self.file_operations.update_workfile(self.last_folder_path, image_path, self.selected_tags_for_current_image)
+        
+        # Now that we've updated the model, all panels must be populated with the appropriate tags
+        self._update_tag_panels()
 
-        # Debugging prints
+        # Debugging prints to be deleted later!
         total_tags = len(self.tag_list_model.tags)
         selected_tags = len([tag for tag in self.tag_list_model.tags if tag.selected])
         unknown_tags = len([tag for tag in self.tag_list_model.tags if not tag.is_known])
@@ -351,6 +365,11 @@ class MainWindow(QMainWindow):
     def _export_tags(self):
         self.file_operations.export_tags(self, self.last_folder_path)
 
+
+    def _update_tag_panels(self):
+        """Updates all tag panels."""
+        self.all_tags_panel.update_display()
+        # any other panels to update will go here once implemented
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)
