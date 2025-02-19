@@ -6,6 +6,7 @@ from config_manager import ConfigManager
 from file_operations import FileOperations
 from tag_list_model import TagListModel, TagData
 from all_tags_panel import AllTagsPanel
+from selected_tags_panel import SelectedTagsPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QListView, QSplitter)
@@ -47,6 +48,11 @@ class MainWindow(QMainWindow):
         # --- Load Tags from CSV ---
         self.csv_path = os.path.join(os.getcwd(), "data", "tags-list.csv")
         self.tag_list_model.load_tags_from_csv(self.csv_path)
+
+        # --- Tag Panels ---
+        # self.all_tags_panel = AllTagsPanel(self.tag_list_model) Not sure if we're gonna do it this way. right now this is directly in setup ui.
+        self.selected_tags_panel = SelectedTagsPanel(self)
+
 
         # --- Setup UI and Load Tags/Images ---
         self._setup_ui()
@@ -160,13 +166,10 @@ class MainWindow(QMainWindow):
 
         # --- Right Panel (Selected Tags) ---
         right_panel_scroll_area = QScrollArea()
-        right_panel_scroll_area.setWidgetResizable(True) 
-        self.right_panel = QFrame() # Use a basic QFrame as placeholder
-        right_layout = QVBoxLayout(self.right_panel)
-        right_layout.setAlignment(Qt.AlignTop)
-        right_layout.addWidget(QLabel("Right Panel"))
-        right_panel_scroll_area.setWidget(self.right_panel)
-        main_splitter.addWidget(right_panel_scroll_area)  # Add to splitter
+        right_panel_scroll_area.setWidgetResizable(True)
+        self.selected_tags_panel = SelectedTagsPanel(self) # Instance is now directly the right panel
+        right_panel_scroll_area.setWidget(self.selected_tags_panel) # Set panel as scroll area widget
+        main_splitter.addWidget(right_panel_scroll_area)  # Add scroll area to splitter
 
         # Set initial sizes for the splitter. Essentially left and right will be fixed width between this and the set stretch factors
         main_splitter.setSizes([150, 200, 150])
@@ -369,6 +372,7 @@ class MainWindow(QMainWindow):
     def _update_tag_panels(self):
         """Updates all tag panels."""
         self.all_tags_panel.update_display()
+        self.selected_tags_panel.update_display()
         # any other panels to update will go here once implemented
 
 app = QApplication(sys.argv)
