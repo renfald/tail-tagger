@@ -294,31 +294,30 @@ class MainWindow(QMainWindow):
         self.filename_label.setText(filename)
 
         # --- Load Tags for Image ---
-        loaded_tags = self.file_operations.load_tags_for_image(image_path, self.last_folder_path)
-        self.selected_tags_for_current_image = [] # Clear and repopulate
-        self.tag_list_model.clear_selected_tags() # Clear *selected* status
+        loaded_tag_names = self.file_operations.load_tags_for_image(image_path, self.last_folder_path) # Get list of tag *names*
+        self.selected_tags_for_current_image = []  # Clear the list of selected tag widgets
+        self.tag_list_model.clear_selected_tags() # Clear selections attrs in model
         self.tag_list_model.remove_unknown_tags() # Remove any unknown tags
-        
-        for tag_name in loaded_tags:
-            # Check if the tag already exists in the model
-            existing_tag = None
+        for tag_name in loaded_tag_names:
+            # Find the TagData object in the model
+            existing_tag_data = None
             for tag in self.tag_list_model.get_all_tags():
                 if tag.name == tag_name:
-                    existing_tag = tag
+                    existing_tag_data = tag
                     break
 
-            if existing_tag:
-                # Tag exists, update selection
-                self.tag_list_model.set_tag_selected(tag_name, True)
-                self.selected_tags_for_current_image.append(existing_tag)
+            if existing_tag_data:
+                # Known tag found in model:
+                self.tag_list_model.set_tag_selected(tag_name, True) # Set selected in model
+                self.selected_tags_for_current_image.append(existing_tag_data) # Add TagData object to selected list
             else:
-                # Tag doesn't exist, create a new one (unknown)
-                new_tag = TagData(name=tag_name, selected=True, is_known=False)
-                self.tag_list_model.add_tag(new_tag)
-                self.selected_tags_for_current_image.append(new_tag)
-        
+                # Unknown tag: create TagData object (is_known=False)
+                new_tag_data = TagData(name=tag_name, selected=True, is_known=False)
+                self.tag_list_model.add_tag(new_tag_data) # Add to model
+                self.selected_tags_for_current_image.append(new_tag_data) # Add TagData object to selected list
+
         self.file_operations.update_workfile(self.last_folder_path, image_path, self.selected_tags_for_current_image)
-        
+
         # Now that we've updated the model, all panels must be populated with the appropriate tags
         self._update_tag_panels()
 
@@ -376,16 +375,41 @@ class MainWindow(QMainWindow):
         # any other panels to update will go here once implemented
 
     def _handle_tag_clicked(self, tag_name):
-        """Handles tag click events (now with toggle logic)."""
-        print(f"Tag clicked: {tag_name}") # Debug print
+        """Handles tag click events, updates model, workfile, and selected tags list."""
+        print(f"Tag clicked: {tag_name}")  # Debug print
 
-        # Find tag and toggle its selected state
+        # Find the TagData object in the model
+        clicked_tag_data = None
         for tag in self.tag_list_model.get_all_tags():
             if tag.name == tag_name:
-                new_selected_state = not tag.selected  # Calculate new selected state (toggle)
-                self.tag_list_model.set_tag_selected(tag_name, new_selected_state)
-                break # Optimization: Tag found, exit loop
-        self._update_tag_panels() # Update panels to reflect change
+                clicked_tag_data = tag
+                break
+
+        if clicked_tag_data:
+            # Toggle the selected state in the model
+            new_selected_state = not clicked_tag_data.selected
+            self.tag_list_model.set_tag_selected(tag_name, new_selected_state)
+
+            if new_selected_state:
+                # Tag was just selected, add it to selected_tags_for_current_image
+                if clicked_tag_data not in self.selected_tags_for_current_image: # Prevent Duplicates
+                    self.selected_tags_for_current_image.append(clicked_tag_data)
+            else:
+                # Tag was just deselected, remove it from selected_tags_for_current_image
+                if clicked_tag_data in self.selected_tags_for_current_image:
+                    self.selected_tags_for_current_image.remove(clicked_tag_data)
+
+            # Update the workfile with the changes
+            image_path = self.image_paths[self.current_image_index] # get current image path
+            self.file_operations.update_workfile(
+                self.last_folder_path,
+                image_path,
+                self.selected_tags_for_current_image
+            ) # Pass updated list
+
+            self._update_tag_panels()  # Update UI to reflect changes
+        else:
+            print(f"Warning: Clicked tag '{tag_name}' not found in TagListModel.")
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)
