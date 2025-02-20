@@ -7,6 +7,7 @@ class SelectedTagsPanel(TagListPanel):
     def __init__(self, main_window, parent=None): # Accept main_window
         super().__init__(parent)
         self.main_window = main_window # Store main_window
+        self.setAcceptDrops(True)
 
     def get_styling_mode(self):
         return "ignore_select"  # Right panel ignores selection for styling
@@ -30,6 +31,16 @@ class SelectedTagsPanel(TagListPanel):
             print("Warning: SelectedTagsPanel does not have access to MainWindow instance.")
             # Consider adding a placeholder QLabel to indicate no image is loaded.
     
+    
+    def dragEnterEvent(self, event):
+        """Handles drag enter events for the panel."""
+        if event.mimeData().hasText(): # Check if mime data has text (tag name)
+            event.acceptProposedAction() # Accept the proposed drop action (MoveAction)
+            print("Drag Enter Event: Drag accepted for text data.") # Debug
+        else:
+            event.ignore() # Ignore drops with non-text data
+            print("Drag Enter Event: Drag ignored - no text data.") # Debug
+    
     # not needed for now
     def add_tag(self, tag_name, is_known=True):
         pass
@@ -45,5 +56,14 @@ class SelectedTagsPanel(TagListPanel):
         pass
     def is_tag_draggable(self, tag_name):
         pass
+    
     def dropEvent(self, event):
-        pass
+        """Handles drop events for the panel."""
+        if event.mimeData().hasText(): # Check if mime data has text
+            tag_name = event.mimeData().text() # Extract tag name from mime data
+            print(f"Drop Event: Tag '{tag_name}' dropped!") # Debug print
+            event.acceptProposedAction() # Accept the drop
+            self.update_display() #TEMP: just update display for now
+        else:
+            event.ignore() # Ignore drops with non-text data
+            print("Drop Event: Drop ignored - no text data.") # Debug
