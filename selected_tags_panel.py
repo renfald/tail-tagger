@@ -58,7 +58,7 @@ class SelectedTagsPanel(TagListPanel):
         pass
     
     def dropEvent(self, event):
-        """Handles drop events for the panel, implementing tag reordering."""
+        """Handles drop events for the panel, implementing tag reordering and workfile update."""
         if event.mimeData().hasText():
             tag_name = event.mimeData().text()
             print(f"Drop Event: Tag '{tag_name}' dropped!") # Debug
@@ -82,20 +82,30 @@ class SelectedTagsPanel(TagListPanel):
 
             # --- Reordering Logic ---
             dragged_tag_data = None
-            for tag_data in self.main_window.selected_tags_for_current_image: # Find the TagData object
+            for tag_data in self.main_window.selected_tags_for_current_image:
                 if tag_data.name == tag_name:
                     dragged_tag_data = tag_data
                     break
 
             if dragged_tag_data:
-                self.main_window.selected_tags_for_current_image.remove(dragged_tag_data) # Remove from old position
-                self.main_window.selected_tags_for_current_image.insert(drop_index, dragged_tag_data) # Insert at new position
-                print(f"  Tag '{tag_name}' reordered to index {drop_index}") # Debug
+                self.main_window.selected_tags_for_current_image.remove(dragged_tag_data)
+                self.main_window.selected_tags_for_current_image.insert(drop_index, dragged_tag_data)
+                print(f"  Tag '{tag_name}' reordered to index {drop_index}")
+
+                # --- Workfile Update ---  Add this section
+                image_path = self.main_window.image_paths[self.main_window.current_image_index]
+                self.main_window.file_operations.update_workfile(
+                    self.main_window.last_folder_path,
+                    image_path,
+                    self.main_window.selected_tags_for_current_image # Pass reordered list!
+                )
+                print("  Workfile updated with new tag order.") # Debug
+
             else:
-                print(f"Warning: Dragged tag '{tag_name}' not found in selected_tags_for_current_image list!") # Error handling
+                print(f"Warning: Dragged tag '{tag_name}' not found in selected_tags_for_current_image list!")
 
             event.acceptProposedAction()
-            self.update_display() # TEMP - will be refined in next step - for now, just refresh the panel
+            self.update_display() #TEMP - keep update display for now - will be refined in next steps
         else:
             event.ignore()
             print("Drop Event: Drop ignored - no text data.")
