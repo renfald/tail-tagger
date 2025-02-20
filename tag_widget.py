@@ -60,7 +60,6 @@ class TagWidget(QFrame):
         print(f"TagWidget '{self.tag_name}' mouseReleaseEvent!")
         if event.button() == Qt.LeftButton:  # Only handle left clicks
             self.tag_clicked.emit(self.tag_name)  # Emit the signal with tag name
-            print(f"TagWidget '{self.tag_name}' clicked!") # Debug print
         super().mouseReleaseEvent(event) # keep default functionality just in case
 
     def _update_style(self):

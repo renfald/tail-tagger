@@ -7,7 +7,6 @@ class SelectedTagsPanel(TagListPanel):
     def __init__(self, main_window, parent=None): # Accept main_window
         super().__init__(parent)
         self.main_window = main_window # Store main_window
-        # self.setStyleSheet("background-color: transparent;") # if you need a bg color
 
     def get_styling_mode(self):
         return "ignore_select"  # Right panel ignores selection for styling
@@ -25,11 +24,12 @@ class SelectedTagsPanel(TagListPanel):
             for tag_data in tags:
                 tag_widget = TagWidget(tag_data.name, tag_data.selected, tag_data.is_known)
                 tag_widget.set_styling_mode(self.get_styling_mode())  # Set styling
+                tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
                 self.layout.addWidget(tag_widget)
         else:
             print("Warning: SelectedTagsPanel does not have access to MainWindow instance.")
             # Consider adding a placeholder QLabel to indicate no image is loaded.
-
+    
     # not needed for now
     def add_tag(self, tag_name, is_known=True):
         pass

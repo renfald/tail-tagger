@@ -98,7 +98,7 @@ class MainWindow(QMainWindow):
         left_panel.setMinimumWidth(75) # Minimum width
         left_panel.setMaximumWidth(300) # Maximum width
         left_layout = QVBoxLayout(left_panel)  # Add a layout
-        left_layout.setContentsMargins(0, 0, 0, 0) # Add this to remove margin
+        left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
 
 
@@ -108,14 +108,10 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(left_splitter)
         
         # --- All Tags Panel ---
-        self.tag_list_model.tags_selected_changed.connect(self._update_tag_panels)
+        self.tag_list_model.tags_selected_changed.connect(self._update_tag_panels) # this doesn't seem to be doing anything CHECK TODO
 
         all_tags_scroll_area = QScrollArea() # A QScrollArea is a scrollable area that can contain another widget.
         all_tags_scroll_area.setWidgetResizable(True) 
-        # all_tags_panel = QFrame()  # taking this out and moving the alltagspanel from init to here. unclear if we really need it to be "self"
-        all_tags_layout = QVBoxLayout(self.all_tags_panel)
-        all_tags_layout.setAlignment(Qt.AlignTop)
-        all_tags_layout.addWidget(self.all_tags_panel)
         all_tags_scroll_area.setWidget(self.all_tags_panel)
 
         # --- Frequently Used Panel ---
@@ -139,7 +135,7 @@ class MainWindow(QMainWindow):
         
         # --- Style the viewports ---  this is temporary and will not be needed when the full panels get implemented
         darker_background_color = "#242424"  # Darker gray.  Adjust as needed.
-        # all_tags_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};")
+        # all_tags_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};") # Only use this is something terrible happens and the styling dies
         frequently_used_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};")
         favorites_scroll_area.setStyleSheet(f"background-color: {darker_background_color};")
 
@@ -167,9 +163,10 @@ class MainWindow(QMainWindow):
         # --- Right Panel (Selected Tags) ---
         right_panel_scroll_area = QScrollArea()
         right_panel_scroll_area.setWidgetResizable(True)
-        self.selected_tags_panel = SelectedTagsPanel(self) # Instance is now directly the right panel
+        
         right_panel_scroll_area.setWidget(self.selected_tags_panel) # Set panel as scroll area widget
-        main_splitter.addWidget(right_panel_scroll_area)  # Add scroll area to splitter
+        # right_panel_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};") # THIS SHOULDN'T BE NEEDED BUT PYSIDE SUCKS
+        main_splitter.addWidget(right_panel_scroll_area)  # Add right panel to splitter
 
         # Set initial sizes for the splitter. Essentially left and right will be fixed width between this and the set stretch factors
         main_splitter.setSizes([150, 200, 150])
@@ -186,7 +183,6 @@ class MainWindow(QMainWindow):
         bottom_layout = QHBoxLayout(bottom_panel)
         bottom_layout.setSpacing(10)
         bottom_layout.setContentsMargins(10, 5, 10, 5)
-        # bottom_panel.setLayout(bottom_layout) # Removed
 
         left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         bottom_layout.addItem(left_spacer)
@@ -376,7 +372,6 @@ class MainWindow(QMainWindow):
 
     def _handle_tag_clicked(self, tag_name):
         """Handles tag click events, updates model, workfile, and selected tags list."""
-        print(f"Tag clicked: {tag_name}")  # Debug print
 
         # Find the TagData object in the model
         clicked_tag_data = None
