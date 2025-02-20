@@ -1,10 +1,12 @@
 from PySide6.QtWidgets import QLabel, QFrame, QSizePolicy, QHBoxLayout
-from PySide6.QtCore import Qt, QSize, Signal, QMimeData  # Signal might be removed
+from PySide6.QtCore import Qt, QSize, Signal, QMimeData
 from PySide6.QtGui import QDrag, QFont
 from math import sqrt
 
 class TagWidget(QFrame):
     """Widget to display a tag."""
+
+    tag_clicked = Signal(str)
 
     def __init__(self, tag_name, is_selected=False, is_known_tag=True):
         """Initializes a TagWidget.
@@ -55,7 +57,11 @@ class TagWidget(QFrame):
 
     def mouseReleaseEvent(self, event):
         """Handles mouse release events."""
-        pass
+        print(f"TagWidget '{self.tag_name}' mouseReleaseEvent!")
+        if event.button() == Qt.LeftButton:  # Only handle left clicks
+            self.tag_clicked.emit(self.tag_name)  # Emit the signal with tag name
+            print(f"TagWidget '{self.tag_name}' clicked!") # Debug print
+        super().mouseReleaseEvent(event) # keep default functionality just in case
 
     def _update_style(self):
             """Updates the visual style."""

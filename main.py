@@ -51,6 +51,7 @@ class MainWindow(QMainWindow):
 
         # --- Tag Panels ---
         # self.all_tags_panel = AllTagsPanel(self.tag_list_model) Not sure if we're gonna do it this way. right now this is directly in setup ui.
+        self.all_tags_panel = AllTagsPanel(self, self.tag_list_model)
         self.selected_tags_panel = SelectedTagsPanel(self)
 
 
@@ -107,7 +108,6 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(left_splitter)
         
         # --- All Tags Panel ---
-        self.all_tags_panel = AllTagsPanel(self.tag_list_model)
         self.tag_list_model.tags_selected_changed.connect(self._update_tag_panels)
 
         all_tags_scroll_area = QScrollArea() # A QScrollArea is a scrollable area that can contain another widget.
@@ -374,6 +374,18 @@ class MainWindow(QMainWindow):
         self.all_tags_panel.update_display()
         self.selected_tags_panel.update_display()
         # any other panels to update will go here once implemented
+
+    def _handle_tag_clicked(self, tag_name):
+        """Handles tag click events (now with toggle logic)."""
+        print(f"Tag clicked: {tag_name}") # Debug print
+
+        # Find tag and toggle its selected state
+        for tag in self.tag_list_model.get_all_tags():
+            if tag.name == tag_name:
+                new_selected_state = not tag.selected  # Calculate new selected state (toggle)
+                self.tag_list_model.set_tag_selected(tag_name, new_selected_state)
+                break # Optimization: Tag found, exit loop
+        self._update_tag_panels() # Update panels to reflect change
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)
