@@ -48,12 +48,36 @@ class TagWidget(QFrame):
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
 
     def mousePressEvent(self, event):
-        """Handles mouse press events."""
-        pass
+        """Handles mouse press events to initiate drag detection."""
+        super().mousePressEvent(event) # Call base class implementation first! Important for focus and other default behaviors.
+        if event.button() == Qt.LeftButton:
+            self.start_drag_pos = event.pos()  # Record starting position
+            self.start_drag_global_pos = event.globalPos() # Needed for calculating global distance
+            print(f"Mouse press event. tag: {self.tag_name}, pos: {self.start_drag_pos}, global: {self.start_drag_global_pos}") # Debug
 
     def mouseMoveEvent(self, event):
-        """Handles mouse move events."""
-        pass
+        """Handles mouse move events to initiate drag operation."""
+        print(f"mouseMoveEvent called for tag: {self.tag_name}") # Debug
+
+        if event.buttons() != Qt.LeftButton: # Check if left button is still pressed
+            print(f"mouseMoveEvent: Ignoring because left button is not pressed.") #Debug
+            return # Ignore if not left button drag
+
+        dx = event.globalPos().x() - self.start_drag_global_pos.x() # Calculate horizontal movement
+        dy = event.globalPos().y() - self.start_drag_global_pos.y() # Calculate vertical movement
+        distance = sqrt(dx * dx + dy * dy) # Calculate total distance using hypotenuse
+
+        print(f"mouseMoveEvent: tag={self.tag_name}, distance={distance:.2f}") # Debug
+
+        if distance > 8: # Drag threshold (pixels).  Adjust as needed.
+            print(f"Initiating drag for tag: {self.tag_name}") # Debug
+            drag = QDrag(self) # Create QDrag object, passing self (TagWidget) as parent
+            mime_data = QMimeData() # Create QMimeData object to hold drag data
+            mime_data.setText(self.tag_name) # For now, just tag name as plain text
+            drag.setMimeData(mime_data) # Set the mime data for the drag operation
+            # drag.setPixmap(self.grab()) # Optional: set a pixmap for visual feedback (later)
+            drag.exec(Qt.MoveAction) # Start the drag and drop operation.  Qt.MoveAction indicates the widget is being moved (reordered)
+            print(f"Drag operation started for tag: {self.tag_name}") # Debug
 
     def mouseReleaseEvent(self, event):
         """Handles mouse release events."""
