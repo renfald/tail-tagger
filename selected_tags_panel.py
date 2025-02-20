@@ -63,28 +63,39 @@ class SelectedTagsPanel(TagListPanel):
             tag_name = event.mimeData().text()
             print(f"Drop Event: Tag '{tag_name}' dropped!") # Debug
 
-            drop_pos = event.pos() # Get drop position in panel coordinates
-            drop_index = 0 # Default to top of list if panel is empty or drop is above all tags
+            drop_pos = event.pos()
+            drop_index = 0
 
-            # Iterate through existing TagWidgets to find drop index
             for index in range(self.layout.count()):
                 widget_item = self.layout.itemAt(index)
                 if widget_item is not None and widget_item.widget() is not None:
                     tag_widget = widget_item.widget()
                     if isinstance(tag_widget, TagWidget):
-                        if drop_pos.y() < tag_widget.geometry().bottom(): # Drop position is above current tag_widget's bottom edge
+                        if drop_pos.y() < tag_widget.geometry().bottom():
                             drop_index = index
-                            print(f"  Drop index determined: {drop_index} (before tag '{tag_widget.tag_name}')") # Debug
-                            break # Insert before this tag
+                            print(f"  Drop index determined: {drop_index} (before tag '{tag_widget.tag_name}')")
+                            break
                         else:
-                            drop_index = index + 1 # If loop completes without breaking, drop at the end
+                            drop_index = index + 1
             else:
-                print("  Drop index determined: 0 (panel empty or dropped below all tags)") #Debug - in 'else' of for loop, meaning loop completed
+                print("  Drop index determined: 0 (panel empty or dropped below all tags)")
 
-            # Placeholder for reordering and workfile update - to be implemented in next steps
+            # --- Reordering Logic ---
+            dragged_tag_data = None
+            for tag_data in self.main_window.selected_tags_for_current_image: # Find the TagData object
+                if tag_data.name == tag_name:
+                    dragged_tag_data = tag_data
+                    break
+
+            if dragged_tag_data:
+                self.main_window.selected_tags_for_current_image.remove(dragged_tag_data) # Remove from old position
+                self.main_window.selected_tags_for_current_image.insert(drop_index, dragged_tag_data) # Insert at new position
+                print(f"  Tag '{tag_name}' reordered to index {drop_index}") # Debug
+            else:
+                print(f"Warning: Dragged tag '{tag_name}' not found in selected_tags_for_current_image list!") # Error handling
 
             event.acceptProposedAction()
-            self.update_display() #TEMP: just update display for now - will be refined in next steps
+            self.update_display() # TEMP - will be refined in next step - for now, just refresh the panel
         else:
             event.ignore()
             print("Drop Event: Drop ignored - no text data.")
