@@ -65,7 +65,6 @@ class TagListModel(QAbstractListModel):
     def remove_unknown_tags(self):
         """Removes any tags where is_known is False from the tag list."""
         self.tags = [tag for tag in self.tags if tag.is_known]
-        self.tags_selected_changed.emit()   # not sure if this is the proper name for the event. may change it later
 
     def rowCount(self, parent=QModelIndex()):
         """Returns the number of rows (tags)."""

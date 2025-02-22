@@ -5,6 +5,7 @@ import theme
 from config_manager import ConfigManager
 from file_operations import FileOperations
 from tag_list_model import TagListModel, TagData
+from left_panel_container import LeftPanelContainer
 from all_tags_panel import AllTagsPanel
 from selected_tags_panel import SelectedTagsPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
@@ -50,8 +51,6 @@ class MainWindow(QMainWindow):
         self.tag_list_model.load_tags_from_csv(self.csv_path)
 
         # --- Tag Panels ---
-        # self.all_tags_panel = AllTagsPanel(self.tag_list_model) Not sure if we're gonna do it this way. right now this is directly in setup ui.
-        self.all_tags_panel = AllTagsPanel(self, self.tag_list_model)
         self.selected_tags_panel = SelectedTagsPanel(self)
 
 
@@ -92,67 +91,9 @@ class MainWindow(QMainWindow):
 
 
         # --- Left Panel (Resizable) ---
-        left_panel = QFrame()
-        left_panel.setFrameShape(QFrame.StyledPanel)
-        left_panel.setFixedWidth(150) # Initial width
-        left_panel.setMinimumWidth(75) # Minimum width
-        left_panel.setMaximumWidth(300) # Maximum width
-        left_layout = QVBoxLayout(left_panel)  # Add a layout
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
+        self.left_panel_container = LeftPanelContainer(main_window=self)
+        main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
 
-
-        # --- Vertical Splitter (Inside Left Panel) ---
-        left_splitter = QSplitter(Qt.Vertical)
-        left_splitter.setChildrenCollapsible(False)
-        left_layout.addWidget(left_splitter)
-        
-        # --- All Tags Panel ---
-        self.tag_list_model.tags_selected_changed.connect(self._update_tag_panels) # this doesn't seem to be doing anything CHECK TODO
-
-        all_tags_scroll_area = QScrollArea() # A QScrollArea is a scrollable area that can contain another widget.
-        all_tags_scroll_area.setWidgetResizable(True) 
-        all_tags_scroll_area.setWidget(self.all_tags_panel)
-
-        # --- Frequently Used Panel ---
-        frequently_used_scroll_area = QScrollArea()
-        frequently_used_scroll_area.setWidgetResizable(True)
-        frequently_used_panel = QFrame()
-        frequently_used_layout = QVBoxLayout(frequently_used_panel)
-        frequently_used_layout.setAlignment(Qt.AlignTop)
-        frequently_used_layout.addWidget(QLabel("Frequently Used"))
-        frequently_used_scroll_area.setWidget(frequently_used_panel)
-
-
-        # --- Favorites Panel ---
-        favorites_scroll_area = QScrollArea()
-        favorites_scroll_area.setWidgetResizable(True)
-        favorites_panel = QFrame()
-        favorites_layout = QVBoxLayout(favorites_panel)
-        favorites_layout.setAlignment(Qt.AlignTop)
-        favorites_layout.addWidget(QLabel("Favorites"))
-        favorites_scroll_area.setWidget(favorites_panel)
-        
-        # --- Style the viewports ---  this is temporary and will not be needed when the full panels get implemented
-        darker_background_color = "#242424"  # Darker gray.  Adjust as needed.
-        # all_tags_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};") # Only use this is something terrible happens and the styling dies
-        frequently_used_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};")
-        favorites_scroll_area.setStyleSheet(f"background-color: {darker_background_color};")
-
-
-        # Add scroll areas to left splitter
-        left_splitter.addWidget(all_tags_scroll_area)
-        left_splitter.addWidget(frequently_used_scroll_area)
-        left_splitter.addWidget(favorites_scroll_area)
-        
-        left_splitter.setSizes([300, 200, 200])
-        
-        # Set stretch factors for the left panels 0 = fixed size, 1 = stretchable
-        left_splitter.setStretchFactor(0, 0) # All Tags
-        left_splitter.setStretchFactor(1, 0) # Frequently Used
-        left_splitter.setStretchFactor(2, 1) # Favorites
-
-        main_splitter.addWidget(left_panel) # Add to splitter
 
         # --- Center Panel (Image Display) ---
         self.center_panel = CenterPanel()
@@ -366,9 +307,8 @@ class MainWindow(QMainWindow):
 
     def _update_tag_panels(self):
         """Updates all tag panels."""
-        self.all_tags_panel.update_display()
+        self.left_panel_container.update_all_displays()
         self.selected_tags_panel.update_display()
-        # any other panels to update will go here once implemented
 
     def _handle_tag_clicked(self, tag_name):
         """Handles tag click events, updates model, workfile, and selected tags list."""
