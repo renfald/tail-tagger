@@ -2,6 +2,7 @@
 from PySide6.QtWidgets import QWidget, QSplitter, QVBoxLayout, QFrame, QScrollArea
 from PySide6.QtCore import Qt
 from all_tags_panel import AllTagsPanel
+from favorites_panel import FavoritesPanel
 
 class LeftPanelContainer(QWidget):
     def __init__(self, main_window, parent=None):
@@ -30,7 +31,7 @@ class LeftPanelContainer(QWidget):
         # --- Favorites Panel (Placeholder with Scroll Area) ---
         self.favorites_scroll_area = QScrollArea()
         self.favorites_scroll_area.setWidgetResizable(True)
-        self.favorites_panel = QFrame()  # Placeholder
+        self.favorites_panel = FavoritesPanel(main_window=self.main_window)
         favorites_layout = QVBoxLayout(self.favorites_panel)
         favorites_layout.setAlignment(Qt.AlignTop)
         self.favorites_scroll_area.setWidget(self.favorites_panel)
@@ -51,4 +52,5 @@ class LeftPanelContainer(QWidget):
     def update_all_displays(self):
         """Updates all internal panels."""
         self.all_tags_panel.update_display()
+        self.favorites_panel.update_display()
         # Future panels will be updated here as well

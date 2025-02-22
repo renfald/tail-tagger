@@ -47,6 +47,10 @@ class TagListModel(QAbstractListModel):
         """Returns all tags."""
         return self.tags
 
+    def get_favorite_tags(self):
+        """Returns all tags."""
+        return [tag for tag in self.tags if tag.favorite]
+
     def add_tag(self, tag_data):
         """Adds a tag"""
         self.tags.append(tag_data)

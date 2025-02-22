@@ -29,6 +29,7 @@ class MainWindow(QMainWindow):
         self.current_image_index = 0  # Index of the currently displayed image.
         self.last_folder_path = None  # Initialize.
         self.selected_tags_for_current_image = []  # List of tags for the current image.
+        self.favorite_tags_ordered = []  # List of favorite tags in order.
         
         # --- File Operations ---
         self.file_operations = FileOperations()
@@ -198,6 +199,17 @@ class MainWindow(QMainWindow):
             return
 
         self.file_operations.create_default_workfile(folder_path) # Create workfile if it doesn't exist
+        
+        # --- Load Favorites ---
+        # TODO - not sure if this is the best place for loading favorites to happen. Need to think this through more
+        # probably better to get loaded during init of app
+        favorite_tag_names = self.file_operations.load_favorites()
+        for tag_name in favorite_tag_names:
+            for tag in self.tag_list_model.get_all_tags():
+                if tag.name == tag_name:
+                    tag.favorite = True
+                    self.favorite_tags_ordered.append(tag)
+                    break # Move to next fav tag name
 
         image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
         self.image_paths = []

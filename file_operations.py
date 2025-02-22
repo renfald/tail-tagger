@@ -189,3 +189,25 @@ class FileOperations:
                 print(f"Created default workfile at {workfile_path}")
             except Exception as e:
                 print(f"Error creating default workfile: {e}")
+
+    # TODO method needs to be enhanced so if the file is not found or data corrupt, we should create a new empty json file on the fly and return an empty list
+    def load_favorites(self):
+        """Loads the ordered list of favorite tag names from favorites.json."""
+        favorites_file_path = os.path.join(os.getcwd(), "data", "favorites.json")
+        try:
+            with open(favorites_file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("favorites", [])  # Return empty list if key is missing
+        except (FileNotFoundError, json.JSONDecodeError):
+            print("Error loading favorites.json. Returning empty list.")
+            return []  # Return empty list on error
+        
+    def save_favorites(self, favorite_tags):
+        """Saves the ordered list of favorite tag names to favorites.json."""
+        favorites_file_path = os.path.join(os.getcwd(), "data", "favorites.json")
+        tag_names = [tag.name for tag in favorite_tags] # Extract names!
+        try:
+            with open(favorites_file_path, 'w', encoding='utf-8') as f:
+                json.dump({"favorites": tag_names}, f, indent=2)  # Save with indentation
+        except Exception as e:
+            print(f"Error saving favorites.json: {e}")
