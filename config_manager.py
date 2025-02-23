@@ -5,7 +5,7 @@ class ConfigManager:
     """Manages application configuration loading and saving."""
 
     def __init__(self):
-        self.config_path = os.path.join(os.getcwd(), "config.json")
+        self.config_path = os.path.join(os.getcwd(), "data", "config.json")
         self.default_config = {
             "last_opened_folder": ""
         }
