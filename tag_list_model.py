@@ -35,6 +35,11 @@ class TagListModel(QAbstractListModel):
                         print(f"Skipping row due to error: {e} - Row data: {row}")
                         continue  # Skip to the next row
 
+                    # Check for duplicates by name
+                    if any(tag.name == name for tag in self.tags):
+                        print(f"Duplicate tag found: {name}, skipping.")
+                        continue
+
                     tag_data = TagData(name=name, category=category, frequency=frequency)
                     self.tags.append(tag_data)
             print(f"Loaded {len(self.tags)} tags from CSV.")
@@ -59,12 +64,12 @@ class TagListModel(QAbstractListModel):
         """Clears all tags."""
         self.tags = []
     
-    def set_tag_selected(self, tag_name, selected):
-        """Sets tag to selected"""
-        for tag in self.tags:
-            if tag.name == tag_name:
-                tag.selected = selected
-        self.tags_selected_changed.emit()
+    def set_tag_selected_state(self, tag_name, is_tag_selected):
+        """Set the current selection state for a given tag."""
+        tag = next((tag for tag in self.tags if tag.name == tag_name), None)
+        if tag:
+            tag.selected = is_tag_selected
+            self.tags_selected_changed.emit()
 
     def remove_unknown_tags(self):
         """Removes any tags where is_known is False from the tag list."""

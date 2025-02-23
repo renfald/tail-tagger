@@ -265,7 +265,7 @@ class MainWindow(QMainWindow):
 
             if existing_tag_data:
                 # Known tag found in model:
-                self.tag_list_model.set_tag_selected(tag_name, True) # Set selected in model
+                self.tag_list_model.set_tag_selected_state(tag_name, True) # Set selected in model
                 self.selected_tags_for_current_image.append(existing_tag_data) # Add TagData object to selected list
             else:
                 # Unknown tag: create TagData object (is_known=False)
@@ -343,7 +343,7 @@ class MainWindow(QMainWindow):
         if clicked_tag_data:
             # Toggle the selected state in the model
             new_selected_state = not clicked_tag_data.selected
-            self.tag_list_model.set_tag_selected(clicked_tag_name, new_selected_state)
+            self.tag_list_model.set_tag_selected_state(clicked_tag_name, new_selected_state)
 
             if new_selected_state:
                 # Tag was just selected, add it to selected_tags_for_current_image
