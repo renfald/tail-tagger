@@ -8,17 +8,19 @@ class TagWidget(QFrame):
 
     tag_clicked = Signal(str)
 
-    def __init__(self, tag_name, is_selected=False, is_known_tag=True):
+    def __init__(self, tag_data, is_selected=False, is_known_tag=True): # Modified constructor - tag_data first
         """Initializes a TagWidget.
 
         Args:
-            tag_name (str): The text of the tag.
-            is_known_tag (bool, optional): Whether the tag is "known". Defaults to True.
+            tag_data (TagData): The TagData object representing the tag. # Modified docstring
+            is_selected (bool, optional): Whether the tag is selected. Defaults to False. # Keep for now, panel can override if needed
+            is_known_tag (bool, optional): Whether the tag is "known". Defaults to True. # Keep for now, panel can override if needed
         """
         super().__init__()
-        self.tag_name = tag_name
-        self.is_selected = is_selected
-        self.is_known_tag = is_known_tag
+        self.tag_data = tag_data # Store TagData object
+        self.tag_name = tag_data.name # Extract tag_name from TagData
+        self.is_selected = is_selected if is_selected is not None else tag_data.selected # Use constructor param if provided, else TagData
+        self.is_known_tag = is_known_tag if is_known_tag is not None else tag_data.is_known # Use constructor param if provided, else TagData
         self.styling_mode = "dim_on_select"
         self._setup_ui()
         self._update_style()
