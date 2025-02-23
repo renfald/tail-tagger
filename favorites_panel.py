@@ -5,28 +5,17 @@ from tag_widget import TagWidget  # Import TagWidget
 
 class FavoritesPanel(TagListPanel):
     def __init__(self, main_window, parent=None):
-        super().__init__(parent)
+        super().__init__(main_window) # Pass main_window to TagListPanel parent init
         self.main_window = main_window  # Store main_window
 
     def get_styling_mode(self):
         return "ignore_select"
 
-    def update_display(self):
-        # Clear existing widgets
-        for i in reversed(range(self.layout.count())):
-            widget = self.layout.itemAt(i).widget()
-            if widget is not None:
-                widget.deleteLater()
+    def _get_tag_data_list(self):
+        """Returns the list of TagData objects for this panel (Favorites)."""
+        return self.main_window.favorite_tags_ordered
 
-        # Get the ordered list of favorite tags from MainWindow
-        favorite_tags = self.main_window.favorite_tags_ordered
-
-        # Create and add TagWidgets
-        for tag_data in favorite_tags:
-            tag_widget = TagWidget(tag_data.name, is_known_tag=tag_data.is_known)  # Pass is_known
-            tag_widget.set_styling_mode(self.get_styling_mode())
-            tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
-            self.layout.addWidget(tag_widget)
+    # No longer need update_display - inherit from TagListPanel
 
     def add_tag(self, tag_name, is_known=True):
         pass  # Not needed

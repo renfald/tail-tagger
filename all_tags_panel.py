@@ -5,30 +5,18 @@ from tag_widget import TagWidget
 
 class AllTagsPanel(TagListPanel):
     def __init__(self, main_window, tag_list_model, parent=None): # Accept main_window
-        super().__init__(parent)
+        super().__init__(main_window) # Pass main_window to TagListPanel parent init
         self.main_window = main_window # Store main_window
         self.tag_list_model = tag_list_model  # Store the model
-        
 
     def get_styling_mode(self):
         return "dim_on_select"
 
-    def update_display(self):
-        # Clear existing widgets
-        for i in reversed(range(self.layout.count())):
-            widget = self.layout.itemAt(i).widget()
-            if widget is not None:
-                widget.deleteLater()
+    def _get_tag_data_list(self):
+        """Returns the list of TagData objects for this panel (All Tags)."""
+        return self.tag_list_model.get_known_tags()
 
-        # Get all *known* tags from the model
-        tags = self.tag_list_model.get_known_tags()
-
-        # Create and add TagWidgets
-        for tag_data in tags:
-            tag_widget = TagWidget(tag_data.name, tag_data.selected, tag_data.is_known)
-            tag_widget.set_styling_mode(self.get_styling_mode()) # Set styling mode
-            tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
-            self.layout.addWidget(tag_widget)
+    # No longer need update_display - using template method from base class
 
     def add_tag(self, tag_name, is_known=True):
         pass # Not needed

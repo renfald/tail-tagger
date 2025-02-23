@@ -27,7 +27,13 @@ class MainWindow(QMainWindow):
         # --- Instance Variables ---
         self.image_paths = []  # List of image file paths.
         self.current_image_index = 0  # Index of the currently displayed image.
+        self.current_image_path = None  # Path of the currently displayed image.
         self.last_folder_path = None  # Initialize.
+        
+        # --- Tag Management ---
+        """These lists are used by panels that need to display tags in a particular order.
+        They are populated with references to TagData objects from the model.
+        This means any changes to the TagData objects in the model will be reflected in these lists automatically and vice versa."""
         self.selected_tags_for_current_image = []  # List of tags for the current image.
         self.favorite_tags_ordered = []  # List of favorite tags in order.
         
@@ -241,6 +247,8 @@ class MainWindow(QMainWindow):
         self.center_panel.set_image_path(image_path)
         filename = os.path.basename(image_path)
         self.filename_label.setText(filename)
+        # current_image_path used for workfile updates
+        self.current_image_path = image_path
 
         # --- Load Tags for Image ---
         loaded_tag_names = self.file_operations.load_tags_for_image(image_path, self.last_folder_path) # Get list of tag *names*
@@ -265,7 +273,7 @@ class MainWindow(QMainWindow):
                 self.tag_list_model.add_tag(new_tag_data) # Add to model
                 self.selected_tags_for_current_image.append(new_tag_data) # Add TagData object to selected list
 
-        self.file_operations.update_workfile(self.last_folder_path, image_path, self.selected_tags_for_current_image)
+        self.update_workfile_for_current_image() # Update workfile with current tags
 
         # Now that we've updated the model, all panels must be populated with the appropriate tags
         self._update_tag_panels()
@@ -322,20 +330,20 @@ class MainWindow(QMainWindow):
         self.left_panel_container.update_all_displays()
         self.selected_tags_panel.update_display()
 
-    def _handle_tag_clicked(self, tag_name):
+    def _handle_tag_clicked(self, clicked_tag_name):
         """Handles tag click events, updates model, workfile, and selected tags list."""
 
         # Find the TagData object in the model
         clicked_tag_data = None
         for tag in self.tag_list_model.get_all_tags():
-            if tag.name == tag_name:
+            if tag.name == clicked_tag_name:
                 clicked_tag_data = tag
                 break
 
         if clicked_tag_data:
             # Toggle the selected state in the model
             new_selected_state = not clicked_tag_data.selected
-            self.tag_list_model.set_tag_selected(tag_name, new_selected_state)
+            self.tag_list_model.set_tag_selected(clicked_tag_name, new_selected_state)
 
             if new_selected_state:
                 # Tag was just selected, add it to selected_tags_for_current_image
@@ -347,16 +355,19 @@ class MainWindow(QMainWindow):
                     self.selected_tags_for_current_image.remove(clicked_tag_data)
 
             # Update the workfile with the changes
-            image_path = self.image_paths[self.current_image_index] # get current image path
-            self.file_operations.update_workfile(
-                self.last_folder_path,
-                image_path,
-                self.selected_tags_for_current_image
-            ) # Pass updated list
+            self.update_workfile_for_current_image()
 
             self._update_tag_panels()  # Update UI to reflect changes
         else:
-            print(f"Warning: Clicked tag '{tag_name}' not found in TagListModel.")
+            print(f"Warning: Clicked tag '{clicked_tag_name}' not found in TagListModel.")
+
+    def update_workfile_for_current_image(self):
+        """Updates the workfile for the current image. Make sure selected_tags_for_current_image is up to date before calling this."""
+        self.file_operations.update_workfile(
+            self.last_folder_path,
+            self.current_image_path,
+            self.selected_tags_for_current_image
+        )
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)

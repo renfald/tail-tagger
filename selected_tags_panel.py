@@ -5,34 +5,22 @@ from tag_widget import TagWidget
 
 class SelectedTagsPanel(TagListPanel):
     def __init__(self, main_window, parent=None): # Accept main_window
-        super().__init__(parent)
-        self.main_window = main_window # Store main_window
+        super().__init__(main_window) # Pass main_window to TagListPanel parent init
+        self.main_window = main_window # Store main_window (needed for drag/drop)
         self.setAcceptDrops(True)
         self.drop_indicator_line = None  # Initialize drop indicator line as None
 
     def get_styling_mode(self):
         return "ignore_select"  # Right panel ignores selection for styling
 
-    def update_display(self):
-        # Clear existing widgets
-        for i in reversed(range(self.layout.count())):
-            widget = self.layout.itemAt(i).widget()
-            if widget is not None:
-                widget.deleteLater()
-
-        # Get selected tags from MainWindow's in-memory list
-        if self.main_window: # Access main_window directly
-            tags = self.main_window.selected_tags_for_current_image # Access via stored main_window
-            for tag_data in tags:
-                tag_widget = TagWidget(tag_data.name, tag_data.selected, tag_data.is_known)
-                tag_widget.set_styling_mode(self.get_styling_mode())  # Set styling
-                tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
-                self.layout.addWidget(tag_widget)
+    def _get_tag_data_list(self):
+        """Returns the list of TagData objects for this panel (Selected Tags)."""
+        if self.main_window:
+            return self.main_window.selected_tags_for_current_image
         else:
             print("Warning: SelectedTagsPanel does not have access to MainWindow instance.")
-            # Consider adding a placeholder QLabel to indicate no image is loaded.
-    
-    
+            return [] # Return empty list if no main_window
+
     def dragEnterEvent(self, event):
         """Handles drag enter events for the panel."""
         if event.mimeData().hasText():
@@ -50,8 +38,7 @@ class SelectedTagsPanel(TagListPanel):
         else:
             event.ignore()
             print("Drag Enter Event: Drag ignored - no text data.")
-    
-    
+
     def dragMoveEvent(self, event):
         """Handles drag move events for the panel, updating drop indicator."""
         if event.mimeData().hasText():
@@ -75,7 +62,7 @@ class SelectedTagsPanel(TagListPanel):
                             insertion_point_found = True
                             break # Exit loop, insertion point found
                         # else:  No else needed here, continue to next tag if not before current tag
-            
+
             if not insertion_point_found:
                 # If we didn't find an insertion point in the loop, it means we are dropping at the end
                 if self.layout.count() > 0:
@@ -99,13 +86,13 @@ class SelectedTagsPanel(TagListPanel):
         else:
             event.ignore()
             print("Drag Move Event: Drag ignored - no text data.")
-    
+
     def dragLeaveEvent(self, event):
         """Handles drag leave events."""
         print("Drag Leave Event: Hiding indicator")
         if self.drop_indicator_line:
             self.drop_indicator_line.hide() # Hide the indicator when drag leaves
-    
+
     # not needed for now
     def add_tag(self, tag_name, is_known=True):
         pass
@@ -121,7 +108,7 @@ class SelectedTagsPanel(TagListPanel):
         pass
     def is_tag_draggable(self, tag_name):
         pass
-    
+
     def dropEvent(self, event):
         """Handles drop events for the panel, implementing tag reordering and workfile update."""
         if event.mimeData().hasText():
@@ -160,13 +147,9 @@ class SelectedTagsPanel(TagListPanel):
                 self.main_window.selected_tags_for_current_image.insert(drop_index, dragged_tag_data)
                 print(f"  Tag '{tag_name}' reordered to index {drop_index}")
 
-                # --- Workfile Update ---  Add this section
-                image_path = self.main_window.image_paths[self.main_window.current_image_index]
-                self.main_window.file_operations.update_workfile(
-                    self.main_window.last_folder_path,
-                    image_path,
-                    self.main_window.selected_tags_for_current_image # Pass reordered list!
-                )
+                # --- Workfile Update ---
+                # updating the workfile based on the current state of the selected_tags_for_current_image
+                self.main_window.update_workfile_for_current_image()
                 print("  Workfile updated with new tag order.") # Debug
 
             else:
@@ -174,6 +157,7 @@ class SelectedTagsPanel(TagListPanel):
 
             event.acceptProposedAction()
             self.update_display() #TEMP - keep update display for now - will be refined in next steps
+
         else:
             event.ignore()
             print("Drop Event: Drop ignored - no text data.")

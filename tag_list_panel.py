@@ -3,7 +3,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtCore import Qt
 
 class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget), type(ABC)), {})):  # Explicit metaclass
-    """Abstract base class for panels."""
+    """Abstract base class for tag list panels."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -12,6 +12,42 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         self.layout.setSpacing(1) # This is the space between the widgets
         self.layout.setContentsMargins(1, 1, 1, 1) # This is the margin around the entire panel, not the individual widgets
         self.setStyleSheet("background-color: #242424;") # This sets a dark grey background for the tag panels
+
+    @abstractmethod
+    def _get_tag_data_list(self):
+        """Abstract method: Subclasses must implement to return the list of TagData objects."""
+        pass
+
+    @abstractmethod
+    def get_styling_mode(self):
+        """Abstract method: Subclasses must implement to return their styling mode."""
+        pass
+
+    def update_display(self):
+        """Template method: Updates the panel display."""
+        self._clear_widgets()  # Clear existing widgets (using helper method)
+        tag_data_list = self._get_tag_data_list() # Get tag data from subclass
+
+        for tag_data in tag_data_list:
+            tag_widget = self._create_tag_widget(tag_data) # Create and configure TagWidget
+
+            self.layout.addWidget(tag_widget) # Add to layout
+
+    def _clear_widgets(self):
+        """Helper method: Clears existing TagWidgets from the layout."""
+        for i in reversed(range(self.layout.count())):
+            widget = self.layout.itemAt(i).widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _create_tag_widget(self, tag_data):
+        """Helper method: Creates and configures a TagWidget."""
+        from tag_widget import TagWidget # Import here to avoid circular dependency
+        tag_widget = TagWidget(tag_name=tag_data.name, is_selected=tag_data.selected, is_known_tag=tag_data.is_known) # Basic TagWidget creation
+        tag_widget.set_styling_mode(self.get_styling_mode()) # Set styling mode from subclass
+        tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect click signal
+        return tag_widget
+
 
     @abstractmethod
     def add_tag(self, tag_name, is_known=True):
@@ -26,7 +62,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
     @abstractmethod
     def clear_tags(self):
         """Clears all tags."""
-        pass # Modified
+        pass
 
     @abstractmethod
     def get_tags(self):
@@ -51,9 +87,4 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
     @abstractmethod
     def dropEvent(self, event):
         """Handles drop events."""
-        pass
-
-    @abstractmethod
-    def get_styling_mode(self):
-        """Gets the styling mode."""
         pass
