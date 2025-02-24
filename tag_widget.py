@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QLabel, QFrame, QSizePolicy, QHBoxLayout
-from PySide6.QtCore import Qt, QSize, Signal, QMimeData
-from PySide6.QtGui import QDrag, QFont
+from PySide6.QtCore import Qt, QSize, Signal, QMimeData, QPoint
+from PySide6.QtGui import QDrag, QFont, QPixmap
 from math import sqrt
 
 # Import compiled resources for icons
@@ -96,8 +96,36 @@ class TagWidget(QFrame):
             mime_data = QMimeData() # Create QMimeData object to hold drag data
             mime_data.setText(self.tag_name) # For now, just tag name as plain text
             drag.setMimeData(mime_data) # Set the mime data for the drag operation
-            # drag.setPixmap(self.grab()) # Optional: set a pixmap for visual feedback (later)
-            drag.exec(Qt.MoveAction) # Start the drag and drop operation.  Qt.MoveAction indicates the widget is being moved (reordered)
+
+            # --- Capture and Set Semi-Transparent TagWidget Pixmap (Corrected) --- <--- MODIFIED CODE!
+            original_pixmap = self.grab() # Grab a pixmap of the TagWidget
+            pixmap = QPixmap(original_pixmap.size()) # Create a new QPixmap of the same size
+            pixmap.fill(Qt.transparent) # Fill the new pixmap with transparency
+
+            from PySide6.QtGui import QPainter, QColor # Ensure QColor is imported
+            painter = QPainter(pixmap) # Create a QPainter to draw on the new pixmap
+            painter.setOpacity(0.5) # Set the opacity for the painter (0.0 - 1.0) - Adjust as needed!
+            painter.drawPixmap(pixmap.rect(), original_pixmap) # Draw the original pixmap onto the new one with opacity
+            painter.end() # End painting
+
+            drag.setPixmap(pixmap) # Set the semi-transparent pixmap
+ 
+            hot_spot_x = pixmap.width() // 2  # Center X-coordinate of the pixmap
+            hot_spot_y = pixmap.height() // 2 # Top Y-coordinate (we want to align top edge vertically)
+            drag.setHotSpot(QPoint(hot_spot_x, hot_spot_y)) # Set the hotspot
+
+            self.hide() # Hide the TagWidget itself during drag
+            
+            drop_action = drag.exec(Qt.MoveAction)
+            
+            if drop_action == Qt.MoveAction:
+                print(f"Drag successful for tag: {self.tag_name}. MoveAction returned.") # Debug - successful drop
+                # Drop was handled by a target, no need to show tag again here.
+            else:
+                print(f"Drag cancelled/invalid for tag: {self.tag_name}. Action: {drop_action}") # Debug - cancelled/invalid drop
+                self.show()
+            
+            # drag.exec(Qt.MoveAction) # Start the drag and drop operation.
             print(f"Drag operation started for tag: {self.tag_name}") # Debug
 
     def mouseReleaseEvent(self, event):
@@ -160,12 +188,12 @@ class TagWidget(QFrame):
     # --- Hover Event Handlers ---
     def enterEvent(self, event):
         """Handles mouse enter events."""
-        print(f"Mouse enter event for tag: {self.tag_name}") # Debug
+        # print(f"Mouse enter event for tag: {self.tag_name}") # Debug
         self.set_favorite_state() # Call set_favorite_state on hover
 
     def leaveEvent(self, event):
         """Handles mouse leave events."""
-        print(f"Mouse leave event for tag: {self.tag_name}") # Debug
+        # print(f"Mouse leave event for tag: {self.tag_name}") # Debug
         self.set_favorite_state() # Call set_favorite_state on leave
     # --- End Hover Event Handlers ---
 

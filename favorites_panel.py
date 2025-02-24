@@ -17,80 +17,6 @@ class FavoritesPanel(TagListPanel):
         """Returns the list of TagData objects for this panel (Favorites)."""
         return self.main_window.favorite_tags_ordered
 
-    # No longer need update_display - inherit from TagListPanel
-
-    def add_tag(self, tag_name, is_known=True):
-        pass  # Not needed
-
-    def remove_tag(self, tag_name):
-        pass  # Not needed
-
-    def clear_tags(self):
-        pass  # Not needed
-
-    def get_tags(self):
-        pass  # Not needed
-
-    def set_tags(self, tags):
-        pass # Not needed
-
-    def set_tag_selected(self, tag_name, is_selected):
-        pass  # Not needed
-
-    def is_tag_draggable(self, tag_name):
-        return True # Always draggable in this panel
-
-    def dropEvent(self, event):
-        """Handles drop events for the panel, implementing tag reordering and favorites file update."""
-        if event.mimeData().hasText():
-            tag_name = event.mimeData().text()
-            print(f"Drop Event: Tag '{tag_name}' dropped!")
-
-            if self.drop_indicator_line:
-                self.drop_indicator_line.hide() # Hide indicator on drop
-
-            drop_pos = event.pos()
-            drop_index = 0
-
-            for index in range(self.layout.count()): # Re-calculate drop index just before insertion for robustness
-                widget_item = self.layout.itemAt(index)
-                if widget_item is not None and widget_item.widget() is not None:
-                    tag_widget = widget_item.widget()
-                    if isinstance(tag_widget, TagWidget):
-                        if drop_pos.y() < tag_widget.geometry().bottom():
-                            drop_index = index
-                            print(f"  Drop index determined (on drop): {drop_index} (before tag '{tag_widget.tag_name}')")
-                            break
-                        else:
-                            drop_index = index + 1
-            else:
-                print("  Drop index determined (on drop): 0 (panel empty or dropped below all tags)")
-
-            # --- Reordering Logic ---
-            dragged_tag_data = None
-            for tag_data in self.main_window.favorite_tags_ordered:
-                if tag_data.name == tag_name:
-                    dragged_tag_data = tag_data
-                    break
-
-            if dragged_tag_data:
-                self.main_window.favorite_tags_ordered.remove(dragged_tag_data)
-                self.main_window.favorite_tags_ordered.insert(drop_index, dragged_tag_data)
-                print(f"  Tag '{tag_name}' reordered to index {drop_index} in Favorites Panel")
-
-                self.main_window.file_operations.save_favorites(self.main_window.favorite_tags_ordered)
-                print("  favorites.json updated with new tag order.")
-
-            else:
-                print(f"Warning: Dragged tag '{tag_name}' not found in favorite_tags_ordered list!")
-
-            event.acceptProposedAction()
-            self.update_display()
-
-        else:
-            event.ignore()
-            print("Drop Event: Drop ignored - no text data.")
-
     def dragEnterEvent(self, event):
         """Handles drag enter events for the panel."""
         if event.mimeData().hasText():
@@ -125,7 +51,9 @@ class FavoritesPanel(TagListPanel):
                 if widget_item is not None and widget_item.widget() is not None:
                     tag_widget = widget_item.widget()
                     if isinstance(tag_widget, TagWidget):
-                        if drop_pos.y() < tag_widget.geometry().bottom(): # Check against bottom edge
+                        # Check if the mouse is less than 10px above the bottom of the tag. 
+                        # We want the indicator to change if the mouse goes past the middle
+                        if drop_pos.y() < tag_widget.geometry().bottom() - 10: # Adjust this if the line should change at a diff height
                             drop_index = index
                             indicator_y_pos = tag_widget.geometry().top() # Position line at the top of the tag
                             print(f"  Drop index determined: {drop_index} (before tag '{tag_widget.tag_name}')")
@@ -162,3 +90,76 @@ class FavoritesPanel(TagListPanel):
         print("Drag Leave Event: Hiding indicator")
         if self.drop_indicator_line:
             self.drop_indicator_line.hide() # Hide the indicator when drag leaves
+
+    def dropEvent(self, event):
+        """Handles drop events for the panel, implementing tag reordering and favorites file update."""
+        if event.mimeData().hasText():
+            tag_name = event.mimeData().text()
+            print(f"Drop Event: Tag '{tag_name}' dropped!")
+
+            if self.drop_indicator_line:
+                self.drop_indicator_line.hide() # Hide indicator on drop
+
+            drop_pos = event.pos()
+            drop_index = 0
+
+            for index in range(self.layout.count()): # Re-calculate drop index just before insertion for robustness
+                widget_item = self.layout.itemAt(index)
+                if widget_item is not None and widget_item.widget() is not None:
+                    tag_widget = widget_item.widget()
+                    if isinstance(tag_widget, TagWidget):
+                        if drop_pos.y() < tag_widget.geometry().bottom() - 10: # This should line up with the indicator logic
+                            drop_index = index
+                            print(f"  Drop index determined (on drop): {drop_index} (before tag '{tag_widget.tag_name}')")
+                            break
+                        else:
+                            drop_index = index + 1
+            else:
+                print("  Drop index determined (on drop): 0 (panel empty or dropped below all tags)")
+
+            # --- Reordering Logic ---
+            dragged_tag_data = None
+            for tag_data in self.main_window.favorite_tags_ordered:
+                if tag_data.name == tag_name:
+                    dragged_tag_data = tag_data
+                    break
+
+            if dragged_tag_data:
+                self.main_window.favorite_tags_ordered.remove(dragged_tag_data)
+                self.main_window.favorite_tags_ordered.insert(drop_index, dragged_tag_data)
+                print(f"  Tag '{tag_name}' reordered to index {drop_index} in Favorites Panel")
+
+                self.main_window.file_operations.save_favorites(self.main_window.favorite_tags_ordered)
+                print("  favorites.json updated with new tag order.")
+
+            else:
+                print(f"Warning: Dragged tag '{tag_name}' not found in favorite_tags_ordered list!")
+
+            event.acceptProposedAction()
+            self.update_display()
+
+        else:
+            event.ignore()
+            print("Drop Event: Drop ignored - no text data.")
+    
+    def add_tag(self, tag_name, is_known=True):
+        pass  # Not needed
+
+    def remove_tag(self, tag_name):
+        pass  # Not needed
+
+    def clear_tags(self):
+        pass  # Not needed
+
+    def get_tags(self):
+        pass  # Not needed
+
+    def set_tags(self, tags):
+        pass # Not needed
+
+    def set_tag_selected(self, tag_name, is_selected):
+        pass  # Not needed
+
+    def is_tag_draggable(self, tag_name):
+        return True # Always draggable in this panel
+

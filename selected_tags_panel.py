@@ -55,7 +55,9 @@ class SelectedTagsPanel(TagListPanel):
                 if widget_item is not None and widget_item.widget() is not None:
                     tag_widget = widget_item.widget()
                     if isinstance(tag_widget, TagWidget):
-                        if drop_pos.y() < tag_widget.geometry().bottom(): # Check against bottom edge
+                        # Check if the mouse is less than 10px above the bottom of the tag. 
+                        # We want the indicator to change if the mouse goes past the middle
+                        if drop_pos.y() < tag_widget.geometry().bottom() - 10: # Adjust this if the line should change at a diff height
                             drop_index = index
                             indicator_y_pos = tag_widget.geometry().top() # Position line at the top of the tag
                             print(f"  Drop index determined: {drop_index} (before tag '{tag_widget.tag_name}')")
@@ -126,7 +128,7 @@ class SelectedTagsPanel(TagListPanel):
                 if widget_item is not None and widget_item.widget() is not None:
                     tag_widget = widget_item.widget()
                     if isinstance(tag_widget, TagWidget):
-                        if drop_pos.y() < tag_widget.geometry().bottom():
+                        if drop_pos.y() < tag_widget.geometry().bottom() - 10: # This should line up with the indicator logic
                             drop_index = index
                             print(f"  Drop index determined (on drop): {drop_index} (before tag '{tag_widget.tag_name}')")
                             break
