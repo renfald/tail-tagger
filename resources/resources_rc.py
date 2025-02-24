@@ -1,0 +1,73 @@
+# Resource object code (Python 3)
+# Created by: object code
+# Created by: The Resource Compiler for Qt version 6.8.2
+# WARNING! All changes made in this file will be lost!
+
+from PySide6 import QtCore
+
+qt_resource_data = b"\
+\x00\x00\x00\xbb\
+<\
+svg width=\x22100\x22 \
+height=\x22100\x22 vie\
+wBox=\x220 0 24 24\x22\
+ fill=\x22yellow\x22 x\
+mlns=\x22http://www\
+.w3.org/2000/svg\
+\x22>\x0d\x0a  <polygon p\
+oints=\x2212,2 15,9\
+ 22,9 16.5,14 18\
+,21 12,17 6,21 7\
+.5,14 2,9 9,9\x22/>\
+\x0d\x0a</svg>\x0d\x0a\
+\x00\x00\x00\xd9\
+<\
+svg width=\x22100\x22 \
+height=\x22100\x22 vie\
+wBox=\x220 0 24 24\x22\
+ fill=\x22none\x22 str\
+oke=\x22#9A9A1B\x22 st\
+roke-width=\x221\x22 x\
+mlns=\x22http://www\
+.w3.org/2000/svg\
+\x22>\x0d\x0a  <polygon p\
+oints=\x2212,2 15,9\
+ 22,9 16.5,14 18\
+,21 12,17 6,21 7\
+.5,14 2,9 9,9\x22/>\
+\x0d\x0a</svg>\
+"
+
+qt_resource_name = b"\
+\x00\x05\
+\x00o\xa6S\
+\x00i\
+\x00c\x00o\x00n\x00s\
+\x00\x0d\
+\x0d\x7f\xfc\xa7\
+\x00s\
+\x00t\x00a\x00r\x00-\x00f\x00i\x00l\x00l\x00.\x00s\x00v\x00g\
+\x00\x10\
+\x06\xd7f\x87\
+\x00s\
+\x00t\x00a\x00r\x00-\x00o\x00u\x00t\x00l\x00i\x00n\x00e\x00.\x00s\x00v\x00g\
+"
+
+qt_resource_struct = b"\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x01\
+\x00\x00\x00\x00\x00\x00\x00\x00\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00\x02\
+\x00\x00\x00\x00\x00\x00\x00\x00\
+\x00\x00\x000\x00\x00\x00\x00\x00\x01\x00\x00\x00\xbf\
+\x00\x00\x01\x955`2\x83\
+\x00\x00\x00\x10\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
+\x00\x00\x01\x954\x97(g\
+"
+
+def qInitResources():
+    QtCore.qRegisterResourceData(0x03, qt_resource_struct, qt_resource_name, qt_resource_data)
+
+def qCleanupResources():
+    QtCore.qUnregisterResourceData(0x03, qt_resource_struct, qt_resource_name, qt_resource_data)
+
+qInitResources()

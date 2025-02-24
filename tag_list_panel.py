@@ -45,7 +45,8 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         from tag_widget import TagWidget # Import here to avoid circular dependency
         tag_widget = TagWidget(tag_data=tag_data, is_selected=None, is_known_tag=None) # Pass tag_data as first arg, remove positional is_selected and is_known_tag
         tag_widget.set_styling_mode(self.get_styling_mode()) # Set styling mode from subclass
-        tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect click signal
+        tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect tag selection logic
+        tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked) # Connect favorite logic
         return tag_widget
 
 

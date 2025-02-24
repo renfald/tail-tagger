@@ -1,0 +1,7 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>icons/star-fill.svg</file>
+        <file>icons/star-outline.svg</file>
+    </qresource>
+</RCC>

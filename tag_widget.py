@@ -3,10 +3,15 @@ from PySide6.QtCore import Qt, QSize, Signal, QMimeData
 from PySide6.QtGui import QDrag, QFont
 from math import sqrt
 
+# Import compiled resources for icons
+# pyside6-rcc resources/resources.qrc -o resources/resources_rc.py
+import resources.resources_rc as resources_rc  
+
 class TagWidget(QFrame):
     """Widget to display a tag."""
 
     tag_clicked = Signal(str)
+    favorite_star_clicked = Signal(str)
 
     def __init__(self, tag_data, is_selected=False, is_known_tag=True): # Modified constructor - tag_data first
         """Initializes a TagWidget.
@@ -32,8 +37,12 @@ class TagWidget(QFrame):
 
     def _setup_ui(self):
         """Sets up the UI elements."""
-        self.setFrameShape(QFrame.StyledPanel)
-        self.setLineWidth(1)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+
+        tag_layout = QHBoxLayout()
+        tag_layout.setContentsMargins(0, 0, 0, 0) # Removing any default margins and letting the label control it
+        tag_layout.setSpacing(0) # Removing any default spacing
 
         self.tag_label = QLabel(self.tag_name)
         self.tag_label.setAlignment(Qt.AlignCenter)
@@ -41,13 +50,23 @@ class TagWidget(QFrame):
         # self.tag_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed) # consider this if I want the tags to be further collapsed
         self.tag_label.setContentsMargins(3, 4, 3, 4) # The widget will shrink to 6 pixels larger than the text before scrolling
 
-        tag_layout = QHBoxLayout()
+        # --- Star Icon Label ---
+        self.star_label = QLabel(self)  # Create QLabel instance
+        self.star_label.setFixedSize(QSize(22, 22)) # Set a fixed size for the star icon (adjust as needed)
+        self.star_label.setScaledContents(True) # Ensure SVG scales nicely to fit label size
+        self.star_label.hide() # Initially hide the star icon
+        # --- End Star Icon Label ---
+
+        # --- Set Initial Star Icon ---
+        from PySide6.QtGui import QPixmap # Import QPixmap here
+        pixmap = QPixmap(":/icons/star-outline.svg") # Load the outline star SVG from resources
+        self.star_label.setPixmap(pixmap) # Set the pixmap for the star_label
+        # --- End Set Initial Star Icon ---
+
         tag_layout.addWidget(self.tag_label)
-        tag_layout.setContentsMargins(0, 0, 0, 0) # Removing any default margins and letting the label above control it
+        tag_layout.addWidget(self.star_label)
         self.setLayout(tag_layout)
 
-        self.setCursor(Qt.PointingHandCursor)
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
 
     def mousePressEvent(self, event):
         """Handles mouse press events to initiate drag detection."""
@@ -85,7 +104,12 @@ class TagWidget(QFrame):
         """Handles mouse release events."""
         print(f"TagWidget '{self.tag_name}' mouseReleaseEvent!")
         if event.button() == Qt.LeftButton:  # Only handle left clicks
-            self.tag_clicked.emit(self.tag_name)  # Emit the signal with tag name
+            if self.star_label.geometry().contains(event.pos()): # Check if click is within star_label
+                print(f"Star icon clicked for tag: {self.tag_name}") # Debug
+                self.favorite_star_clicked.emit(self.tag_name) # Emit favorite_star_clicked signal
+            else:
+                print(f"Tag label clicked for tag: {self.tag_name}") # Debug
+                self.tag_clicked.emit(self.tag_name)  # Emit the tag_clicked signal (existing functionality)
         super().mouseReleaseEvent(event) # keep default functionality just in case
 
     def _update_style(self):
@@ -116,8 +140,8 @@ class TagWidget(QFrame):
                 # Default (Known, Unselected) Style
                 style = base_style  # No additional changes needed
 
-            # --- Apply the Combined Stylesheet ---
-            self.setStyleSheet(style)
+            # --- Apply the Combined Stylesheet to label ---
+            self.tag_label.setStyleSheet(style)
 
 
     def set_selected(self, is_selected):
@@ -132,3 +156,33 @@ class TagWidget(QFrame):
             self._update_style()  # Re-apply style
         else:
             print(f"Warning: Invalid styling mode: {mode}")
+
+    # --- Hover Event Handlers ---
+    def enterEvent(self, event):
+        """Handles mouse enter events."""
+        print(f"Mouse enter event for tag: {self.tag_name}") # Debug
+        self.set_favorite_state() # Call set_favorite_state on hover
+
+    def leaveEvent(self, event):
+        """Handles mouse leave events."""
+        print(f"Mouse leave event for tag: {self.tag_name}") # Debug
+        self.set_favorite_state() # Call set_favorite_state on leave
+    # --- End Hover Event Handlers ---
+
+        # --- set_favorite_state method (Implementation in next action) ---
+    def set_favorite_state(self):
+        """Updates the star icon based on favorite state and hover."""
+        from PySide6.QtGui import QPixmap # Import QPixmap here (if not already imported)
+
+        # Determine star icon based on tag_data.favorite (currently always False)
+        if self.tag_data.favorite: # Access tag_data.favorite directly! (Currently always False)
+            pixmap = QPixmap(":/icons/star-fill.svg")
+        else:
+            pixmap = QPixmap(":/icons/star-outline.svg")
+
+        # Show star ONLY on hover AND if it's a known tag
+        if self.underMouse() and self.is_known_tag: # Check for mouse hover and is_known_tag
+            self.star_label.setPixmap(pixmap) # Set the appropriate star icon
+            self.star_label.show() # Show the star label
+        else:
+            self.star_label.hide() # Hide the star label

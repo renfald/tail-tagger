@@ -113,7 +113,7 @@ class MainWindow(QMainWindow):
         right_panel_scroll_area.setWidgetResizable(True)
         
         right_panel_scroll_area.setWidget(self.selected_tags_panel) # Set panel as scroll area widget
-        # right_panel_scroll_area.viewport().setStyleSheet(f"background-color: {darker_background_color};") # THIS SHOULDN'T BE NEEDED BUT PYSIDE SUCKS
+        # right_panel_scroll_area.viewport().setStyleSheet(f"background-color: black;") # THIS IS JUST FOR TROUBLESHOOTING STYLE ISSUES
         main_splitter.addWidget(right_panel_scroll_area)  # Add right panel to splitter
 
         # Set initial sizes for the splitter. Essentially left and right will be fixed width between this and the set stretch factors
@@ -361,6 +361,45 @@ class MainWindow(QMainWindow):
         else:
             print(f"Warning: Clicked tag '{clicked_tag_name}' not found in TagListModel.")
 
+    def _handle_favorite_star_clicked(self, clicked_tag_name):
+        """Handles clicks on the favorite star icon in TagWidget."""
+        print(f"Favorite star clicked for tag: {clicked_tag_name}") # Debug - basic confirmation
+
+        # 1. Find the TagData object in the model
+        clicked_tag_data = None
+        for tag in self.tag_list_model.get_all_tags():
+            if tag.name == clicked_tag_name:
+                clicked_tag_data = tag
+                break
+
+        if clicked_tag_data:
+            # 2. Toggle the 'favorite' attribute in TagData
+            clicked_tag_data.favorite = not clicked_tag_data.favorite
+            new_favorite_state = clicked_tag_data.favorite # Get the new state
+
+            # 3. Update favorite_tags_ordered list
+            if new_favorite_state:
+                # Tag is now a favorite, add it to the list (append to end)
+                if clicked_tag_data not in self.favorite_tags_ordered: # Prevent duplicates
+                    self.favorite_tags_ordered.append(clicked_tag_data)
+                print(f"Tag '{clicked_tag_name}' added to favorites.") # Debug
+            else:
+                # Tag is no longer a favorite, remove it from the list
+                if clicked_tag_data in self.favorite_tags_ordered:
+                    self.favorite_tags_ordered.remove(clicked_tag_data)
+                print(f"Tag '{clicked_tag_name}' removed from favorites.") # Debug
+
+            # 4. Save updated favorites to favorites.json
+            self.file_operations.save_favorites(self.favorite_tags_ordered)
+            print("favorites.json updated.") # Debug
+
+            # 5. Update UI (refresh tag panels to reflect changes)
+            self._update_tag_panels()
+            print("Tag panels updated to reflect favorite changes.") # Debug
+
+        else:
+            print(f"Warning: Favorite star clicked for tag '{clicked_tag_name}', but tag not found in TagListModel.")
+    
     def update_workfile_for_current_image(self):
         """Updates the workfile for the current image. Make sure selected_tags_for_current_image is up to date before calling this."""
         self.file_operations.update_workfile(
