@@ -2,6 +2,7 @@ from PySide6.QtWidgets import QLabel, QFrame, QSizePolicy, QHBoxLayout
 from PySide6.QtCore import Qt, QSize, Signal, QMimeData, QPoint
 from PySide6.QtGui import QDrag, QFont, QPixmap
 from math import sqrt
+from file_operations import FileOperations
 
 # Import compiled resources for icons
 # pyside6-rcc resources/resources.qrc -o resources/resources_rc.py
@@ -44,7 +45,7 @@ class TagWidget(QFrame):
         tag_layout.setContentsMargins(0, 0, 0, 0) # Removing any default margins and letting the label control it
         tag_layout.setSpacing(0) # Removing any default spacing
 
-        self.tag_label = QLabel(self.tag_name)
+        self.tag_label = QLabel(FileOperations.convert_underscores_to_spaces(self.tag_name)) # Tag name with underscores replaced by spaces
         self.tag_label.setAlignment(Qt.AlignCenter)
         self.tag_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         # self.tag_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed) # consider this if I want the tags to be further collapsed

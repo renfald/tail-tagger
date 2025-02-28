@@ -125,7 +125,12 @@ class FileOperations:
                     with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
                         tag_content = tag_file.readline().strip()
                         loaded_tags = [tag.strip() for tag in tag_content.split(',')]
+                        
+                        # txt files may have spaces in tag names, so convert them to underscores before loading to workfile or model
+                        for i in range(len(loaded_tags)):
+                            loaded_tags[i] = FileOperations.convert_spaces_to_underscores(loaded_tags[i])
                         print(f"  Loaded tags from .txt file: {loaded_tags}")
+                
                 except Exception as e:
                     print(f"  Error reading tag file: {e}")
                     loaded_tags = [] # Ensure loaded_tags is empty on error.
@@ -163,7 +168,8 @@ class FileOperations:
 
                 try:
                     with open(txt_filepath, 'w', encoding='utf-8') as f:
-                        f.write(", ".join(tags))  # Join tags with comma and space.
+                        spaced_tags = [FileOperations.convert_underscores_to_spaces(tag) for tag in tags] # TODO: may need to have it configurable
+                        f.write(", ".join(spaced_tags))
                     print(f"  Wrote tags for {filename} to {txt_filepath}")
                 except Exception as e:
                     print(f"  Error writing to {txt_filepath}: {e}")
@@ -211,3 +217,13 @@ class FileOperations:
                 json.dump({"favorites": tag_names}, f, indent=2)  # Save with indentation
         except Exception as e:
             print(f"Error saving favorites.json: {e}")
+
+    @staticmethod
+    def convert_underscores_to_spaces(tag_name):
+        """Converts underscores in a tag name to spaces for display."""
+        return tag_name.replace('_', ' ')
+
+    @staticmethod
+    def convert_spaces_to_underscores(tag_name):
+        """Converts spaces in a tag name to underscores for storage."""
+        return tag_name.replace(' ', '_')

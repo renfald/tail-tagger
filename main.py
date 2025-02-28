@@ -1,17 +1,14 @@
 import sys
 import os
-import json
 import theme
 from config_manager import ConfigManager
 from file_operations import FileOperations
 from tag_list_model import TagListModel, TagData
 from left_panel_container import LeftPanelContainer
-from all_tags_panel import AllTagsPanel
 from selected_tags_panel import SelectedTagsPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
-                             QFileDialog, QListView, QSplitter)
-from PySide6.QtGui import QColor, QPalette
+                             QFileDialog, QSplitter)
 from PySide6.QtCore import Qt
 from center_panel import CenterPanel #Added back import
 
