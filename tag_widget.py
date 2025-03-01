@@ -14,7 +14,7 @@ class TagWidget(QFrame):
     tag_clicked = Signal(str)
     favorite_star_clicked = Signal(str)
 
-    def __init__(self, tag_data, is_selected=False, is_known_tag=True): # Modified constructor - tag_data first
+    def __init__(self, tag_data, is_selected=None, is_known_tag=None):
         """Initializes a TagWidget.
 
         Args:

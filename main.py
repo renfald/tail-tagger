@@ -60,7 +60,6 @@ class MainWindow(QMainWindow):
         # --- Tag Panels ---
         self.selected_tags_panel = SelectedTagsPanel(self)
 
-
         # --- Setup UI and Load Tags/Images ---
         self._setup_ui()
 
@@ -282,6 +281,9 @@ class MainWindow(QMainWindow):
         total_tags = len(self.tag_list_model.tags)
         selected_tags = len([tag for tag in self.tag_list_model.tags if tag.selected])
         unknown_tags = len([tag for tag in self.tag_list_model.tags if not tag.is_known])
+        
+        # we load the search panel differently than the others (update_display()) because I'm a bad developer
+        self.left_panel_container.tag_search_panel._on_tags_changed()  
 
         print(f"Total tags in model: {total_tags}")
         print(f"Selected tags: {selected_tags}")

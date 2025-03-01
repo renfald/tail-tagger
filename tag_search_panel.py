@@ -6,6 +6,15 @@ class TagSearchPanel(QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self.main_window = main_window
+        self.setup_ui()
+        initial_tag_list = self.main_window.tag_list_model.search_tags("") # Get all known tags via stubbed search
+        self._display_search_results(initial_tag_list) # Display the tags in the panel
+        self.main_window.tag_list_model.tags_selected_changed.connect(self._on_tags_changed)
+
+    def setup_ui(self):
+        """
+        Sets up the UI components for the TagSearchPanel.
+        """
         # Main layout - setting minimal spacing between ui elements (search and results)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
@@ -32,9 +41,6 @@ class TagSearchPanel(QWidget):
         self.results_scroll_area.setWidget(self.results_area) # Add results_area TO Scroll Area
         layout.addWidget(self.results_scroll_area) # Add Scroll Area TO Main Layout
 
-        initial_tag_list = self.main_window.tag_list_model.search_tags("") # Get all known tags via stubbed search
-        self._display_search_results(initial_tag_list) # Display the tags in the panel
-
     def _display_search_results(self, tag_data_list):
         """
         Clears the current results and displays the provided list of TagData objects as TagWidgets.
@@ -52,3 +58,11 @@ class TagSearchPanel(QWidget):
             tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect tag_clicked signal
             tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
             self.results_area_layout.addWidget(tag_widget) # Add TagWidget to layout
+
+    def _on_tags_changed(self):
+        """
+        Handles updates when the tag selection state changes.
+        Re-renders the tag display using the stubbed search.
+        """
+        updated_tag_list = self.main_window.tag_list_model.search_tags("")  # Get all known tags (stubbed search)
+        self._display_search_results(updated_tag_list)  # Re-display the tags
