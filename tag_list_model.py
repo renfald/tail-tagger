@@ -92,3 +92,10 @@ class TagListModel(QAbstractListModel):
     def get_known_tags(self):
         """Returns a list of all known tags."""
         return [tag for tag in self.tags if tag.is_known]
+
+    def search_tags(self, query):
+        """
+        Stubbed search method for Phase 2.
+        Returns all known tags, ignoring the query.
+        """
+        return self.get_known_tags()

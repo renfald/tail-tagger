@@ -12,6 +12,9 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
 from PySide6.QtCore import Qt
 from center_panel import CenterPanel #Added back import
 
+# TODO: its probably better for tag widget shading to not need every panel to rebuild their tag list and instead just check their current state. better yet a single
+# tag should be able to know if it needs an update
+
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
 
@@ -321,7 +324,8 @@ class MainWindow(QMainWindow):
     def _export_tags(self):
         self.file_operations.export_tags(self, self.last_folder_path)
 
-
+    # TODO: pretty sure favorites don't need to update panels (besides favs panel). star icon determined on mouse hover of widget based directly on
+    # on favorite attr of tag data object which all tag widgets have a reference for their given tag. same tag in all panels have the same info
     def _update_tag_panels(self):
         """Updates all tag panels."""
         self.left_panel_container.update_all_displays()

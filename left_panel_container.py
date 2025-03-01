@@ -2,6 +2,7 @@
 from PySide6.QtWidgets import QWidget, QSplitter, QVBoxLayout, QFrame, QScrollArea
 from PySide6.QtCore import Qt
 from all_tags_panel import AllTagsPanel
+from tag_search_panel import TagSearchPanel
 from favorites_panel import FavoritesPanel
 
 class LeftPanelContainer(QWidget):
@@ -14,11 +15,8 @@ class LeftPanelContainer(QWidget):
         self.splitter = QSplitter(Qt.Vertical)
         self.layout.addWidget(self.splitter)
 
-        # --- All Tags Panel with Scroll Area ---
-        self.all_tags_scroll_area = QScrollArea()
-        self.all_tags_scroll_area.setWidgetResizable(True)
-        self.all_tags_panel = AllTagsPanel(main_window=self.main_window, tag_list_model=self.main_window.tag_list_model)
-        self.all_tags_scroll_area.setWidget(self.all_tags_panel)
+        # --- Tag Search Panel (Replaces All Tags Panel) ---
+        self.tag_search_panel = TagSearchPanel(main_window=self.main_window)
 
         # --- Frequently Used Panel (Placeholder with Scroll Area) ---
         self.frequently_used_scroll_area = QScrollArea()
@@ -37,7 +35,7 @@ class LeftPanelContainer(QWidget):
         self.favorites_scroll_area.setWidget(self.favorites_panel)
 
         # --- Add *scroll areas* to the splitter ---
-        self.splitter.addWidget(self.all_tags_scroll_area)
+        self.splitter.addWidget(self.tag_search_panel)
         self.splitter.addWidget(self.frequently_used_scroll_area)
         self.splitter.addWidget(self.favorites_scroll_area)
 
@@ -51,6 +49,6 @@ class LeftPanelContainer(QWidget):
 
     def update_all_displays(self):
         """Updates all internal panels."""
-        self.all_tags_panel.update_display()
+        # self.all_tags_panel.update_display()
         self.favorites_panel.update_display()
         # Future panels will be updated here as well
