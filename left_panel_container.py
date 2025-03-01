@@ -17,6 +17,9 @@ class LeftPanelContainer(QWidget):
 
         # --- Tag Search Panel (Replaces All Tags Panel) ---
         self.tag_search_panel = TagSearchPanel(main_window=self.main_window)
+        # We want the text input to be focused when the app starts
+        self.tag_search_panel.setFocus()
+        self.tag_search_panel.search_input.setFocus()
 
         # --- Frequently Used Panel (Placeholder with Scroll Area) ---
         self.frequently_used_scroll_area = QScrollArea()

@@ -1,4 +1,5 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Signal
+from operator import attrgetter
 
 class TagData:
     def __init__(self, name, category=None, frequency=None, selected=False, favorite=False, is_known=True):
@@ -106,4 +107,6 @@ class TagListModel(QAbstractListModel):
         for tag_data in self.get_known_tags(): # Search within known tags only
             if query_lower in tag_data.name.lower(): # Case-insensitive substring check
                 filtered_tags.append(tag_data)
+        filtered_tags.sort(key=attrgetter('frequency'), reverse=True)
+        
         return filtered_tags

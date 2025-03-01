@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel, QScrollArea
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QKeyEvent
 from tag_widget import TagWidget
+
 
 class TagSearchPanel(QWidget):
     def __init__(self, main_window, parent=None):
@@ -10,6 +12,8 @@ class TagSearchPanel(QWidget):
         self.search_timer.setSingleShot(True)
         self.search_timer.timeout.connect(self._execute_search)
         self.search_query = ""
+        self.highlighted_tag_index = -1 # Initialize highlighted index to -1 (no tag highlighted initially)
+        self.search_results_tag_widgets = [] # Store TagWidgets in search results for navigation
         self.setup_ui()
         self._display_search_results([])
         self.main_window.tag_list_model.tags_selected_changed.connect(self._on_tags_changed)
@@ -54,6 +58,10 @@ class TagSearchPanel(QWidget):
             widget = self.results_area_layout.itemAt(i).widget()
             if widget is not None:
                 widget.deleteLater()
+    
+        self.search_results_tag_widgets = [] # Reset tag widget list
+        self.highlighted_tag_index = -1 # Reset highlighted index
+
 
         # Display new TagWidgets from the provided list
         for tag_data in tag_data_list:
@@ -62,6 +70,7 @@ class TagSearchPanel(QWidget):
             tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect tag_clicked signal
             tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
             self.results_area_layout.addWidget(tag_widget) # Add TagWidget to layout
+            self.search_results_tag_widgets.append(tag_widget) # Store TagWidget in list
 
     def _on_tags_changed(self):
         """
@@ -89,3 +98,41 @@ class TagSearchPanel(QWidget):
         else:
             filtered_tags = self.main_window.tag_list_model.search_tags(query_text) # Perform search
             self._display_search_results(filtered_tags) # Update UI with search results
+
+        if self.search_results_tag_widgets: # Check if there are results to highlight
+            self.highlighted_tag_index = 0 # Highlight the first tag (index 0)
+            self._update_tag_highlight() # Update the visual highlight
+        else:
+            self.highlighted_tag_index = -1 # No results, reset highlight index
+            self._update_tag_highlight() # Ensure no tag is highlighted
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """Handles key press events for keyboard navigation."""
+        if not self.search_results_tag_widgets: # Do nothing if no search results
+            return
+
+        if event.key() == Qt.Key_Down:
+            self.highlighted_tag_index = min(self.highlighted_tag_index + 1, len(self.search_results_tag_widgets) - 1)
+            self._update_tag_highlight()
+            event.accept() # Accept the event
+        elif event.key() == Qt.Key_Up:
+            self.highlighted_tag_index = max(self.highlighted_tag_index - 1, 0)
+            self._update_tag_highlight()
+            event.accept() # Accept the event
+        elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter: # Handle Enter key press
+            if 0 <= self.highlighted_tag_index < len(self.search_results_tag_widgets):
+                highlighted_tag_widget = self.search_results_tag_widgets[self.highlighted_tag_index]
+                self.main_window._handle_tag_clicked(highlighted_tag_widget.tag_name) # Select the highlighted tag
+                self.search_input.clear() # Clear search input after selection - for next phase
+                self._execute_search() # Refresh results to be empty - for next phase
+            event.accept() # Accept the event
+        else:
+            super().keyPressEvent(event) # Pass event to parent for default handling
+
+    def _update_tag_highlight(self):
+        """Updates the visual highlight of the currently highlighted tag."""
+        for index, tag_widget in enumerate(self.search_results_tag_widgets):
+            if index == self.highlighted_tag_index:
+                tag_widget.setStyleSheet("border: 2px solid grey;") # Highlight style
+            else:
+                tag_widget.setStyleSheet("") # Reset to default style
