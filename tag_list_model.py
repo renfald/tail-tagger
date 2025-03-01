@@ -95,7 +95,15 @@ class TagListModel(QAbstractListModel):
 
     def search_tags(self, query):
         """
-        Stubbed search method for Phase 2.
-        Returns all known tags, ignoring the query.
+        Performs a basic substring search for tags.
+        Returns a list of TagData objects whose names contain the query (case-insensitive).
         """
-        return self.get_known_tags()
+        if not query: # Check if the query is empty
+            return [] # Return empty list if query is empty
+
+        query_lower = query.lower()  # Convert query to lowercase for case-insensitive search
+        filtered_tags = []
+        for tag_data in self.get_known_tags(): # Search within known tags only
+            if query_lower in tag_data.name.lower(): # Case-insensitive substring check
+                filtered_tags.append(tag_data)
+        return filtered_tags

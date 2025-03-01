@@ -1,14 +1,17 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel, QScrollArea
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from tag_widget import TagWidget
 
 class TagSearchPanel(QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self.main_window = main_window
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self._execute_search)
+        self.search_query = ""
         self.setup_ui()
-        initial_tag_list = self.main_window.tag_list_model.search_tags("") # Get all known tags via stubbed search
-        self._display_search_results(initial_tag_list) # Display the tags in the panel
+        self._display_search_results([])
         self.main_window.tag_list_model.tags_selected_changed.connect(self._on_tags_changed)
 
     def setup_ui(self):
@@ -25,6 +28,7 @@ class TagSearchPanel(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search Tags...") # Placeholder text
         self.search_input.setStyleSheet("background-color: #2B2B2B;color: white;")
+        self.search_input.textChanged.connect(self._on_search_text_changed)
         layout.addWidget(self.search_input)
 
         # Tag Results Display Area (in Scroll Area)
@@ -62,7 +66,26 @@ class TagSearchPanel(QWidget):
     def _on_tags_changed(self):
         """
         Handles updates when the tag selection state changes.
-        Re-renders the tag display using the stubbed search.
         """
-        updated_tag_list = self.main_window.tag_list_model.search_tags("")  # Get all known tags (stubbed search)
-        self._display_search_results(updated_tag_list)  # Re-display the tags
+        self._execute_search()
+
+    def _on_search_text_changed(self, text):
+        """
+        Handles changes in the search input text.
+        Implements debounce to delay the search execution.
+        """
+        self.search_query = text # Store the search query
+        self.search_timer.start(250) # Start debounce timer with 250ms delay
+
+    def _execute_search(self):
+        """
+        Executes the tag search and updates the display.
+        Handles empty search query case.
+        This method is called by the debounce timer.
+        """
+        query_text = self.search_query # Retrieve stored search query
+        if not query_text: # Check if search query is empty
+            self._display_search_results([]) # Display empty results area if query is empty
+        else:
+            filtered_tags = self.main_window.tag_list_model.search_tags(query_text) # Perform search
+            self._display_search_results(filtered_tags) # Update UI with search results
