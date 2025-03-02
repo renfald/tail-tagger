@@ -3,5 +3,6 @@
     <qresource prefix="/">
         <file>icons/star-fill.svg</file>
         <file>icons/star-outline.svg</file>
+        <file>icons/add-tag.svg</file>
     </qresource>
 </RCC>

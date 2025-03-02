@@ -8,7 +8,7 @@ from left_panel_container import LeftPanelContainer
 from selected_tags_panel import SelectedTagsPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
-                             QFileDialog, QSplitter)
+                             QFileDialog, QSplitter, QMessageBox)
 from PySide6.QtCore import Qt
 from center_panel import CenterPanel #Added back import
 
@@ -410,6 +410,58 @@ class MainWindow(QMainWindow):
             self.current_image_path,
             self.selected_tags_for_current_image
         )
+
+    def add_new_tag_to_model(self, tag_name):
+        """
+        Adds a new tag to the application, handling CSV updates, model updates, and panel refreshes.
+        Centralized method for tag addition, promoting unknown tags if necessary.
+        """
+        underscored_tag_name = self.file_operations.convert_spaces_to_underscores(tag_name)
+
+        # --- Check for existing tags (prioritize known, then check unknown) ---
+        existing_tag_data = None
+        existing_unknown_tag_data = None
+        for tag in self.tag_list_model.get_all_tags():
+            if tag.name.lower() == underscored_tag_name.lower():
+                if tag.is_known:
+                    existing_tag_data = tag
+                    break  # Exit loop, known tag found
+                else:
+                    existing_unknown_tag_data = tag # Found existing UNKNOWN tag, keep track of it
+
+        if existing_tag_data:
+            # If tag already exists as a *known* tag, show warning and return
+            QMessageBox.warning(self, "Tag Already Exists", f"Tag '{FileOperations.convert_underscores_to_spaces(underscored_tag_name)}' already exists as a known tag.", QMessageBox.Ok)
+            return
+
+        if existing_unknown_tag_data:
+            # --- Promote existing unknown tag to known ---
+            csv_added_successfully = self.file_operations.add_tag_to_csv(self.csv_path, underscored_tag_name)
+            if not csv_added_successfully:
+                QMessageBox.critical(self, "Error Adding Tag", f"Error adding tag to CSV file.", QMessageBox.Ok)
+                return
+
+            # In-place update of existing TagData object:
+            existing_unknown_tag_data.is_known = True
+            existing_unknown_tag_data.category = "9"
+            existing_unknown_tag_data.frequency = 0
+            print(f"Unknown tag '{underscored_tag_name}' promoted to known tag (in-place update).")
+
+        else:
+            # --- Add completely new tag ---
+            csv_added_successfully = self.file_operations.add_tag_to_csv(self.csv_path, underscored_tag_name)
+            if not csv_added_successfully:
+                QMessageBox.critical(self, "Error Adding Tag", f"Error adding tag to CSV file.", QMessageBox.Ok)
+                return
+
+            # Add new tag to model
+            new_tag_data = TagData(name=underscored_tag_name, category="9", frequency=0, is_known=True)
+            self.tag_list_model.add_tag(new_tag_data)
+            print(f"New tag '{underscored_tag_name}' added to TagListModel.")
+
+        # --- Update UI (All relevant panels) ---
+        self.tag_list_model.tags_selected_changed.emit() # Always emit this signal (handles search and fav panels)
+        self.selected_tags_panel.update_display() # Explicitly update SelectedTagsPanel
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)

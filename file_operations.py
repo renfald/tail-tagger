@@ -1,5 +1,6 @@
 import os
 import json
+import csv
 
 class FileOperations:
     """Handles file system operations for the image tagger."""
@@ -227,3 +228,36 @@ class FileOperations:
     def convert_spaces_to_underscores(tag_name):
         """Converts spaces in a tag name to underscores for storage."""
         return tag_name.replace(' ', '_')
+
+    def add_tag_to_csv(self, csv_path, tag_name):
+        """
+        Appends a new tag to the tags-list.csv file, ensuring it's on a new line.
+        """
+        try:
+            # 1. Check if the file exists and is not empty. If not, create with header
+            if not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0:
+                with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+                    csv_writer = csv.writer(csvfile)
+                    csv_writer.writerow(["id", "name", "category", "post_count"]) # Write header
+                print(f"Created new CSV file with header at {csv_path}")
+
+            # 2. Check if the file already ends with a newline.
+            with open(csv_path, 'rb') as csvfile:
+                csvfile.seek(0, os.SEEK_END) # Go to the end of the file
+                if csvfile.tell() == 0:
+                    ends_with_newline = True
+                else:
+                    csvfile.seek(-1, os.SEEK_END)
+                    ends_with_newline = csvfile.read(1) == b'\n'
+
+            # 3. Open in append mode, add newline if needed, and write the new tag.
+            with open(csv_path, 'a', newline='', encoding='utf-8') as csvfile:
+                csv_writer = csv.writer(csvfile)
+                if not ends_with_newline:
+                    csvfile.write('\n') # Add a newline if it doesn't end with one
+                csv_writer.writerow(["", tag_name, "9", "0"])  # Write new row
+            print(f"New tag '{tag_name}' added to CSV at {csv_path}")
+            return True
+        except Exception as e:
+            print(f"Error writing to CSV: {e}")
+            return False

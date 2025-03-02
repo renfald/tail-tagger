@@ -1,5 +1,6 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Signal
 from operator import attrgetter
+from file_operations import FileOperations
 
 class TagData:
     def __init__(self, name, category=None, frequency=None, selected=False, favorite=False, is_known=True):
@@ -61,6 +62,17 @@ class TagListModel(QAbstractListModel):
         """Adds a tag"""
         self.tags.append(tag_data)
 
+    def remove_tag(self, tag_data_to_remove):
+        """Removes a specific TagData object from the tag list."""
+        if tag_data_to_remove in self.tags:
+            self.beginResetModel() # Or beginRemoveRows/endRemoveRows for more specific signal
+            self.tags.remove(tag_data_to_remove)
+            self.endResetModel() # Or endRemoveRows
+            self.tags_selected_changed.emit() # Notify panels of change
+            print(f"Tag '{tag_data_to_remove.name}' removed from TagListModel.")
+        else:
+            print(f"Warning: Tag '{tag_data_to_remove.name}' not found in TagListModel for removal.")
+    
     def clear_tags(self):
         """Clears all tags."""
         self.tags = []
@@ -97,16 +109,20 @@ class TagListModel(QAbstractListModel):
     def search_tags(self, query):
         """
         Performs a basic substring search for tags.
-        Returns a list of TagData objects whose names contain the query (case-insensitive).
+        Handles empty queries by returning an empty list.
+        Orders search results by frequency (descending).
+        Implements underscore/space agnostic search.
+        Returns a list of TagData objects whose names contain the query (case-insensitive), ordered by frequency.
         """
         if not query: # Check if the query is empty
             return [] # Return empty list if query is empty
 
-        query_lower = query.lower()  # Convert query to lowercase for case-insensitive search
+        query_spaces = FileOperations.convert_underscores_to_spaces(query.lower()) # Convert query to space-separated lowercase
         filtered_tags = []
         for tag_data in self.get_known_tags(): # Search within known tags only
-            if query_lower in tag_data.name.lower(): # Case-insensitive substring check
+            tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower()) # Convert tag name to space-separated lowercase
+            if query_spaces in tag_name_spaces: # Case-insensitive substring check on space-separated names
                 filtered_tags.append(tag_data)
+
         filtered_tags.sort(key=attrgetter('frequency'), reverse=True)
-        
         return filtered_tags

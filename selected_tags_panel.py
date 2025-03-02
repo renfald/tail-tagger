@@ -3,6 +3,8 @@ from PySide6.QtCore import Qt
 from tag_list_panel import TagListPanel
 from tag_widget import TagWidget
 
+# TODO: There is a bug where the tag will go one slot lower than expected if you are dragging downward past where it originally was. must be fixed here and in FavoritesPanel
+
 class SelectedTagsPanel(TagListPanel):
     def __init__(self, main_window, parent=None): # Accept main_window
         super().__init__(main_window) # Pass main_window to TagListPanel parent init
