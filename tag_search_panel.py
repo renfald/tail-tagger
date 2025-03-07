@@ -1,10 +1,8 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, QScrollArea, QPushButton, QInputDialog, QMessageBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, QScrollArea, QPushButton, QInputDialog, QSpacerItem, QSizePolicy
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeyEvent, QIcon
 
 from tag_widget import TagWidget
-from file_operations import FileOperations
-from tag_list_model import TagData
 
 class TagSearchPanel(QWidget):
     def __init__(self, main_window, parent=None):
@@ -16,6 +14,7 @@ class TagSearchPanel(QWidget):
         self.search_query = ""
         self.highlighted_tag_index = -1 # Initialize highlighted index to -1 (no tag highlighted initially)
         self.search_results_tag_widgets = [] # Store TagWidgets in search results for navigation
+        self.exact_match_mode = False   # Initialize exact match mode to False (fuzzy search by default)
         self.setup_ui()
         self._display_search_results([])
         self.main_window.tag_list_model.tags_selected_changed.connect(self._on_tags_changed)
@@ -27,18 +26,40 @@ class TagSearchPanel(QWidget):
         # Main layout - setting minimal spacing between ui elements (search and results)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setSpacing(1)
         self.setLayout(layout)
 
+        # --- Header Layout (Search Label + Exact Match Toggle) ---
+        header_layout = QHBoxLayout() # Horizontal layout for header
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(1) # Add some spacing between label and toggle
+        layout.addLayout(header_layout) # Add header layout to main vertical layout
+        
+        # Search Label
+        search_label = QLabel("Search") # Create QLabel for "Search" text
+        header_layout.addWidget(search_label) # Add label to header layout
+
+        header_spacer = QSpacerItem(10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum) # Create horizontal spacer
+        header_layout.addItem(header_spacer) # Add spacer to header layout
+
+        # Exact Match Toggle Button
+        self.exact_match_toggle_button = QPushButton() # Create push button for toggle icon
+        self.exact_match_toggle_button.setMinimumWidth(35) # Set minimum width for the button
+        self.exact_match_toggle_button.setCheckable(True) # Make it checkable for toggle behavior
+        self.exact_match_toggle_button.setChecked(False) # Default to Fuzzy Match (not checked)
+        self.exact_match_toggle_button.clicked.connect(self._toggle_exact_match_mode) # Connect toggle signal
+        header_layout.addWidget(self.exact_match_toggle_button) # Add toggle button to header layout
+        self._update_exact_match_toggle_icon() # Initial icon and tooltip setup (call helper method below)
+        
         # --- Search Input Area (Horizontal Layout for Input + Icon) ---
         search_input_layout = QHBoxLayout()
         search_input_layout.setContentsMargins(0, 0, 0, 0)
-        search_input_layout.setSpacing(0)
+        search_input_layout.setSpacing(1)
         layout.addLayout(search_input_layout) # Add horizontal layout to main vertical layout
 
         # Search Input Field
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search Tags...")
+        self.search_input.setPlaceholderText("Type Tag Here...")
         self.search_input.setStyleSheet("background-color: #2B2B2B;color: white;")
         self.search_input.textChanged.connect(self._on_search_text_changed)
         search_input_layout.addWidget(self.search_input) # Add search input to horizontal layout
@@ -50,7 +71,7 @@ class TagSearchPanel(QWidget):
         self.add_new_tag_icon_button.setToolTip("Add New Tag")
         self.add_new_tag_icon_button.clicked.connect(self._handle_add_new_tag_icon_clicked)
         search_input_layout.addWidget(self.add_new_tag_icon_button)
-        self.add_new_tag_icon_button.setStyleSheet("QPushButton { background-color: #2B2B2B; border: none; padding: 0px; margin: 0px; } QPushButton:hover { background-color: #353535; }")
+        self.add_new_tag_icon_button.setStyleSheet("QPushButton { border: none; padding: 0px; margin: 0px; } QPushButton:hover { background-color: #2B2B2B; }")
 
         # Tag Results Display Area (in Scroll Area)
         self.results_scroll_area = QScrollArea()
@@ -66,6 +87,21 @@ class TagSearchPanel(QWidget):
         self.results_scroll_area.setWidget(self.results_area)
         layout.addWidget(self.results_scroll_area)
 
+    def _toggle_exact_match_mode(self):
+        """Toggles the exact match mode and updates the toggle icon and tooltip."""
+        self.exact_match_mode = not self.exact_match_mode # Toggle the boolean state
+        self._update_exact_match_toggle_icon() # Update the button's icon and tooltip based on mode
+        self._execute_search() # Re-execute search with new mode
+
+    def _update_exact_match_toggle_icon(self):
+        """Updates the exact match toggle icon and tooltip based on the current mode."""
+        if self.exact_match_mode:
+            self.exact_match_toggle_button.setIcon(QIcon(":/icons/equal.svg")) # Set icon for Exact Match mode
+            self.exact_match_toggle_button.setToolTip("Exact Match (Toggle to Fuzzy Match)") # Tooltip for Exact Match
+        else:
+            self.exact_match_toggle_button.setIcon(QIcon(":/icons/approx.svg")) # Set icon for Fuzzy Match mode
+            self.exact_match_toggle_button.setToolTip("Fuzzy Match (Default) (Toggle to Exact Match)") # Tooltip for Fuzzy Match
+    
     def _display_search_results(self, tag_data_list):
         """
         Clears the current results and displays the provided list of TagData objects as TagWidgets.
@@ -129,7 +165,7 @@ class TagSearchPanel(QWidget):
         if not query_text: # Check if search query is empty
             self._display_search_results([]) # Display empty results area if query is empty
         else:
-            filtered_tags = self.main_window.tag_list_model.search_tags(query_text) # Perform search
+            filtered_tags = self.main_window.tag_list_model.search_tags(query_text, self.exact_match_mode) # Perform search
             self._display_search_results(filtered_tags) # Update UI with search results
 
         if self.search_results_tag_widgets: # Check if there are results to highlight

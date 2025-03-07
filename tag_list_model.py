@@ -106,13 +106,11 @@ class TagListModel(QAbstractListModel):
         """Returns a list of all known tags."""
         return [tag for tag in self.tags if tag.is_known]
 
-    def search_tags(self, query):
+    def search_tags(self, query, exact_match_mode):
         """
-        Performs a basic substring search for tags.
-        Handles empty queries by returning an empty list.
-        Orders search results by frequency (descending).
-        Implements underscore/space agnostic search.
-        Returns a list of TagData objects whose names contain the query (case-insensitive), ordered by frequency.
+        Searches for tags based on the query.
+        Returns an empty list for empty queries.
+        Orders results by frequency (descending).
         """
         if not query: # Check if the query is empty
             return [] # Return empty list if query is empty
@@ -121,8 +119,15 @@ class TagListModel(QAbstractListModel):
         filtered_tags = []
         for tag_data in self.get_known_tags(): # Search within known tags only
             tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower()) # Convert tag name to space-separated lowercase
-            if query_spaces in tag_name_spaces: # Case-insensitive substring check on space-separated names
-                filtered_tags.append(tag_data)
+        
+            if exact_match_mode: # Check Exact Match mode - Now using parameter
+                # --- Exact Match Logic ---
+                if query_spaces == tag_name_spaces: # Exact equality check for Exact Match
+                    filtered_tags.append(tag_data) 
+            else:
+                # --- Fuzzy Match Logic (Existing Substring Search) ---
+                if query_spaces in tag_name_spaces: # Case-insensitive substring check on space-separated names
+                    filtered_tags.append(tag_data)
 
         filtered_tags.sort(key=attrgetter('frequency'), reverse=True)
         return filtered_tags
