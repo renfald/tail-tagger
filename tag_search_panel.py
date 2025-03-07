@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, QScrollArea, QPushButton, QInputDialog, QMessageBox
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeyEvent, QIcon
+
 from tag_widget import TagWidget
 from file_operations import FileOperations
 from tag_list_model import TagData
-import csv
 
 class TagSearchPanel(QWidget):
     def __init__(self, main_window, parent=None):
@@ -140,27 +140,33 @@ class TagSearchPanel(QWidget):
             self._update_tag_highlight() # Ensure no tag is highlighted
 
     def keyPressEvent(self, event: QKeyEvent):
-        """Handles key press events for keyboard navigation."""
-        if not self.search_results_tag_widgets: # Do nothing if no search results
-            return
-
-        if event.key() == Qt.Key_Down:
-            self.highlighted_tag_index = min(self.highlighted_tag_index + 1, len(self.search_results_tag_widgets) - 1)
-            self._update_tag_highlight()
-            event.accept() # Accept the event
-        elif event.key() == Qt.Key_Up:
-            self.highlighted_tag_index = max(self.highlighted_tag_index - 1, 0)
-            self._update_tag_highlight()
-            event.accept() # Accept the event
-        elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter: # Handle Enter key press
-            if 0 <= self.highlighted_tag_index < len(self.search_results_tag_widgets):
-                highlighted_tag_widget = self.search_results_tag_widgets[self.highlighted_tag_index]
-                self.main_window._handle_tag_clicked(highlighted_tag_widget.tag_name) # Select the highlighted tag
-                self.search_input.clear() # Clear search input after selection - for next phase
-                self._execute_search() # Refresh results to be empty - for next phase
-            event.accept() # Accept the event
-        else:
+        """Handles key press events for keyboard navigation and delegates to KeyboardManager."""
+        if not self.search_results_tag_widgets: # Keep existing check - Do nothing if no search results
+            pass # Keep existing - do nothing if no search results
+        elif event.key() == Qt.Key_Down or event.key() == Qt.Key_Up or event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter: # Keep existing panel-specific navigation
+            # --- Panel-specific navigation logic (Up/Down/Enter) ---
+            if event.key() == Qt.Key_Down:
+                self.highlighted_tag_index = min(self.highlighted_tag_index + 1, len(self.search_results_tag_widgets) - 1)
+                self._update_tag_highlight()
+                event.accept() # Accept the event
+                return
+            elif event.key() == Qt.Key_Up:
+                self.highlighted_tag_index = max(self.highlighted_tag_index - 1, 0)
+                self._update_tag_highlight()
+                event.accept() # Accept the event
+                return
+            elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter: # Handle Enter key press
+                if 0 <= self.highlighted_tag_index < len(self.search_results_tag_widgets):
+                    highlighted_tag_widget = self.search_results_tag_widgets[self.highlighted_tag_index]
+                    self.main_window._handle_tag_clicked(highlighted_tag_widget.tag_name) # Select the highlighted tag
+                    self.search_input.clear() # Clear search input after selection - for next phase
+                    self._execute_search() # Refresh results to be empty - for next phase
+                event.accept() # Accept the event
+                return
+        # --- Delegate to KeyboardManager for unhandled events ---
+        if not self.main_window.keyboard_manager.handle_key_press(event, self):
             super().keyPressEvent(event) # Pass event to parent for default handling
+        # --- End Delegation ---
 
     def _update_tag_highlight(self):
         """Updates the visual highlight of the currently highlighted tag."""

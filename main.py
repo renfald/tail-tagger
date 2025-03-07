@@ -4,13 +4,17 @@ import theme
 from config_manager import ConfigManager
 from file_operations import FileOperations
 from tag_list_model import TagListModel, TagData
+from keyboard_manager import KeyboardManager
+
 from left_panel_container import LeftPanelContainer
+from center_panel import CenterPanel
 from selected_tags_panel import SelectedTagsPanel
+
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QSplitter, QMessageBox)
 from PySide6.QtCore import Qt
-from center_panel import CenterPanel #Added back import
+from PySide6.QtGui import QKeySequence, QShortcut
 
 # TODO: its probably better for tag widget shading to not need every panel to rebuild their tag list and instead just check their current state. better yet a single
 # tag should be able to know if it needs an update
@@ -41,6 +45,18 @@ class MainWindow(QMainWindow):
         self.file_operations = FileOperations()
         self.tag_list_model = TagListModel()
 
+        # --- Keyboard Manager --- <--- ADD THIS SECTION
+        self.keyboard_manager = KeyboardManager(self)
+
+        # --- Global Keyboard Shortcuts --- <--- ADD THIS SECTION
+        self.prev_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
+        self.prev_shortcut.activated.connect(self._prev_image)
+        self.prev_shortcut.setContext(Qt.ApplicationShortcut)  # Works throughout application
+
+        self.next_shortcut = QShortcut(QKeySequence(Qt.Key_Right), self)
+        self.next_shortcut.setContext(Qt.ApplicationShortcut)
+        self.next_shortcut.activated.connect(self._next_image)
+       
         # --- Staging Folder ---
         self.staging_folder_path = os.path.join(os.getcwd(), "staging")
         if not os.path.isdir(self.staging_folder_path):

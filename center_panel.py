@@ -8,6 +8,8 @@ class CenterPanel(QLabel):
         self.setAlignment(Qt.AlignCenter)  # Keep alignment from MainWindow
         self.image_path = None  # Store image path
 
+        self.setFocusPolicy(Qt.ClickFocus)
+
     def set_image_path(self, image_path):
         """Sets the image path for the center panel."""
         self.image_path = image_path

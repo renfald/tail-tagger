@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeyEvent
 
 class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget), type(ABC)), {})):  # Explicit metaclass
     """Abstract base class for tag list panels."""
@@ -49,6 +50,12 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked) # Connect favorite logic
         return tag_widget
 
+    def keyPressEvent(self, event: QKeyEvent):
+        """Overrides keyPressEvent to handle keyboard shortcuts."""
+        # Delegate event handling to KeyboardManager
+        if not self.main_window.keyboard_manager.handle_key_press(event, self):
+            # If event was not handled by KeyboardManager, pass it to the parent
+            super().keyPressEvent(event)
 
     @abstractmethod
     def add_tag(self, tag_name, is_known=True):
