@@ -1,8 +1,9 @@
 # left_panel_container.py
 from PySide6.QtWidgets import QWidget, QSplitter, QVBoxLayout, QFrame, QScrollArea
 from PySide6.QtCore import Qt
-from all_tags_panel import AllTagsPanel
+
 from tag_search_panel import TagSearchPanel
+from frequently_used_panel import FrequentlyUsedPanel
 from favorites_panel import FavoritesPanel
 
 class LeftPanelContainer(QWidget):
@@ -24,9 +25,9 @@ class LeftPanelContainer(QWidget):
         # --- Frequently Used Panel (Placeholder with Scroll Area) ---
         self.frequently_used_scroll_area = QScrollArea()
         self.frequently_used_scroll_area.setWidgetResizable(True)
-        self.frequently_used_panel = QFrame()  # Placeholder
-        frequently_used_layout = QVBoxLayout(self.frequently_used_panel) # Placeholder
-        frequently_used_layout.setAlignment(Qt.AlignTop)  # Placeholder
+        self.frequently_used_panel = FrequentlyUsedPanel(main_window=self.main_window)
+        frequently_used_layout = QVBoxLayout(self.frequently_used_panel)
+        frequently_used_layout.setAlignment(Qt.AlignTop)
         self.frequently_used_scroll_area.setWidget(self.frequently_used_panel)
 
         # --- Favorites Panel (Placeholder with Scroll Area) ---
