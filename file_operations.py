@@ -261,3 +261,48 @@ class FileOperations:
         except Exception as e:
             print(f"Error writing to CSV: {e}")
             return False
+        
+    def load_usage_data(self):
+        """Loads tag usage data from usage_data.json.
+        Returns a dictionary of tag names to usage counts.
+        Returns an empty dict if file not found or loading fails.
+        """
+        usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json") # Define usage_data.json path
+        try:
+            with open(usage_data_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                print(f"  Loaded usage data from: {usage_data_path}") # Debug message
+                return data # Return loaded usage data dictionary
+        except FileNotFoundError:
+            print(f"  Usage data file not found at: {usage_data_path}. Creating default usage data file.") # Debug message
+            self.create_default_usage_data() # Create default usage data file
+            return {} # Return empty dict after creating default file
+        except json.JSONDecodeError:
+            print(f"  Error decoding usage data JSON at: {usage_data_path}. Starting with empty usage data.") # Debug message
+            return {} # Return empty dict if JSON decode error
+        except Exception as e:
+            print(f"  Error loading usage data: {e}. Starting with empty usage data.") # General error catch
+            return {} # Return empty dict for other exceptions
+    
+    def save_usage_data(self, usage_data):
+        """Saves tag usage data to usage_data.json."""
+        usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json") # Define usage_data.json path
+        try:
+            with open(usage_data_path, 'w', encoding='utf-8') as f:
+                json.dump(usage_data, f, indent=2) # Save usage_data dict to JSON file with indent
+            print(f"  Saved usage data to: {usage_data_path}") # Debug message
+            return True # Indicate success
+        except Exception as e:
+            print(f"  Error saving usage data to {usage_data_path}: {e}") # Error message with path
+            return False # Indicate failure
+
+    def create_default_usage_data(self):
+        """Creates a default usage data file if it doesn't exist."""
+        usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json")
+        if not os.path.exists(usage_data_path):
+            try:
+                with open(usage_data_path, 'w', encoding='utf-8') as f:
+                    json.dump({}, f)  # Create an empty JSON object
+                print(f"  Created default usage data file at: {usage_data_path}") # Debug message
+            except Exception as e:
+                print(f"  Error creating default usage data file: {e}")

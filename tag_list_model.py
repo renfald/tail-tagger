@@ -20,6 +20,7 @@ class TagListModel(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.tags = []
+        self.tag_usage_counts = self._load_usage_data()
 
     def load_tags_from_csv(self, csv_path):
         """Loads tags from the specified CSV file."""
@@ -49,7 +50,12 @@ class TagListModel(QAbstractListModel):
             print(f"Error: CSV file not found at {csv_path}")
         except Exception as e:
             print(f"Error loading tags from CSV: {e}")
-
+    
+    def _load_usage_data(self): # <--- ADD THIS METHOD - Helper method to load usage data
+        """Loads usage data using FileOperations."""
+        file_operations = FileOperations() # Create FileOperations instance
+        return file_operations.load_usage_data() # Call load_usage_data and return the dictionary
+    
     def get_all_tags(self):
         """Returns all tags."""
         return self.tags
