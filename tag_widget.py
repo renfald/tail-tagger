@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QLabel, QFrame, QSizePolicy, QHBoxLayout
 from PySide6.QtCore import Qt, QSize, Signal, QMimeData, QPoint
-from PySide6.QtGui import QDrag, QFont, QPixmap
+from PySide6.QtGui import QDrag, QFont, QPixmap, QContextMenuEvent
 from math import sqrt
 from file_operations import FileOperations
 
@@ -13,6 +13,7 @@ class TagWidget(QFrame):
 
     tag_clicked = Signal(str)
     favorite_star_clicked = Signal(str)
+    tag_right_clicked = Signal(str)
 
     def __init__(self, tag_data, is_selected=None, is_known_tag=None):
         """Initializes a TagWidget.
@@ -215,3 +216,12 @@ class TagWidget(QFrame):
             self.star_label.show() # Show the star label
         else:
             self.star_label.hide() # Hide the star label
+
+    def contextMenuEvent(self, event: QContextMenuEvent):
+        """Handles right-click context menu events for the TagWidget."""
+        if event.reason() == QContextMenuEvent.Mouse:
+            print(f"Right-click detected on tag: {self.tag_name}")
+            self.tag_right_clicked.emit(self.tag_name)
+            event.accept()
+        else:
+            super().contextMenuEvent(event) # Call base class implementation for non-mouse context menus

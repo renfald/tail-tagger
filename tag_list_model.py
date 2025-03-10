@@ -167,3 +167,12 @@ class TagListModel(QAbstractListModel):
         top_tags = [tag for _, _, _, tag in nlargest(top_n, frequent_tag_tuples)]
 
         return top_tags
+   
+    def remove_tag_usage(self, tag_name):
+        """Removes the usage data for a given tag name."""
+        underscored_tag_name = FileOperations.convert_spaces_to_underscores(tag_name) # Convert to underscore format for consistency
+        if underscored_tag_name in self.tag_usage_counts:
+            del self.tag_usage_counts[underscored_tag_name] # Remove tag from usage_counts dict
+            print(f"  Usage data removed for tag: '{underscored_tag_name}'") # Debug message
+        else:
+            print(f"  Warning: No usage data found for tag '{underscored_tag_name}' to remove.") # Warning if no data found
