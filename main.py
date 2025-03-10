@@ -368,6 +368,8 @@ class MainWindow(QMainWindow):
                 # Tag was just selected, add it to selected_tags_for_current_image
                 if clicked_tag_data not in self.selected_tags_for_current_image: # Prevent Duplicates
                     self.selected_tags_for_current_image.append(clicked_tag_data)
+                self.tag_list_model.increment_tag_usage(clicked_tag_name)
+                self.file_operations.save_usage_data(self.tag_list_model.tag_usage_counts)
             else:
                 # Tag was just deselected, remove it from selected_tags_for_current_image
                 if clicked_tag_data in self.selected_tags_for_current_image:
@@ -460,7 +462,7 @@ class MainWindow(QMainWindow):
             # In-place update of existing TagData object:
             existing_unknown_tag_data.is_known = True
             existing_unknown_tag_data.category = "9"
-            existing_unknown_tag_data.frequency = 0
+            existing_unknown_tag_data.post_count = 0
             print(f"Unknown tag '{underscored_tag_name}' promoted to known tag (in-place update).")
 
         else:
@@ -471,7 +473,7 @@ class MainWindow(QMainWindow):
                 return
 
             # Add new tag to model
-            new_tag_data = TagData(name=underscored_tag_name, category="9", frequency=0, is_known=True)
+            new_tag_data = TagData(name=underscored_tag_name, category="9", post_count=0, is_known=True)
             self.tag_list_model.add_tag(new_tag_data)
             print(f"New tag '{underscored_tag_name}' added to TagListModel.")
 

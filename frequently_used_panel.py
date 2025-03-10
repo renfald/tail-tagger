@@ -9,8 +9,8 @@ class FrequentlyUsedPanel(TagListPanel):
         self.main_window = main_window
 
     def _get_tag_data_list(self):
-        """Stub method: Returns an empty list for now (Phase 8A)."""
-        return [] # Return empty list - no tags displayed in Phase 8A
+        """Returns the list of TagData objects for this panel (Frequently Used Tags), ordered by usage frequency."""
+        return self.main_window.tag_list_model.get_frequent_tags()
 
     def get_styling_mode(self):
         """Returns the styling mode for this panel."""

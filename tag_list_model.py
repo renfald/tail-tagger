@@ -1,12 +1,13 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Signal
 from operator import attrgetter
 from file_operations import FileOperations
+from heapq import nlargest
 
 class TagData:
-    def __init__(self, name, category=None, frequency=None, selected=False, favorite=False, is_known=True):
+    def __init__(self, name, category=None, post_count=None, selected=False, favorite=False, is_known=True):
         self.name = name
         self.category = category
-        self.frequency = frequency
+        self.post_count = post_count
         self.selected = selected
         self.favorite = favorite
         self.is_known = is_known
@@ -33,7 +34,7 @@ class TagListModel(QAbstractListModel):
                     try:
                         name = row['name']
                         category = row['category']
-                        frequency = int(row['post_count'])  # Convert to integer
+                        post_count = int(row['post_count'])  # Convert to integer
                     except (KeyError, ValueError) as e:
                         print(f"Skipping row due to error: {e} - Row data: {row}")
                         continue  # Skip to the next row
@@ -43,15 +44,16 @@ class TagListModel(QAbstractListModel):
                         print(f"Duplicate tag found: {name}, skipping.")
                         continue
 
-                    tag_data = TagData(name=name, category=category, frequency=frequency)
+                    tag_data = TagData(name=name, category=category, post_count=post_count)
                     self.tags.append(tag_data)
+
             print(f"Loaded {len(self.tags)} tags from CSV.")
         except FileNotFoundError:
             print(f"Error: CSV file not found at {csv_path}")
         except Exception as e:
             print(f"Error loading tags from CSV: {e}")
     
-    def _load_usage_data(self): # <--- ADD THIS METHOD - Helper method to load usage data
+    def _load_usage_data(self):
         """Loads usage data using FileOperations."""
         file_operations = FileOperations() # Create FileOperations instance
         return file_operations.load_usage_data() # Call load_usage_data and return the dictionary
@@ -112,11 +114,11 @@ class TagListModel(QAbstractListModel):
         """Returns a list of all known tags."""
         return [tag for tag in self.tags if tag.is_known]
 
-    def search_tags(self, query, exact_match_mode):
+    def search_tags(self, query, exact_match):
         """
         Searches for tags based on the query.
         Returns an empty list for empty queries.
-        Orders results by frequency (descending).
+        Orders results by post_count (descending).
         """
         if not query: # Check if the query is empty
             return [] # Return empty list if query is empty
@@ -126,7 +128,7 @@ class TagListModel(QAbstractListModel):
         for tag_data in self.get_known_tags(): # Search within known tags only
             tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower()) # Convert tag name to space-separated lowercase
         
-            if exact_match_mode: # Check Exact Match mode - Now using parameter
+            if exact_match:
                 # --- Exact Match Logic ---
                 if query_spaces == tag_name_spaces: # Exact equality check for Exact Match
                     filtered_tags.append(tag_data) 
@@ -135,5 +137,33 @@ class TagListModel(QAbstractListModel):
                 if query_spaces in tag_name_spaces: # Case-insensitive substring check on space-separated names
                     filtered_tags.append(tag_data)
 
-        filtered_tags.sort(key=attrgetter('frequency'), reverse=True)
+        filtered_tags.sort(key=attrgetter('post_count'), reverse=True)
         return filtered_tags
+    
+    def increment_tag_usage(self, tag_name):
+        """Increments the usage count for a given tag name."""
+        underscored_tag_name = FileOperations.convert_spaces_to_underscores(tag_name) # Convert to underscore format for consistency
+        if underscored_tag_name in self.tag_usage_counts:
+            self.tag_usage_counts[underscored_tag_name] += 1 # Increment existing count
+        else:
+            self.tag_usage_counts[underscored_tag_name] = 1 # Initialize count to 1 if tag is new to usage data
+        print(f"  Tag usage count incremented for '{underscored_tag_name}': {self.tag_usage_counts[underscored_tag_name]}") # Debug message
+
+    def get_frequent_tags(self, top_n=30):
+        """
+        Returns the top `top_n` most frequently used tags, ordered by usage count, then post_count, then name.
+        """
+        # Step 1: Build a list of (primary, secondary, tertiary, TagData) tuples
+        frequent_tag_tuples = [
+            (self.tag_usage_counts.get(tag.name, 0),  # Usage count (primary sort key)
+            tag.post_count,                             # post_count (secondary tie-breaker)
+            tag.name,                                    # Tag name (tertiary tie-breaker)
+            tag)                                         # TagData object
+            for tag in self.get_known_tags() # <--- Filter for known tags here
+            if tag.name in self.tag_usage_counts # <--- Ensure tag has usage data
+        ]
+
+        # Step 2: Get the top `top_n` using heapq.nlargest()
+        top_tags = [tag for _, _, _, tag in nlargest(top_n, frequent_tag_tuples)]
+
+        return top_tags

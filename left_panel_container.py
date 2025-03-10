@@ -26,16 +26,16 @@ class LeftPanelContainer(QWidget):
         self.frequently_used_scroll_area = QScrollArea()
         self.frequently_used_scroll_area.setWidgetResizable(True)
         self.frequently_used_panel = FrequentlyUsedPanel(main_window=self.main_window)
-        frequently_used_layout = QVBoxLayout(self.frequently_used_panel)
-        frequently_used_layout.setAlignment(Qt.AlignTop)
+        # frequently_used_layout = QVBoxLayout(self.frequently_used_panel)
+        # frequently_used_layout.setAlignment(Qt.AlignTop)
         self.frequently_used_scroll_area.setWidget(self.frequently_used_panel)
 
         # --- Favorites Panel (Placeholder with Scroll Area) ---
         self.favorites_scroll_area = QScrollArea()
         self.favorites_scroll_area.setWidgetResizable(True)
         self.favorites_panel = FavoritesPanel(main_window=self.main_window)
-        favorites_layout = QVBoxLayout(self.favorites_panel)
-        favorites_layout.setAlignment(Qt.AlignTop)
+        # favorites_layout = QVBoxLayout(self.favorites_panel)
+        # favorites_layout.setAlignment(Qt.AlignTop)
         self.favorites_scroll_area.setWidget(self.favorites_panel)
 
         # --- Add *scroll areas* to the splitter ---
@@ -53,6 +53,6 @@ class LeftPanelContainer(QWidget):
 
     def update_all_displays(self):
         """Updates all internal panels."""
-        # self.all_tags_panel.update_display()
+        self.frequently_used_panel.update_display()
         self.favorites_panel.update_display()
         # Future panels will be updated here as well
