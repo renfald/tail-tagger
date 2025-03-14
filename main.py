@@ -128,7 +128,7 @@ class MainWindow(QMainWindow):
         right_panel_scroll_area.setWidgetResizable(True)
         
         right_panel_scroll_area.setWidget(self.selected_tags_panel) # Set panel as scroll area widget
-        # right_panel_scroll_area.viewport().setStyleSheet(f"background-color: black;") # THIS IS JUST FOR TROUBLESHOOTING STYLE ISSUES
+        right_panel_scroll_area.viewport().setStyleSheet("background-color: #242424;") # hardcoding background for every scrollarea because Qt is garbage
         main_splitter.addWidget(right_panel_scroll_area)  # Add right panel to splitter
 
         # Set initial sizes for the splitter. Essentially left and right will be fixed width between this and the set stretch factors
