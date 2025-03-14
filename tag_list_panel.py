@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy, QScrollArea
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeyEvent
 
@@ -8,19 +8,37 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
 
     def __init__(self, parent=None, panel_title=""):
         super().__init__(parent)
-        self.layout = QVBoxLayout(self)
-        self.layout.setAlignment(Qt.AlignTop)
-        self.layout.setSpacing(1) # This is the space between the widgets
-        self.layout.setContentsMargins(1, 1, 1, 1) # This is the margin around the entire panel, not the individual widgets
-        self.setStyleSheet("background-color: #242424;") # This sets a dark grey background for the tag panels
+        # self.setStyleSheet("background-color: #242424;") # This sets a dark grey background for the panel
         
-        # Create panel title label
+        # Main layout for the panel
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setSpacing(0)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create panel title label (fixed at top)
         self.title_label = QLabel(panel_title)
         self.title_label.setStyleSheet("color: white; font-weight: bold; padding: 3px; background-color: rgb(53,53,53); border: none; margin: 0px;")
         self.title_label.setAlignment(Qt.AlignCenter)
-        # Set the label to take the full width of the layout and stretch to fill any gaps
         self.title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.layout.addWidget(self.title_label, 0, Qt.AlignTop)
+        self.main_layout.addWidget(self.title_label, 0, Qt.AlignTop)
+        
+        # Create scroll area for tag widgets
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("border: none;")
+        self.scroll_area.viewport().setStyleSheet("background-color: #242424;") # Explicitly set viewport color
+        self.main_layout.addWidget(self.scroll_area, 1) # Make scroll area take remaining space
+        
+        # Container widget for tag widgets inside scroll area
+        self.tags_container = QWidget()
+        # self.tags_container.setStyleSheet("background-color: #242424;")
+        self.layout = QVBoxLayout(self.tags_container)
+        self.layout.setAlignment(Qt.AlignTop)
+        self.layout.setSpacing(1) # Space between the widgets
+        self.layout.setContentsMargins(1, 1, 1, 1) # Margin around the tags container
+        
+        # Set the container as the scroll area's widget
+        self.scroll_area.setWidget(self.tags_container)
 
     @abstractmethod
     def _get_tag_data_list(self):
@@ -39,13 +57,12 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
 
         for tag_data in tag_data_list:
             tag_widget = self._create_tag_widget(tag_data) # Create and configure TagWidget
-
-            self.layout.addWidget(tag_widget) # Add to layout
+            self.layout.addWidget(tag_widget) # Add to container layout
 
     def _clear_widgets(self):
-        """Helper method: Clears existing TagWidgets from the layout but preserves the title label."""
-        # Start from index 1 to preserve the title label at index 0
-        for i in reversed(range(1, self.layout.count())):
+        """Helper method: Clears existing TagWidgets from the layout."""
+        # Clear all widgets from the tags container layout
+        for i in reversed(range(self.layout.count())):
             widget = self.layout.itemAt(i).widget()
             if widget is not None:
                 widget.deleteLater()

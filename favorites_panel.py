@@ -25,7 +25,7 @@ class FavoritesPanel(TagListPanel):
 
             # --- Create and initialize the indicator line here ---
             if self.drop_indicator_line is None: # Only create if it doesn't exist
-                self.drop_indicator_line = QWidget(self) # Use QWidget for simple line
+                self.drop_indicator_line = QWidget(self.tags_container) # Create in tags container instead of panel
                 self.drop_indicator_line.setStyleSheet("background-color: white; height: 2px;") # Style as a white line, 2px height
                 self.drop_indicator_line.hide() # Initially hidden
             else:
@@ -40,6 +40,9 @@ class FavoritesPanel(TagListPanel):
         if event.mimeData().hasText():
             event.acceptProposedAction()
             drop_pos = event.pos()
+            # Convert position to be relative to the tags container
+            # Adjust for the title label and any other elements above the tags container
+            container_pos = self.tags_container.mapFrom(self, drop_pos)
             drop_index = 0
             indicator_y_pos = 0 # Initialize indicator Y position
 
@@ -53,7 +56,8 @@ class FavoritesPanel(TagListPanel):
                     if isinstance(tag_widget, TagWidget):
                         # Check if the mouse is less than 10px above the bottom of the tag. 
                         # We want the indicator to change if the mouse goes past the middle
-                        if drop_pos.y() < tag_widget.geometry().bottom() - 10: # Adjust this if the line should change at a diff height
+                        tag_pos_in_container = tag_widget.geometry().bottom()
+                        if container_pos.y() < tag_pos_in_container - 10: # Adjust this if the line should change at a diff height
                             drop_index = index
                             indicator_y_pos = tag_widget.geometry().top() # Position line at the top of the tag
                             print(f"  Drop index determined: {drop_index} (before tag '{tag_widget.tag_name}')")
@@ -76,8 +80,15 @@ class FavoritesPanel(TagListPanel):
 
 
             # --- Position and show the indicator line ---
-            panel_width = self.width() # Get panel width to make line span across
-            self.drop_indicator_line.setGeometry(0, indicator_y_pos, panel_width, 2) # x=0, y=calculated, width=panel width, height=2px
+            container_width = self.tags_container.width() # Get container width to make line span across
+            
+            # Create the indicator line in the tags container if it doesn't exist
+            if self.drop_indicator_line is None:
+                self.drop_indicator_line = QWidget(self.tags_container)
+                self.drop_indicator_line.setStyleSheet("background-color: white; height: 2px;")
+                self.drop_indicator_line.hide()
+            
+            self.drop_indicator_line.setGeometry(0, indicator_y_pos, container_width, 2) # x=0, y=calculated, width=container width, height=2px
             self.drop_indicator_line.raise_() # Ensure it's on top of tags
             self.drop_indicator_line.show()
 
@@ -101,6 +112,7 @@ class FavoritesPanel(TagListPanel):
                 self.drop_indicator_line.hide() # Hide indicator on drop
 
             drop_pos = event.pos()
+            container_pos = self.tags_container.mapFrom(self, drop_pos)
             drop_index = 0
 
             for index in range(self.layout.count()): # Re-calculate drop index just before insertion for robustness
@@ -108,7 +120,7 @@ class FavoritesPanel(TagListPanel):
                 if widget_item is not None and widget_item.widget() is not None:
                     tag_widget = widget_item.widget()
                     if isinstance(tag_widget, TagWidget):
-                        if drop_pos.y() < tag_widget.geometry().bottom() - 10: # This should line up with the indicator logic
+                        if container_pos.y() < tag_widget.geometry().bottom() - 10: # This should line up with the indicator logic
                             drop_index = index
                             print(f"  Drop index determined (on drop): {drop_index} (before tag '{tag_widget.tag_name}')")
                             break

@@ -48,3 +48,28 @@ class FrequentlyUsedPanel(TagListPanel):
         self.main_window.tag_list_model.remove_tag_usage(tag_name) # Call TagListModel to remove usage data
         self.main_window.file_operations.save_usage_data(self.main_window.tag_list_model.tag_usage_counts) # Save updated usage data to file
         self.update_display() # Refresh the FrequentlyUsedPanel display
+    
+    # Implementing abstract methods to meet TagListPanel requirements
+    def add_tag(self, tag_name, is_known=True):
+        pass  # Not needed
+
+    def remove_tag(self, tag_name):
+        pass  # Not needed
+
+    def clear_tags(self):
+        pass  # Not needed
+
+    def get_tags(self):
+        pass  # Not needed
+
+    def set_tags(self, tags):
+        pass # Not needed
+
+    def set_tag_selected(self, tag_name, is_selected):
+        pass  # Not needed
+
+    def is_tag_draggable(self, tag_name):
+        return False # Not draggable in this panel
+        
+    def dropEvent(self, event):
+        pass  # Not needed - no drag and drop in this panel
