@@ -5,7 +5,7 @@ from tag_widget import TagWidget
 
 class FavoritesPanel(TagListPanel):
     def __init__(self, main_window, parent=None):
-        super().__init__(main_window) # Pass main_window to TagListPanel parent init
+        super().__init__(main_window, panel_title="Favorites") # Pass main_window and panel title
         self.main_window = main_window  # Store main_window
         self.setAcceptDrops(True)
         self.drop_indicator_line = None  # Initialize drop indicator line as None

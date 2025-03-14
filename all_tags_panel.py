@@ -5,7 +5,7 @@ from tag_widget import TagWidget
 
 class AllTagsPanel(TagListPanel):
     def __init__(self, main_window, tag_list_model, parent=None): # Accept main_window
-        super().__init__(main_window) # Pass main_window to TagListPanel parent init
+        super().__init__(main_window, panel_title="All Tags") # Pass main_window and panel title
         self.main_window = main_window # Store main_window
         self.tag_list_model = tag_list_model  # Store the model
 

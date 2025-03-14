@@ -37,6 +37,8 @@ class TagSearchPanel(QWidget):
         
         # Search Label
         search_label = QLabel("Search") # Create QLabel for "Search" text
+        search_label.setStyleSheet("color: white; font-weight: bold; padding: 3px; background-color: rgb(53,53,53);") # Match TagListPanel title style
+        search_label.setAlignment(Qt.AlignLeft) # Left-align this title since it has the toggle button on the right
         header_layout.addWidget(search_label) # Add label to header layout
 
         header_spacer = QSpacerItem(10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum) # Create horizontal spacer

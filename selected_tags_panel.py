@@ -7,7 +7,7 @@ from tag_widget import TagWidget
 
 class SelectedTagsPanel(TagListPanel):
     def __init__(self, main_window, parent=None): # Accept main_window
-        super().__init__(main_window) # Pass main_window to TagListPanel parent init
+        super().__init__(main_window, panel_title="Selected Tags") # Pass main_window and panel title
         self.main_window = main_window # Store main_window (needed for drag/drop)
         self.setAcceptDrops(True)
         self.drop_indicator_line = None  # Initialize drop indicator line as None

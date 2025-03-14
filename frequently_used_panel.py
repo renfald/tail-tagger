@@ -5,7 +5,7 @@ from PySide6.QtGui import QAction
 
 class FrequentlyUsedPanel(TagListPanel):
     def __init__(self, main_window, parent=None):
-        super().__init__(main_window)
+        super().__init__(main_window, panel_title="Frequently Used")
         self.main_window = main_window
 
     def _get_tag_data_list(self):
