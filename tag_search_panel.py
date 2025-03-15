@@ -18,6 +18,8 @@ class TagSearchPanel(QWidget):
         self.setup_ui()
         self._display_search_results([])
         self.main_window.tag_list_model.tags_selected_changed.connect(self._on_tags_changed)
+        # Connect to the new tag_state_changed signal for individual tag updates
+        self.main_window.tag_list_model.tag_state_changed.connect(self._on_tag_state_changed)
 
     def setup_ui(self):
         """
@@ -113,6 +115,12 @@ class TagSearchPanel(QWidget):
         for i in reversed(range(self.results_area_layout.count())):
             widget = self.results_area_layout.itemAt(i).widget()
             if widget is not None:
+                # Make sure to remove observer if it's a TagWidget
+                if hasattr(widget, 'tag_data') and hasattr(widget, '_on_tag_data_changed'):
+                    try:
+                        widget.tag_data.remove_observer(widget._on_tag_data_changed)
+                    except:
+                        pass  # In case there are errors during cleanup
                 widget.deleteLater()
 
         self.search_results_tag_widgets = []
@@ -242,3 +250,12 @@ class TagSearchPanel(QWidget):
         Calls MainWindow.add_new_tag_to_model() to handle tag addition.
         """
         self.main_window.add_new_tag_to_model(tag_name)
+        
+    def _on_tag_state_changed(self, tag_name):
+        """
+        Handle updates when a specific tag's state changes.
+        If the tag is in our current search results, it will automatically
+        update since the TagWidget is an observer of its TagData.
+        """
+        # No need to do anything - the TagWidget will update itself
+        # This handler is here for future expandability

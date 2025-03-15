@@ -337,10 +337,15 @@ class MainWindow(QMainWindow):
     def _export_tags(self):
         self.file_operations.export_tags(self, self.last_folder_path)
 
-    # TODO: pretty sure favorites don't need to update panels (besides favs panel). star icon determined on mouse hover of widget based directly on
-    # on favorite attr of tag data object which all tag widgets have a reference for their given tag. same tag in all panels have the same info
+    # LEGACY: This method is kept for backward compatibility and for full refreshes
+    # Modern approach uses observer pattern and targeted panel updates
     def _update_tag_panels(self):
-        """Updates all tag panels."""
+        """Updates all tag panels. 
+        
+        Note: This method is only needed for major changes that require full panel refreshes,
+        such as loading a new image or when the entire model changes. For individual tag state
+        changes (selected/unselected, favorite), the observer pattern handles updates automatically.
+        """
         self.left_panel_container.update_all_displays()
         self.selected_tags_panel.update_display()
 
@@ -358,6 +363,7 @@ class MainWindow(QMainWindow):
             # Toggle the selected state in the model
             new_selected_state = not clicked_tag_data.selected
             self.tag_list_model.set_tag_selected_state(clicked_tag_name, new_selected_state)
+            # Note: set_tag_selected_state now handles notifying observers and emitting signals
 
             if new_selected_state:
                 # Tag was just selected, add it to selected_tags_for_current_image
@@ -373,7 +379,12 @@ class MainWindow(QMainWindow):
             # Update the workfile with the changes
             self.update_workfile_for_current_image()
 
-            self._update_tag_panels()  # Update UI to reflect changes
+            # Only update the selected panel as it needs to rebuild its list
+            self.selected_tags_panel.update_display()
+            
+            # Frequently used panel needs to refresh if usage changed
+            if new_selected_state:  # Only update on selection, not deselection
+                self.left_panel_container.frequently_used_panel.update_display()
         else:
             print(f"Warning: Clicked tag '{clicked_tag_name}' not found in TagListModel.")
 
@@ -409,9 +420,13 @@ class MainWindow(QMainWindow):
             self.file_operations.save_favorites(self.favorite_tags_ordered)
             print("favorites.json updated.") # Debug
 
-            # 5. Update UI (refresh tag panels to reflect changes)
-            self._update_tag_panels()
-            print("Tag panels updated to reflect favorite changes.") # Debug
+            # 5. Notify observers of state change
+            clicked_tag_data.notify_observers()
+            self.tag_list_model.tag_state_changed.emit(clicked_tag_name)
+
+            # 6. Update only the favorites panel as it needs to rebuild
+            self.left_panel_container.favorites_panel.update_display()
+            print("Favorites panel updated to reflect favorite changes.") # Debug
 
         else:
             print(f"Warning: Favorite star clicked for tag '{clicked_tag_name}', but tag not found in TagListModel.")
@@ -458,6 +473,9 @@ class MainWindow(QMainWindow):
             existing_unknown_tag_data.is_known = True
             existing_unknown_tag_data.category = "9"
             existing_unknown_tag_data.post_count = 0
+            # Notify observers about the change
+            existing_unknown_tag_data.notify_observers()
+            self.tag_list_model.tag_state_changed.emit(underscored_tag_name)
             print(f"Unknown tag '{underscored_tag_name}' promoted to known tag (in-place update).")
 
         else:
@@ -473,8 +491,10 @@ class MainWindow(QMainWindow):
             print(f"New tag '{underscored_tag_name}' added to TagListModel.")
 
         # --- Update UI (All relevant panels) ---
-        self.tag_list_model.tags_selected_changed.emit() # Always emit this signal (handles search and fav panels)
-        self.selected_tags_panel.update_display() # Explicitly update SelectedTagsPanel
+        # Still need to update search panel for new searches to include the tag
+        self.tag_list_model.tags_selected_changed.emit() 
+        # Updates are needed for SelectedTagsPanel if we just promoted a tag that's in the current image
+        self.selected_tags_panel.update_display()
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)

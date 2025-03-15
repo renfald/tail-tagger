@@ -71,6 +71,12 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         for i in reversed(range(self.layout.count())):
             widget = self.layout.itemAt(i).widget()
             if widget is not None:
+                # Make sure to remove observer if it's a TagWidget
+                if hasattr(widget, 'tag_data') and hasattr(widget, '_on_tag_data_changed'):
+                    try:
+                        widget.tag_data.remove_observer(widget._on_tag_data_changed)
+                    except:
+                        pass  # In case there are errors during cleanup
                 widget.deleteLater()
 
     def _create_tag_widget(self, tag_data):

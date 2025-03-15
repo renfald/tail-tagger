@@ -11,12 +11,38 @@ class TagData:
         self.selected = selected
         self.favorite = favorite
         self.is_known = is_known
+        self.observers = []  # List of functions to call when this tag's state changes
+    
+    def add_observer(self, callback):
+        """Add a callback function to be notified when this tag's state changes."""
+        if callback not in self.observers:
+            self.observers.append(callback)
+    
+    def remove_observer(self, callback):
+        """Remove a callback function from the observers list."""
+        if callback in self.observers:
+            self.observers.remove(callback)
+    
+    def notify_observers(self):
+        """Notify all observers that this tag's state has changed."""
+        # Make a copy of the observers list to avoid issues if observers 
+        # remove themselves during notification
+        observers_copy = self.observers.copy()
+        for callback in observers_copy:
+            try:
+                callback()
+            except RuntimeError as e:
+                # If we hit a deleted Qt object, remove it from observers
+                print(f"Observer error for tag {self.name}: {e}")
+                if callback in self.observers:
+                    self.observers.remove(callback)
 
 
 class TagListModel(QAbstractListModel):
     """A model to hold a list of tags."""
 
     tags_selected_changed = Signal() # Add Signal
+    tag_state_changed = Signal(str)  # Signal emitted when a specific tag's state changes
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -90,7 +116,9 @@ class TagListModel(QAbstractListModel):
         tag = next((tag for tag in self.tags if tag.name == tag_name), None)
         if tag:
             tag.selected = is_tag_selected
-            self.tags_selected_changed.emit()
+            tag.notify_observers()  # Notify observers of this specific tag
+            self.tag_state_changed.emit(tag_name)  # Emit signal with tag name
+            self.tags_selected_changed.emit()  # Keep existing signal for backward compatibility
 
     def remove_unknown_tags(self):
         """Removes any tags where is_known is False from the tag list."""

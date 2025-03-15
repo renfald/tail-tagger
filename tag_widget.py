@@ -31,6 +31,9 @@ class TagWidget(QFrame):
         self.styling_mode = "dim_on_select"
         self._setup_ui()
         self._update_style()
+        
+        # Register as an observer for this tag's data changes
+        self.tag_data.add_observer(self._on_tag_data_changed)
 
     def set_is_known_tag(self, is_known_tag):
         """Sets the is_known_tag property."""
@@ -245,3 +248,33 @@ class TagWidget(QFrame):
             event.accept()
         else:
             super().contextMenuEvent(event) # Call base class implementation for non-mouse context menus
+            
+    def _on_tag_data_changed(self):
+        """Called when this tag's data changes."""
+        # Update local properties from TagData
+        self.is_selected = self.tag_data.selected
+        self.is_known_tag = self.tag_data.is_known
+        # Update the visual appearance
+        self._update_style()
+        
+    def __del__(self):
+        """Clean up by removing this widget as an observer."""
+        try:
+            if hasattr(self, 'tag_data') and self.tag_data:
+                self.tag_data.remove_observer(self._on_tag_data_changed)
+        except:
+            # In case of destruction order issues
+            pass
+            
+    def hideEvent(self, event):
+        """Handle widget being hidden."""
+        super().hideEvent(event)
+        
+    def closeEvent(self, event):
+        """Handle widget being closed."""
+        try:
+            if hasattr(self, 'tag_data') and self.tag_data:
+                self.tag_data.remove_observer(self._on_tag_data_changed)
+        except:
+            pass
+        super().closeEvent(event)
