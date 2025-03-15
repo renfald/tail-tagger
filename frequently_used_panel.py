@@ -6,7 +6,6 @@ from PySide6.QtGui import QAction
 class FrequentlyUsedPanel(TagListPanel):
     def __init__(self, main_window, parent=None):
         super().__init__(main_window, panel_title="Frequently Used")
-        self.main_window = main_window
 
     def _get_tag_data_list(self):
         """Returns the list of TagData objects for this panel (Frequently Used Tags), ordered by usage frequency."""
@@ -32,14 +31,9 @@ class FrequentlyUsedPanel(TagListPanel):
     # overriding the base class method to handle the right-click event. Don't like it. feel like we should handle right click in a more centralized way TODO:
     def _create_tag_widget(self, tag_data):
         """Helper method: Creates and configures a TagWidget."""
-        from tag_widget import TagWidget # Import here to avoid circular dependency
-        tag_widget = TagWidget(tag_data=tag_data, is_selected=None, is_known_tag=None) # Pass tag_data as first arg, remove positional is_selected and is_known_tag
-        tag_widget.set_styling_mode(self.get_styling_mode()) # Set styling mode from subclass
-        tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect tag selection logic
-        tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked) # Connect favorite logic
-        tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked) # this may not be the right place to connect this signal
+        tag_widget = super()._create_tag_widget(tag_data)
+        tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked) # Add right-click handling
         return tag_widget
-
 
     def _remove_tag_from_frequent_list(self, tag_name):
         """Handles removing a tag from the frequently used list (and usage data)."""
@@ -48,6 +42,22 @@ class FrequentlyUsedPanel(TagListPanel):
         self.main_window.tag_list_model.remove_tag_usage(tag_name) # Call TagListModel to remove usage data
         self.main_window.file_operations.save_usage_data(self.main_window.tag_list_model.tag_usage_counts) # Save updated usage data to file
         self.update_display() # Refresh the FrequentlyUsedPanel display
+    
+    # Required implementations for abstract methods
+    def is_tag_draggable(self, tag_name):
+        return False # Not draggable in this panel
+
+    def _remove_tag_from_data_list(self, tag_data):
+        """Not used in non-draggable panel."""
+        pass
+
+    def _insert_tag_into_data_list(self, tag_data, index):
+        """Not used in non-draggable panel."""
+        pass
+
+    def _handle_post_drop_update(self, tag_name, original_index, new_index):
+        """Not used in non-draggable panel."""
+        pass
     
     # Implementing abstract methods to meet TagListPanel requirements
     def add_tag(self, tag_name, is_known=True):
@@ -67,9 +77,3 @@ class FrequentlyUsedPanel(TagListPanel):
 
     def set_tag_selected(self, tag_name, is_selected):
         pass  # Not needed
-
-    def is_tag_draggable(self, tag_name):
-        return False # Not draggable in this panel
-        
-    def dropEvent(self, event):
-        pass  # Not needed - no drag and drop in this panel
