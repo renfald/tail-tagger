@@ -9,6 +9,7 @@ class FavoritesPanel(TagListPanel):
         self.main_window = main_window  # Store main_window
         self.setAcceptDrops(True)
         self.drop_indicator_line = None  # Initialize drop indicator line as None
+        self.dragged_tag_name = None  # Track the tag being dragged
 
     def get_styling_mode(self):
         return "dim_on_select"
@@ -22,6 +23,10 @@ class FavoritesPanel(TagListPanel):
         if event.mimeData().hasText():
             event.acceptProposedAction()
             print("Drag Enter Event: Drag accepted for text data.")
+            
+            # Store the dragged tag name
+            self.dragged_tag_name = event.mimeData().text()
+            print(f"  Dragged tag name: {self.dragged_tag_name}")
 
             # --- Create and initialize the indicator line here ---
             if self.drop_indicator_line is None: # Only create if it doesn't exist
@@ -41,55 +46,20 @@ class FavoritesPanel(TagListPanel):
             event.acceptProposedAction()
             drop_pos = event.pos()
             # Convert position to be relative to the tags container
-            # Adjust for the title label and any other elements above the tags container
             container_pos = self.tags_container.mapFrom(self, drop_pos)
-            drop_index = 0
-            indicator_y_pos = 0 # Initialize indicator Y position
-
-            # --- Determine drop index and Y position ---
-            insertion_point_found = False # Flag to track if we found an insertion point
-
-            for index in range(self.layout.count()):
-                widget_item = self.layout.itemAt(index)
-                if widget_item is not None and widget_item.widget() is not None:
-                    tag_widget = widget_item.widget()
-                    if isinstance(tag_widget, TagWidget):
-                        # Check if the mouse is less than 10px above the bottom of the tag. 
-                        # We want the indicator to change if the mouse goes past the middle
-                        tag_pos_in_container = tag_widget.geometry().bottom()
-                        if container_pos.y() < tag_pos_in_container - 10: # Adjust this if the line should change at a diff height
-                            drop_index = index
-                            indicator_y_pos = tag_widget.geometry().top() # Position line at the top of the tag
-                            print(f"  Drop index determined: {drop_index} (before tag '{tag_widget.tag_name}')")
-                            insertion_point_found = True
-                            break # Exit loop, insertion point found
-                        # else:  No else needed here, continue to next tag if not before current tag
-
-            if not insertion_point_found:
-                # If we didn't find an insertion point in the loop, it means we are dropping at the end
-                if self.layout.count() > 0:
-                    # Position the indicator line below the last tag
-                    last_tag_widget = self.layout.itemAt(self.layout.count() - 1).widget()
-                    indicator_y_pos = last_tag_widget.geometry().bottom()
-                    drop_index = self.layout.count() # Insert at the end
-                    print(f"  Drop index determined: {drop_index} (after last tag)")
-                else:
-                    # Panel is empty
-                    print("  Drop index determined: 0 (panel empty)")
-                    indicator_y_pos = 0 # Top of panel
-
-
-            # --- Position and show the indicator line ---
-            container_width = self.tags_container.width() # Get container width to make line span across
             
-            # Create the indicator line in the tags container if it doesn't exist
+            # Get the visual insertion position (y-coordinate) and tag index
+            visual_position, tag_index = self._get_visual_insertion_position(container_pos)
+            
+            # Set and show the indicator line
+            container_width = self.tags_container.width()
             if self.drop_indicator_line is None:
                 self.drop_indicator_line = QWidget(self.tags_container)
                 self.drop_indicator_line.setStyleSheet("background-color: white; height: 2px;")
                 self.drop_indicator_line.hide()
             
-            self.drop_indicator_line.setGeometry(0, indicator_y_pos, container_width, 2) # x=0, y=calculated, width=container width, height=2px
-            self.drop_indicator_line.raise_() # Ensure it's on top of tags
+            self.drop_indicator_line.setGeometry(0, visual_position, container_width, 2)
+            self.drop_indicator_line.raise_()
             self.drop_indicator_line.show()
 
         else:
@@ -101,6 +71,66 @@ class FavoritesPanel(TagListPanel):
         print("Drag Leave Event: Hiding indicator")
         if self.drop_indicator_line:
             self.drop_indicator_line.hide() # Hide the indicator when drag leaves
+        self.dragged_tag_name = None  # Reset dragged tag name
+
+    def _get_visual_insertion_position(self, container_pos):
+        """
+        Determine the visual insertion position and corresponding tag index
+        based on the container position, accounting for hidden tags.
+        
+        Returns:
+        - visual_position: Y coordinate for the indicator line
+        - tag_index: Index in the data model where the tag should be inserted
+        """
+        # Get visible tag widgets
+        visible_tags = []
+        for index in range(self.layout.count()):
+            widget_item = self.layout.itemAt(index)
+            if widget_item is not None and widget_item.widget() is not None:
+                tag_widget = widget_item.widget()
+                if isinstance(tag_widget, TagWidget) and tag_widget.isVisible():
+                    visible_tags.append((index, tag_widget))
+        
+        # Find the desired position among visible tags
+        insertion_point_found = False
+        visual_position = 0
+        tag_index = 0
+        
+        # Find the position in the visible tags
+        for layout_index, tag_widget in visible_tags:
+            tag_pos_bottom = tag_widget.geometry().bottom()
+            # Check if the mouse is less than 10px above the bottom of the tag. 
+            # We want the indicator to change if the mouse goes past the middle
+            if container_pos.y() < tag_pos_bottom - 10:  # Adjust this if the line should change at a diff height
+                visual_position = tag_widget.geometry().top()
+                tag_index = self._get_data_index_for_tag(tag_widget.tag_name)
+                print(f"  Drop index determined: {tag_index} (before tag '{tag_widget.tag_name}')")
+                insertion_point_found = True
+                break
+        
+        if not insertion_point_found:
+            # Position at the end of visible tags
+            if visible_tags:
+                _, last_tag_widget = visible_tags[-1]
+                visual_position = last_tag_widget.geometry().bottom()
+                tag_index = len(self.main_window.favorite_tags_ordered)
+                print(f"  Drop index determined: {tag_index} (after last tag)")
+            else:
+                # Panel is empty or all tags are hidden
+                visual_position = 0
+                tag_index = 0
+                print("  Drop index determined: 0 (panel empty)")
+        
+        return visual_position, tag_index
+    
+    def _get_data_index_for_tag(self, tag_name):
+        """
+        Get the index of a tag in the data model by its name.
+        """
+        for i, tag_data in enumerate(self.main_window.favorite_tags_ordered):
+            if tag_data.name == tag_name:
+                return i
+        return 0  # Default to first position if not found
 
     def dropEvent(self, event):
         """Handles drop events for the panel, implementing tag reordering and favorites file update."""
@@ -111,45 +141,46 @@ class FavoritesPanel(TagListPanel):
             if self.drop_indicator_line:
                 self.drop_indicator_line.hide() # Hide indicator on drop
 
+            # Get the drop position
             drop_pos = event.pos()
             container_pos = self.tags_container.mapFrom(self, drop_pos)
-            drop_index = 0
-
-            for index in range(self.layout.count()): # Re-calculate drop index just before insertion for robustness
-                widget_item = self.layout.itemAt(index)
-                if widget_item is not None and widget_item.widget() is not None:
-                    tag_widget = widget_item.widget()
-                    if isinstance(tag_widget, TagWidget):
-                        if container_pos.y() < tag_widget.geometry().bottom() - 10: # This should line up with the indicator logic
-                            drop_index = index
-                            print(f"  Drop index determined (on drop): {drop_index} (before tag '{tag_widget.tag_name}')")
-                            break
-                        else:
-                            drop_index = index + 1
-            else:
-                print("  Drop index determined (on drop): 0 (panel empty or dropped below all tags)")
-
-            # --- Reordering Logic ---
+            
+            # Get visual position and data index
+            _, drop_index = self._get_visual_insertion_position(container_pos)
+            
+            # Find and handle the dragged tag
             dragged_tag_data = None
-            for tag_data in self.main_window.favorite_tags_ordered:
+            dragged_tag_orig_index = -1
+            
+            for i, tag_data in enumerate(self.main_window.favorite_tags_ordered):
                 if tag_data.name == tag_name:
                     dragged_tag_data = tag_data
+                    dragged_tag_orig_index = i
                     break
-
+            
             if dragged_tag_data:
+                # Account for the tag's original position when inserting
                 self.main_window.favorite_tags_ordered.remove(dragged_tag_data)
+                
+                # Adjust drop index if needed
+                if drop_index > dragged_tag_orig_index:
+                    drop_index -= 1  # Adjust for the removal of the tag
+                
+                # Insert at the target position
                 self.main_window.favorite_tags_ordered.insert(drop_index, dragged_tag_data)
-                print(f"  Tag '{tag_name}' reordered to index {drop_index} in Favorites Panel")
+                print(f"  Tag '{tag_name}' reordered from {dragged_tag_orig_index} to {drop_index} in Favorites Panel")
 
+                # Save favorites
                 self.main_window.file_operations.save_favorites(self.main_window.favorite_tags_ordered)
                 print("  favorites.json updated with new tag order.")
-
             else:
                 print(f"Warning: Dragged tag '{tag_name}' not found in favorite_tags_ordered list!")
 
+            # Reset dragged tag name
+            self.dragged_tag_name = None
+            
             event.acceptProposedAction()
             self.update_display()
-
         else:
             event.ignore()
             print("Drop Event: Drop ignored - no text data.")
