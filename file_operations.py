@@ -9,6 +9,58 @@ class FileOperations:
 
     def __init__(self):
         pass
+        
+    def _load_json_file(self, file_path, default_value=None, create_if_missing=True):
+        """Helper method to load JSON data from a file with standardized error handling.
+        
+        Args:
+            file_path (str): Path to the JSON file to load
+            default_value: Value to return if the file is not found or has invalid JSON
+            create_if_missing (bool): Whether to create the file with default_value if not found
+            
+        Returns:
+            The loaded JSON data, or default_value if loading fails
+        """
+        if default_value is None:
+            default_value = {}
+            
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            print(f"File not found: {file_path}. Using default value.")
+            if create_if_missing:
+                print(f"Creating new file at {file_path} with default data.")
+                self._save_json_file(file_path, default_value)
+            return default_value
+        except json.JSONDecodeError:
+            print(f"Error decoding JSON in {file_path}. Using default value.")
+            return default_value
+        except Exception as e:
+            print(f"Error loading JSON file {file_path}: {e}")
+            return default_value
+            
+    def _save_json_file(self, file_path, data, indent=2):
+        """Helper method to save JSON data to a file with standardized error handling.
+        
+        Args:
+            file_path (str): Path to save the JSON file
+            data: Data to save as JSON
+            indent (int): Indentation level for pretty-printing
+            
+        Returns:
+            bool: True if saving succeeded, False otherwise
+        """
+        try:
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=indent)
+            return True
+        except Exception as e:
+            print(f"Error saving JSON to {file_path}: {e}")
+            return False
 
     def get_workfile_path(self, folder_path):
         """Generates a valid workfile path based on the image folder path."""
@@ -197,27 +249,21 @@ class FileOperations:
             except Exception as e:
                 print(f"Error creating default workfile: {e}")
 
-    # TODO method needs to be enhanced so if the file is not found or data corrupt, we should create a new empty json file on the fly and return an empty list
     def load_favorites(self):
         """Loads the ordered list of favorite tag names from favorites.json."""
         favorites_file_path = os.path.join(os.getcwd(), "data", "favorites.json")
-        try:
-            with open(favorites_file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get("favorites", [])  # Return empty list if key is missing
-        except (FileNotFoundError, json.JSONDecodeError):
-            print("Error loading favorites.json. Returning empty list.")
-            return []  # Return empty list on error
+        data = self._load_json_file(
+            favorites_file_path, 
+            default_value={"favorites": []},
+            create_if_missing=True
+        )
+        return data.get("favorites", [])
         
     def save_favorites(self, favorite_tags):
         """Saves the ordered list of favorite tag names to favorites.json."""
         favorites_file_path = os.path.join(os.getcwd(), "data", "favorites.json")
         tag_names = [tag.name for tag in favorite_tags] # Extract names!
-        try:
-            with open(favorites_file_path, 'w', encoding='utf-8') as f:
-                json.dump({"favorites": tag_names}, f, indent=2)  # Save with indentation
-        except Exception as e:
-            print(f"Error saving favorites.json: {e}")
+        self._save_json_file(favorites_file_path, {"favorites": tag_names})
 
     @staticmethod
     def convert_underscores_to_spaces(tag_name):
@@ -267,42 +313,25 @@ class FileOperations:
         Returns a dictionary of tag names to usage counts.
         Returns an empty dict if file not found or loading fails.
         """
-        usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json") # Define usage_data.json path
-        try:
-            with open(usage_data_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                print(f"  Loaded usage data from: {usage_data_path}") # Debug message
-                return data # Return loaded usage data dictionary
-        except FileNotFoundError:
-            print(f"  Usage data file not found at: {usage_data_path}. Creating default usage data file.") # Debug message
-            self.create_default_usage_data() # Create default usage data file
-            return {} # Return empty dict after creating default file
-        except json.JSONDecodeError:
-            print(f"  Error decoding usage data JSON at: {usage_data_path}. Starting with empty usage data.") # Debug message
-            return {} # Return empty dict if JSON decode error
-        except Exception as e:
-            print(f"  Error loading usage data: {e}. Starting with empty usage data.") # General error catch
-            return {} # Return empty dict for other exceptions
+        usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json")
+        data = self._load_json_file(
+            usage_data_path, 
+            default_value={},
+            create_if_missing=True
+        )
+        print(f"  Loaded usage data from: {usage_data_path}")
+        return data
     
     def save_usage_data(self, usage_data):
         """Saves tag usage data to usage_data.json."""
-        usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json") # Define usage_data.json path
-        try:
-            with open(usage_data_path, 'w', encoding='utf-8') as f:
-                json.dump(usage_data, f, indent=2) # Save usage_data dict to JSON file with indent
-            print(f"  Saved usage data to: {usage_data_path}") # Debug message
-            return True # Indicate success
-        except Exception as e:
-            print(f"  Error saving usage data to {usage_data_path}: {e}") # Error message with path
-            return False # Indicate failure
+        usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json")
+        success = self._save_json_file(usage_data_path, usage_data)
+        if success:
+            print(f"  Saved usage data to: {usage_data_path}")
+        return success
 
+    # This method is now handled by _load_json_file with create_if_missing=True
     def create_default_usage_data(self):
         """Creates a default usage data file if it doesn't exist."""
         usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json")
-        if not os.path.exists(usage_data_path):
-            try:
-                with open(usage_data_path, 'w', encoding='utf-8') as f:
-                    json.dump({}, f)  # Create an empty JSON object
-                print(f"  Created default usage data file at: {usage_data_path}") # Debug message
-            except Exception as e:
-                print(f"  Error creating default usage data file: {e}")
+        return self._save_json_file(usage_data_path, {})

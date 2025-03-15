@@ -102,13 +102,9 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             self.dragged_tag_name = event.mimeData().text()
             print(f"  Dragged tag name: {self.dragged_tag_name}")
 
-            # --- Create and initialize the indicator line here ---
-            if self.drop_indicator_line is None: # Only create if it doesn't exist
-                self.drop_indicator_line = QWidget(self.tags_container) # Create in tags container instead of panel
-                self.drop_indicator_line.setStyleSheet("background-color: white; height: 2px;") # Style as a white line, 2px height
-                self.drop_indicator_line.hide() # Initially hidden
-            else:
-                self.drop_indicator_line.hide() # Ensure hidden at drag start
+            # Initialize or reset drop indicator
+            self._ensure_drop_indicator_exists()
+            self.drop_indicator_line.hide() # Ensure hidden at drag start
         else:
             event.ignore()
             print("Drag Enter Event: Drag ignored - no text data or panel does not support dragging.")
@@ -126,10 +122,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             
             # Set and show the indicator line
             container_width = self.tags_container.width()
-            if self.drop_indicator_line is None:
-                self.drop_indicator_line = QWidget(self.tags_container)
-                self.drop_indicator_line.setStyleSheet("background-color: white; height: 2px;")
-                self.drop_indicator_line.hide()
+            self._ensure_drop_indicator_exists()
             
             self.drop_indicator_line.setGeometry(0, visual_position, container_width, 2)
             self.drop_indicator_line.raise_()
@@ -151,6 +144,13 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             if self.is_tag_draggable(tag_data.name):
                 return True
         return False
+        
+    def _ensure_drop_indicator_exists(self):
+        """Helper method to initialize the drop indicator line if it doesn't exist yet."""
+        if self.drop_indicator_line is None:
+            self.drop_indicator_line = QWidget(self.tags_container)
+            self.drop_indicator_line.setStyleSheet("background-color: white; height: 2px;")
+            self.drop_indicator_line.hide()
 
     def _get_visual_insertion_position(self, container_pos):
         """
