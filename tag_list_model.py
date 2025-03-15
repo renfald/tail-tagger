@@ -48,13 +48,27 @@ class TagListModel(QAbstractListModel):
         super().__init__(parent)
         self.tags = []
         self.tag_usage_counts = self._load_usage_data()
+        # Search index for quick lookups
+        self.search_index = {}  # Maps lowercase tag name segments to lists of TagData objects
+        self.tags_by_name = {}  # Maps tag name to TagData for O(1) lookups
 
     def load_tags_from_csv(self, csv_path):
         """Loads tags from the specified CSV file."""
         import csv
+        import time
+        
+        start_time = time.time()
+        print(f"Loading tags from CSV: {csv_path}")
+        
         try:
+            # Create a set of existing tag names for faster duplicate checking
+            existing_tag_names = set()
+            
             with open(csv_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
+                # Preallocate list capacity for better performance
+                tags_to_add = []
+                
                 for row in reader:
                     # Extract data from CSV, handling potential errors
                     try:
@@ -65,19 +79,64 @@ class TagListModel(QAbstractListModel):
                         print(f"Skipping row due to error: {e} - Row data: {row}")
                         continue  # Skip to the next row
 
-                    # Check for duplicates by name
-                    if any(tag.name == name for tag in self.tags):
+                    # Check for duplicates by name using set (O(1) lookup)
+                    if name in existing_tag_names:
                         print(f"Duplicate tag found: {name}, skipping.")
                         continue
-
+                    
+                    existing_tag_names.add(name)
                     tag_data = TagData(name=name, category=category, post_count=post_count)
-                    self.tags.append(tag_data)
+                    tags_to_add.append(tag_data)
+                
+                # Extend the list at once instead of appending one by one
+                self.tags.extend(tags_to_add)
+                
+                # Build the search index
+                self._build_search_index()
 
-            print(f"Loaded {len(self.tags)} tags from CSV.")
+            end_time = time.time()
+            print(f"Loaded {len(self.tags)} tags from CSV in {end_time - start_time:.4f} seconds.")
         except FileNotFoundError:
             print(f"Error: CSV file not found at {csv_path}")
         except Exception as e:
             print(f"Error loading tags from CSV: {e}")
+            
+    def _build_search_index(self):
+        """Builds the search index for faster tag lookup."""
+        import time
+        
+        start_time = time.time()
+        print("Building search index...")
+        
+        # Clear existing indexes
+        self.search_index = {}
+        self.tags_by_name = {}
+        
+        for tag_data in self.tags:
+            if not tag_data.is_known:
+                continue  # Skip unknown tags in the index
+                
+            # Add to tags_by_name dictionary for O(1) lookups
+            self.tags_by_name[tag_data.name] = tag_data
+            
+            # Add to search index
+            tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower())
+            
+            # Index the full tag name
+            if tag_name_spaces not in self.search_index:
+                self.search_index[tag_name_spaces] = []
+            self.search_index[tag_name_spaces].append(tag_data)
+            
+            # Index each word separately for better substring matching
+            words = tag_name_spaces.split()
+            for word in words:
+                if word not in self.search_index:
+                    self.search_index[word] = []
+                if tag_data not in self.search_index[word]:
+                    self.search_index[word].append(tag_data)
+                    
+        end_time = time.time()
+        print(f"Search index built in {end_time - start_time:.4f} seconds. Indexed {len(self.search_index)} terms.")
     
     def _load_usage_data(self):
         """Loads usage data using FileOperations."""
@@ -93,8 +152,29 @@ class TagListModel(QAbstractListModel):
         return [tag for tag in self.tags if tag.favorite]
 
     def add_tag(self, tag_data):
-        """Adds a tag"""
+        """Adds a tag and updates the search index if it's a known tag"""
         self.tags.append(tag_data)
+        
+        # Update tags_by_name dictionary
+        self.tags_by_name[tag_data.name] = tag_data
+        
+        # Only add known tags to the search index
+        if tag_data.is_known:
+            # Add to search index
+            tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower())
+            
+            # Index the full tag name
+            if tag_name_spaces not in self.search_index:
+                self.search_index[tag_name_spaces] = []
+            self.search_index[tag_name_spaces].append(tag_data)
+            
+            # Index each word separately
+            words = tag_name_spaces.split()
+            for word in words:
+                if word not in self.search_index:
+                    self.search_index[word] = []
+                if tag_data not in self.search_index[word]:
+                    self.search_index[word].append(tag_data)
 
     def remove_tag(self, tag_data_to_remove):
         """Removes a specific TagData object from the tag list."""
@@ -144,28 +224,66 @@ class TagListModel(QAbstractListModel):
 
     def search_tags(self, query, exact_match):
         """
-        Searches for tags based on the query.
+        Searches for tags based on the query using the optimized search index.
         Returns an empty list for empty queries.
         Orders results by post_count (descending).
+        Limits results to MAX_SEARCH_RESULTS.
         """
+        import time
+        
+        # TODO: Make this a configurable setting in the UI once we add user configuration menus
+        MAX_SEARCH_RESULTS = 50  # Limit search results to 50 items for better performance
+        
+        start_time = time.time()
+        
         if not query: # Check if the query is empty
             return [] # Return empty list if query is empty
-
-        query_spaces = FileOperations.convert_underscores_to_spaces(query.lower()) # Convert query to space-separated lowercase
-        filtered_tags = []
-        for tag_data in self.get_known_tags(): # Search within known tags only
-            tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower()) # Convert tag name to space-separated lowercase
-        
-            if exact_match:
-                # --- Exact Match Logic ---
-                if query_spaces == tag_name_spaces: # Exact equality check for Exact Match
-                    filtered_tags.append(tag_data) 
-            else:
-                # --- Fuzzy Match Logic (Existing Substring Search) ---
-                if query_spaces in tag_name_spaces: # Case-insensitive substring check on space-separated names
-                    filtered_tags.append(tag_data)
-
+            
+        query_spaces = FileOperations.convert_underscores_to_spaces(query.lower())
+        result_set = set()  # Use a set to avoid duplicates
+            
+        if exact_match:
+            # For exact match, we need to find tags where the ENTIRE name equals our query
+            # We can't just use the index directly, as it might match partial words
+            for tag_data in self.get_known_tags():
+                # Convert tag name to space format just like the query
+                tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower())
+                if tag_name_spaces == query_spaces:  # Exact equality check
+                    result_set.add(tag_data)
+        else:
+            # Fuzzy match - find all tags that contain the query
+            # Check each key in the search index that contains our query
+            matching_keys = [key for key in self.search_index.keys() if query_spaces in key]
+            
+            # If the query is a single letter or short string, this could return too many results
+            # For very short queries, we can optimize by doing a more targeted search
+            if len(query_spaces) <= 2:
+                # For short queries, limit to keys that start with the query
+                matching_keys = [key for key in matching_keys if key.startswith(query_spaces)]
+            
+            # Add all tags from matching keys to our result set
+            for key in matching_keys:
+                result_set.update(self.search_index[key])
+                
+            # If we still have too many results, we can limit further
+            if len(result_set) > 1000:
+                # Convert to list for sorting
+                result_list = list(result_set)
+                # Sort by post_count and take top 1000
+                result_list.sort(key=attrgetter('post_count'), reverse=True)
+                result_set = set(result_list[:1000])
+            
+        # Convert set back to list for final sorting
+        filtered_tags = list(result_set)
         filtered_tags.sort(key=attrgetter('post_count'), reverse=True)
+        
+        # Limit to MAX_SEARCH_RESULTS
+        total_matches = len(filtered_tags)
+        filtered_tags = filtered_tags[:MAX_SEARCH_RESULTS]
+        
+        end_time = time.time()
+        print(f"Search for '{query}' took {end_time - start_time:.4f} seconds with {total_matches} matches (showing {len(filtered_tags)})")
+        
         return filtered_tags
     
     def increment_tag_usage(self, tag_name):

@@ -143,6 +143,15 @@ class TagSearchPanel(QWidget):
                 tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
                 self.results_area_layout.addWidget(tag_widget)
                 self.search_results_tag_widgets.append(tag_widget)
+                
+            # Check if we've hit the result limit (hardcoded to 50 for now)
+            # This value should match MAX_SEARCH_RESULTS in tag_list_model.py
+            if len(tag_data_list) >= 50 and self.search_query:
+                # Add a label to indicate there are more results
+                more_results_label = QLabel(f"Showing top 50 results. Refine your search for more specific matches.")
+                more_results_label.setStyleSheet("color: #888888; font-style: italic; padding: 5px;")
+                more_results_label.setWordWrap(True)
+                self.results_area_layout.addWidget(more_results_label)
 
         if self.search_results_tag_widgets:
             self.highlighted_tag_index = 0

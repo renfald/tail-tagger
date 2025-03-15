@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 import theme
 from config_manager import ConfigManager
 from file_operations import FileOperations
@@ -8,6 +9,9 @@ from keyboard_manager import KeyboardManager
 
 from left_panel_container import LeftPanelContainer
 from center_panel import CenterPanel
+
+# Start application timer
+app_start_time = time.time()
 from selected_tags_panel import SelectedTagsPanel
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
@@ -70,8 +74,11 @@ class MainWindow(QMainWindow):
         self.last_folder_path = config.get("last_opened_folder") # Set last folder from config
 
         # --- Load Tags from CSV ---
+        csv_load_start = time.time()
         self.csv_path = os.path.join(os.getcwd(), "data", "tags-list.csv")
         self.tag_list_model.load_tags_from_csv(self.csv_path)
+        csv_load_end = time.time()
+        print(f"CSV loading complete in {csv_load_end - csv_load_start:.4f} seconds")
 
         # --- Tag Panels ---
         self.selected_tags_panel = SelectedTagsPanel(self)
@@ -498,6 +505,16 @@ class MainWindow(QMainWindow):
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)
+
+# Create main window
+window_start_time = time.time()
 window = MainWindow()
+window_end_time = time.time()
+print(f"MainWindow initialization took {window_end_time - window_start_time:.4f} seconds")
+
+# Show window
 window.show()
+app_ready_time = time.time()
+print(f"Total application startup time: {app_ready_time - app_start_time:.4f} seconds")
+
 app.exec()
