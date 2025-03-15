@@ -15,25 +15,16 @@ class FrequentlyUsedPanel(TagListPanel):
         """Returns the styling mode for this panel."""
         return "dim_on_select" # Or "ignore_select" - choose the desired styling
     
-    def _handle_tag_right_clicked(self, tag_name):
-        """Handles right-click events on TagWidgets in this panel.
-        Creates and displays a context menu with "Remove from Frequently Used" option.
+    def _add_context_menu_actions(self, menu, tag_data):
+        """Add panel-specific context menu actions for FrequentlyUsedPanel.
+        Adds 'Remove from Frequently Used' option.
         """
-        print(f"Right-clicked tag: {tag_name}")
-
-        menu = QMenu(self)
         remove_action = QAction("Remove from Frequently Used", self)
-        remove_action.triggered.connect(lambda: self._remove_tag_from_frequent_list(tag_name))
+        remove_action.triggered.connect(lambda: self._remove_tag_from_frequent_list(tag_data.name))
         menu.addAction(remove_action)
-
-        menu.popup(self.mapToGlobal(self.rect().topLeft()) + self.mapFromGlobal(self.cursor().pos())) # Popup menu at cursor position
-    
-    # overriding the base class method to handle the right-click event. Don't like it. feel like we should handle right click in a more centralized way TODO:
-    def _create_tag_widget(self, tag_data):
-        """Helper method: Creates and configures a TagWidget."""
-        tag_widget = super()._create_tag_widget(tag_data)
-        tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked) # Add right-click handling
-        return tag_widget
+        
+        # Return True because we added an action
+        return True
 
     def _remove_tag_from_frequent_list(self, tag_name):
         """Handles removing a tag from the frequently used list (and usage data)."""

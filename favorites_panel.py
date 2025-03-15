@@ -1,4 +1,5 @@
-from PySide6.QtWidgets import QFrame
+from PySide6.QtWidgets import QFrame, QMenu
+from PySide6.QtGui import QAction
 from tag_list_panel import TagListPanel
 
 class FavoritesPanel(TagListPanel):
@@ -48,4 +49,12 @@ class FavoritesPanel(TagListPanel):
 
     def set_tag_selected(self, tag_name, is_selected):
         pass  # Not needed
+        
+    def _add_context_menu_actions(self, menu, tag_data):
+        """Add panel-specific context menu actions for FavoritesPanel.
+        No specific actions for this panel yet.
+        """
+        # For now, we don't have specific actions for favorite tags
+        # Could add "Remove from Favorites" option here in the future
+        return False  # No actions added
 

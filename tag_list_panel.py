@@ -80,6 +80,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         tag_widget.set_styling_mode(self.get_styling_mode()) # Set styling mode from subclass
         tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect tag selection logic
         tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked) # Connect favorite logic
+        tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked) # Connect right-click handling
         return tag_widget
 
     def keyPressEvent(self, event: QKeyEvent):
@@ -312,4 +313,44 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
     @abstractmethod
     def is_tag_draggable(self, tag_name):
         """Returns True if draggable, False otherwise."""
+        return False
+        
+    def _handle_tag_right_clicked(self, tag_name):
+        """Handles right-click events on TagWidgets. Creates and displays a context menu with panel-specific actions."""
+        print(f"Right-clicked tag: {tag_name}")
+        
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtGui import QAction
+        
+        # Find tag data for the clicked tag
+        tag_data = None
+        for td in self._get_tag_data_list():
+            if td.name == tag_name:
+                tag_data = td
+                break
+        
+        if not tag_data:
+            print(f"Warning: Tag data not found for right-clicked tag '{tag_name}'")
+            return
+            
+        # Create context menu
+        menu = QMenu(self)
+        
+        # Add panel-specific actions to menu
+        actions_added = self._add_context_menu_actions(menu, tag_data)
+        
+        # Only show menu if actions were added
+        if actions_added:
+            menu.popup(self.mapToGlobal(self.rect().topLeft()) + self.mapFromGlobal(self.cursor().pos()))
+            
+    @abstractmethod
+    def _add_context_menu_actions(self, menu, tag_data):
+        """Abstract method: Add panel-specific context menu actions.
+        Args:
+            menu (QMenu): The menu to add actions to
+            tag_data (TagData): The TagData object for the right-clicked tag
+            
+        Returns:
+            bool: True if any actions were added, False otherwise
+        """
         return False

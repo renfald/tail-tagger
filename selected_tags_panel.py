@@ -1,4 +1,5 @@
-from PySide6.QtWidgets import QFrame
+from PySide6.QtWidgets import QFrame, QMenu
+from PySide6.QtGui import QAction
 from tag_list_panel import TagListPanel
 
 class SelectedTagsPanel(TagListPanel):
@@ -16,6 +17,28 @@ class SelectedTagsPanel(TagListPanel):
         else:
             print("Warning: SelectedTagsPanel does not have access to MainWindow instance.")
             return [] # Return empty list if no main_window
+
+    def _add_context_menu_actions(self, menu, tag_data):
+        """Add panel-specific context menu actions for SelectedTagsPanel.
+        Adds 'Add to Known Tags' option for unknown tags.
+        """
+        actions_added = False
+        
+        # Only add the "Add to Known Tags" action for unknown tags
+        if not tag_data.is_known:
+            add_action = QAction("Add to Known Tags", self)
+            add_action.triggered.connect(lambda: self._add_tag_to_known_tags(tag_data.name))
+            menu.addAction(add_action)
+            actions_added = True
+            
+        return actions_added
+        
+    def _add_tag_to_known_tags(self, tag_name):
+        """Promotes an unknown tag to a known tag."""
+        print(f"Adding tag '{tag_name}' to known tags")
+        
+        # Use the existing method in MainWindow to add the tag to known tags
+        self.main_window.add_new_tag_to_model(tag_name)
 
     def is_tag_draggable(self, tag_name):
         """Always allow dragging in this panel."""
