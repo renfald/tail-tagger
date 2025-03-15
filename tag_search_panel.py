@@ -78,7 +78,7 @@ class TagSearchPanel(QWidget):
         # Tag Results Display Area (in Scroll Area)
         self.results_scroll_area = QScrollArea()
         self.results_scroll_area.setWidgetResizable(True)
-        self.results_scroll_area.viewport().setStyleSheet("background-color: #242424;") # Scroll area
+        self.results_scroll_area.viewport().setStyleSheet("background-color: #191919;") # Scroll area
 
         self.results_area = QWidget()
         self.results_area_layout = QVBoxLayout(self.results_area) # Layout for results area

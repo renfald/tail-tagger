@@ -169,7 +169,7 @@ class TagWidget(QFrame):
             base_style = """
                 background-color: #353535;
                 color: white;
-                border: 1px solid #181818;
+                border: 1px solid #121212;
                 border-radius: 5px;
             """
             
@@ -185,7 +185,7 @@ class TagWidget(QFrame):
 
             elif self.styling_mode == "dim_on_select" and self.is_selected:
                 # Selected (Dimmed) Style
-                style = base_style + "background-color: #212121; color: #888888;"
+                style = base_style + "background-color: #242424; color: #888888;"
             else:
                 # Default (Known, Unselected) Style
                 style = base_style  # No additional changes needed

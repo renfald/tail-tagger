@@ -28,7 +28,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         # Create scroll area for tag widgets
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.viewport().setStyleSheet("background-color: #242424;") # Explicitly set viewport color
+        self.scroll_area.viewport().setStyleSheet("background-color: #191919;") # Explicitly set viewport color
         self.main_layout.addWidget(self.scroll_area, 1) # Make scroll area take remaining space
         
         # Container widget for tag widgets inside scroll area
