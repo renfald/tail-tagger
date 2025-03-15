@@ -17,7 +17,8 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         
         # Create panel title label (fixed at top)
         self.title_label = QLabel(panel_title)
-        self.title_label.setStyleSheet("color: white; font-weight: bold; padding: 3px; background-color: rgb(53,53,53); border: none; margin: 0px;")
+        self.title_label.setStyleSheet("color: white; font-weight: bold; padding: 3px; background-color: rgb(53,53,53); margin: 0px;")
+        # self.title_label.setStyleSheet("color: white; font-weight: bold; padding: 3px; background-color: rgb(53,53,53); border-top: 2px solid #242424; margin: 0px;") # potentiall alternate. provides a spacer for the splitters but looks bad in selected tags panel
         self.title_label.setAlignment(Qt.AlignCenter)
         self.title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.main_layout.addWidget(self.title_label, 0, Qt.AlignTop)
@@ -25,7 +26,6 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         # Create scroll area for tag widgets
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setStyleSheet("border: none;")
         self.scroll_area.viewport().setStyleSheet("background-color: #242424;") # Explicitly set viewport color
         self.main_layout.addWidget(self.scroll_area, 1) # Make scroll area take remaining space
         
