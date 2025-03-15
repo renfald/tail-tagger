@@ -92,43 +92,63 @@ class TagWidget(QFrame):
 
         print(f"mouseMoveEvent: tag={self.tag_name}, distance={distance:.2f}") # Debug
 
-        if distance > 8: # Drag threshold (pixels).  Adjust as needed.
+        # Get the parent panel to check if the tag is draggable
+        parent_panel = self.parent()
+        while parent_panel and not hasattr(parent_panel, 'is_tag_draggable'):
+            parent_panel = parent_panel.parent()
+        
+        # Check if tag is draggable
+        is_draggable = False
+        if parent_panel and hasattr(parent_panel, 'is_tag_draggable'):
+            is_draggable = parent_panel.is_tag_draggable(self.tag_name)
+            print(f"Tag '{self.tag_name}' draggable: {is_draggable}")
+        
+        if distance > 8: # Drag threshold (pixels) - Always initiate a drag to allow "escape" from misclicks
             print(f"Initiating drag for tag: {self.tag_name}") # Debug
             drag = QDrag(self) # Create QDrag object, passing self (TagWidget) as parent
             mime_data = QMimeData() # Create QMimeData object to hold drag data
             mime_data.setText(self.tag_name) # For now, just tag name as plain text
             drag.setMimeData(mime_data) # Set the mime data for the drag operation
 
-            # --- Capture and Set Semi-Transparent TagWidget Pixmap (Corrected) --- <--- MODIFIED CODE!
-            original_pixmap = self.grab() # Grab a pixmap of the TagWidget
-            pixmap = QPixmap(original_pixmap.size()) # Create a new QPixmap of the same size
-            pixmap.fill(Qt.transparent) # Fill the new pixmap with transparency
+            if is_draggable:
+                # --- For draggable tags: Full drag visual experience ---
+                # Create a semi-transparent pixmap for drag representation
+                original_pixmap = self.grab() # Grab a pixmap of the TagWidget
+                pixmap = QPixmap(original_pixmap.size()) # Create a new QPixmap of the same size
+                pixmap.fill(Qt.transparent) # Fill the new pixmap with transparency
 
-            from PySide6.QtGui import QPainter, QColor # Ensure QColor is imported
-            painter = QPainter(pixmap) # Create a QPainter to draw on the new pixmap
-            painter.setOpacity(0.5) # Set the opacity for the painter (0.0 - 1.0) - Adjust as needed!
-            painter.drawPixmap(pixmap.rect(), original_pixmap) # Draw the original pixmap onto the new one with opacity
-            painter.end() # End painting
+                from PySide6.QtGui import QPainter, QColor # Ensure QColor is imported
+                painter = QPainter(pixmap) # Create a QPainter to draw on the new pixmap
+                painter.setOpacity(0.5) # Set the opacity for the painter (0.0 - 1.0) - Adjust as needed!
+                painter.drawPixmap(pixmap.rect(), original_pixmap) # Draw the original pixmap onto the new one with opacity
+                painter.end() # End painting
 
-            drag.setPixmap(pixmap) # Set the semi-transparent pixmap
- 
-            hot_spot_x = pixmap.width() // 2  # Center X-coordinate of the pixmap
-            hot_spot_y = pixmap.height() // 2 # Top Y-coordinate (we want to align top edge vertically)
-            drag.setHotSpot(QPoint(hot_spot_x, hot_spot_y)) # Set the hotspot
+                drag.setPixmap(pixmap) # Set the semi-transparent pixmap
+     
+                hot_spot_x = pixmap.width() // 2  # Center X-coordinate of the pixmap
+                hot_spot_y = pixmap.height() // 2 # Top Y-coordinate (we want to align top edge vertically)
+                drag.setHotSpot(QPoint(hot_spot_x, hot_spot_y)) # Set the hotspot
 
-            self.hide() # Hide the TagWidget itself during drag
+                self.hide() # Hide the TagWidget itself during drag
+            else:
+                # --- For non-draggable tags: "Empty" drag with no visuals ---
+                # Create a 1x1 transparent pixmap (effectively invisible)
+                empty_pixmap = QPixmap(1, 1)
+                empty_pixmap.fill(Qt.transparent)
+                drag.setPixmap(empty_pixmap)
+                # Don't hide the tag for non-draggable panels
             
             drop_action = drag.exec(Qt.MoveAction)
             
-            if drop_action == Qt.MoveAction:
-                print(f"Drag successful for tag: {self.tag_name}. MoveAction returned.") # Debug - successful drop
-                # Drop was handled by a target, no need to show tag again here.
-            else:
-                print(f"Drag cancelled/invalid for tag: {self.tag_name}. Action: {drop_action}") # Debug - cancelled/invalid drop
-                self.show()
+            if is_draggable:
+                if drop_action == Qt.MoveAction:
+                    print(f"Drag successful for tag: {self.tag_name}. MoveAction returned.") # Debug - successful drop
+                    # Drop was handled by a target, no need to show tag again here.
+                else:
+                    print(f"Drag cancelled/invalid for tag: {self.tag_name}. Action: {drop_action}") # Debug - cancelled/invalid drop
+                    self.show()
             
-            # drag.exec(Qt.MoveAction) # Start the drag and drop operation.
-            print(f"Drag operation started for tag: {self.tag_name}") # Debug
+            print(f"Drag operation completed for tag: {self.tag_name}") # Debug
 
     def mouseReleaseEvent(self, event):
         """Handles mouse release events."""
