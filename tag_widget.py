@@ -32,6 +32,11 @@ class TagWidget(QFrame):
         self._setup_ui()
         self._update_style()
         
+        # Initialize with elided text
+        # Need to use a short timer because widget sizes aren't properly initialized yet
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self._update_elided_text)
+        
         # Register as an observer for this tag's data changes
         self.tag_data.add_observer(self._on_tag_data_changed)
 
@@ -52,9 +57,13 @@ class TagWidget(QFrame):
         self.tag_label = QLabel(FileOperations.convert_underscores_to_spaces(self.tag_name)) # Tag name with underscores replaced by spaces
         self.tag_label.setAlignment(Qt.AlignCenter)
         self.tag_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        # self.tag_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed) # consider this if I want the tags to be further collapsed
         self.tag_label.setContentsMargins(3, 4, 3, 4) # The widget will shrink to 6 pixels larger than the text before scrolling
-
+        
+        # Enable text eliding with ellipsis for long text
+        self.tag_label.setTextFormat(Qt.PlainText)
+        self.tag_label.setWordWrap(False)
+        # Maximum width will be set in resizeEvent
+        
         # --- Star Icon Label ---
         self.star_label = QLabel(self)  # Create QLabel instance
         self.star_label.setFixedSize(QSize(22, 22)) # Set a fixed size for the star icon (adjust as needed)
@@ -233,12 +242,22 @@ class TagWidget(QFrame):
         else:
             pixmap = QPixmap(":/icons/star-outline.svg")
 
+        # Store current visibility state
+        was_visible = self.star_label.isVisible()
+        
         # Show star ONLY on hover AND if it's a known tag
-        if self.underMouse() and self.is_known_tag: # Check for mouse hover and is_known_tag
+        should_be_visible = self.underMouse() and self.is_known_tag
+        
+        # Update visibility and pixmap when needed
+        if should_be_visible:
             self.star_label.setPixmap(pixmap) # Set the appropriate star icon
             self.star_label.show() # Show the star label
         else:
             self.star_label.hide() # Hide the star label
+            
+        # If visibility changed, update the elided text
+        if was_visible != should_be_visible:
+            self._update_elided_text()
 
     def contextMenuEvent(self, event: QContextMenuEvent):
         """Handles right-click context menu events for the TagWidget."""
@@ -256,6 +275,8 @@ class TagWidget(QFrame):
         self.is_known_tag = self.tag_data.is_known
         # Update the visual appearance
         self._update_style()
+        # Update the elided text in case visibility constraints have changed
+        self._update_elided_text()
         
     def __del__(self):
         """Clean up by removing this widget as an observer."""
@@ -278,3 +299,67 @@ class TagWidget(QFrame):
         except:
             pass
         super().closeEvent(event)
+        
+    def resizeEvent(self, event):
+        """Handle widget resize events to adjust text eliding."""
+        super().resizeEvent(event)
+        self._update_elided_text()
+        
+    def _update_elided_text(self):
+        """Update the label text with elision based on available width."""
+        from PySide6.QtGui import QFontMetrics
+        
+        # Get original text (with spaces instead of underscores)
+        original_text = FileOperations.convert_underscores_to_spaces(self.tag_name)
+        
+        # Get the parent container width (scroll area viewport)
+        parent_width = 0
+        parent = self.parent()
+        
+        # Look for an appropriate parent to determine max width
+        if parent:
+            # Try to find parent scroll area viewport
+            while parent and not parent.inherits("QScrollArea") and not parent.inherits("QViewport"):
+                parent = parent.parent()
+                
+            if parent:
+                if parent.inherits("QScrollArea"):
+                    # If we found a scroll area, use its viewport width
+                    parent_width = parent.viewport().width()
+                else:
+                    # Otherwise use the parent width directly
+                    parent_width = parent.width()
+            
+            # If we couldn't find a suitable parent, use tag widget width
+            if parent_width <= 0:
+                parent_width = self.width()
+        else:
+            # Fallback if no parent
+            parent_width = self.width()
+        
+        # Account for container layout margins and spacing
+        parent_width -= 1  # Safe buffer for container margins/spacing
+        
+        # Calculate available width for text within this tag widget
+        available_width = parent_width
+        
+        # For known tags, account for star icon space whether visible or not
+        # For unknown tags, the star will never be visible so we can use the full width
+        if self.is_known_tag:
+            # Account for star icon width to prevent text jumping when star appears/disappears
+            available_width -= self.star_label.width()
+            
+        # Account for label margins
+        available_width -= (self.tag_label.contentsMargins().left() + self.tag_label.contentsMargins().right())
+        
+        # Apply a small buffer to ensure text doesn't touch edges
+        available_width -= 1
+        
+        # If there's not enough width, elide the text
+        if available_width > 10:  # Ensure minimum sensible width
+            font_metrics = QFontMetrics(self.tag_label.font())
+            elided_text = font_metrics.elidedText(original_text, Qt.ElideRight, available_width)
+            self.tag_label.setText(elided_text)
+        else:
+            # Fallback if available width calculation is invalid
+            self.tag_label.setText(original_text)

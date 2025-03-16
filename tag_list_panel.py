@@ -45,6 +45,9 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         # Drag and drop properties
         self.drop_indicator_line = None  # Initialize drop indicator line as None
         self.dragged_tag_name = None  # Track the tag being dragged
+        
+        # Connect to resize events to update tags when container size changes
+        self.scroll_area.resizeEvent = self._on_scroll_area_resize
 
     @abstractmethod
     def _get_tag_data_list(self):
@@ -360,3 +363,26 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             bool: True if any actions were added, False otherwise
         """
         return False
+        
+    def _on_scroll_area_resize(self, event):
+        """Handle scroll area resize events to update tag widget elided text.
+        
+        This method ensures that when the panel is resized via splitter,
+        the tag widgets will update their elided text accordingly.
+        """
+        # Call original resize event handler
+        QScrollArea.resizeEvent(self.scroll_area, event)
+        
+        # Update all tag widgets
+        self._update_tag_widgets_elided_text()
+        
+    def _update_tag_widgets_elided_text(self):
+        """Update elided text in all tag widgets in this panel."""
+        # Find all TagWidget instances in the container
+        for i in range(self.layout.count()):
+            widget_item = self.layout.itemAt(i)
+            if widget_item and widget_item.widget():
+                tag_widget = widget_item.widget()
+                # Check if it's a TagWidget with _update_elided_text method
+                if hasattr(tag_widget, '_update_elided_text'):
+                    tag_widget._update_elided_text()
