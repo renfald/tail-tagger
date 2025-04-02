@@ -198,7 +198,7 @@ class TagListModel(QAbstractListModel):
             tag.selected = is_tag_selected
             tag.notify_observers()  # Notify observers of this specific tag
             self.tag_state_changed.emit(tag_name)  # Emit signal with tag name
-            self.tags_selected_changed.emit()  # Keep existing signal for backward compatibility
+            self.tags_selected_changed.emit()  # Keep existing signal for backward compatibility TODO: is anything broken if this is removed? check search panel
 
     def remove_unknown_tags(self):
         """Removes any tags where is_known is False from the tag list."""
