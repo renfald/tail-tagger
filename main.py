@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 
+from classifier_manager import ClassifierManager
+
 # TODO: its probably better for tag widget shading to not need every panel to rebuild their tag list and instead just check their current state. better yet a single
 # tag should be able to know if it needs an update
 
@@ -92,6 +94,34 @@ class MainWindow(QMainWindow):
         else:
             print("No valid last opened folder, attempting to load initial directory.")
             self._load_initial_directory()            # self._load_image_folder(None) # May deprecate
+
+        # --- TEMPORARY TEST FOR ClassifierManager Phase 1 ---
+        print("\n[--- STARTING CLASSIFIER MANAGER PHASE 1 TEST ---]")
+        # Instantiate the manager (can use GPU if available)
+        # Set use_gpu=False here if you want to force CPU testing
+        temp_classifier_manager = ClassifierManager(use_gpu=True)
+
+        # Find a test image path (replace with an actual path on your system)
+        # For example, if you loaded a folder, use the first image:
+        test_image_path = None
+        if self.image_paths:
+            test_image_path = self.image_paths[0]
+            print(f"Using test image: {test_image_path}")
+            # Call the synchronous analysis
+            output_logits = temp_classifier_manager.analyze_image_sync(test_image_path)
+            if output_logits is not None:
+                print("Synchronous analysis returned logits.")
+            else:
+                print("Synchronous analysis failed or returned None.")
+            # Maybe test lazy loading: call again
+            print("\n[Calling analyze_image_sync again to test lazy loading...]")
+            temp_classifier_manager.analyze_image_sync(test_image_path)
+
+        else:
+            print("No images loaded in MainWindow, skipping ClassifierManager test.")
+            print("Please load an image folder first to run this test.")
+
+        print("[--- FINISHED CLASSIFIER MANAGER PHASE 1 TEST ---]\n")
 
 
     def _setup_ui(self):
