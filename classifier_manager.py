@@ -7,19 +7,27 @@ import timm
 import safetensors.torch
 from PIL import Image
 from timm.models import VisionTransformer # Explicit import for type hinting
+from PySide6.QtCore import QObject, Signal, QRunnable, Slot, QThreadPool
 
 # Import the transformation function
 from transformations import get_transform
 
-class ClassifierManager:
-    def __init__(self, model_id="vit_so400m", use_gpu=True): # Added use_gpu flag
+class ClassifierManager(QObject):
+    analysis_started = Signal()
+    analysis_finished = Signal(list) # Will emit list of (tag, score) tuples
+    error_occurred = Signal(str)
+
+
+    def __init__(self, model_id="vit_so400m", use_gpu=True, parent=None): # Added use_gpu flag
         """
         Initializes the ClassifierManager.
 
         Args:
             model_id (str): Identifier for the model to load (maps to folder name).
             use_gpu (bool): Flag to attempt using GPU if available.
+            parent (QObject): Parent QObject for signal-slot connections.
         """
+        super().__init__(parent)
         self.model_id = model_id
         self.use_gpu_preference = use_gpu
         self.device = None # Will be set during model load
@@ -35,6 +43,9 @@ class ClassifierManager:
         self.model: VisionTransformer | None = None # Type hint for the model
         self.allowed_tags: list[str] | None = None
         self.transform = get_transform() # Get the transformation pipeline
+
+        self.thread_pool = QThreadPool.globalInstance()
+        print(f"Using thread pool with max threads: {self.thread_pool.maxThreadCount()}")
 
         print(f"ClassifierManager initialized for model '{model_id}'.")
         print(f" - Model path: {self.model_path}")
@@ -118,68 +129,153 @@ class ClassifierManager:
         print(f"Model and tags loaded in {load_end_time - load_start_time:.2f} seconds.")
 
     # --- Synchronous analysis method for testing Phase 1 ---
-    def analyze_image_sync(self, image_path: str):
+    def request_analysis(self, image_path: str):
         """
-        Performs SYNCHRONOUS image analysis (for testing purposes).
-        Loads model/tags if needed, preprocesses, runs inference.
+        Requests ASYNCHRONOUS image analysis.
+        Performs preprocessing on main thread, dispatches inference/postprocessing
+        to a background thread. Emits signals for results/errors.
 
         Args:
             image_path (str): Path to the image file.
-
-        Returns:
-            torch.Tensor | None: Raw logits tensor if successful, None otherwise.
         """
-        print(f"\n--- Starting Synchronous Analysis for: {os.path.basename(image_path)} ---")
+        print(f"\n--- Requesting Asynchronous Analysis for: {os.path.basename(image_path)} ---")
         self._ensure_loaded() # Make sure model and tags are loaded
 
         if self.model is None or self.allowed_tags is None:
-            print("ERROR: Cannot analyze, model or tags failed to load.")
-            return None
+            error_msg = "Cannot analyze, model or tags failed to load."
+            print(f"ERROR: {error_msg}")
+            self.error_occurred.emit(error_msg) # Emit error signal
+            return
 
         try:
-            # --- Preprocessing ---
-            print("Loading and preprocessing image...")
+            # --- Preprocessing (on main thread) ---
+            print("MainThread: Loading and preprocessing image...")
             start_preprocess = time.time()
-            # Match ImageDataset logic: Load -> RGBA -> Transform
             image = Image.open(image_path).convert("RGBA")
             tensor = self.transform(image)
             # Add batch dimension and move to device
             tensor = tensor.unsqueeze(0).to(self.device)
 
-            # Apply dtype optimization if needed (matching model's dtype)
-            if self.device.type == 'cuda' and torch.cuda.get_device_capability()[0] >= 7:
+            # Apply dtype optimization if needed
+            if self.device.type == 'cuda' and torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7:
                 try:
-                    # Get the dtype of the first parameter (assuming all parameters are the same type)
                     model_dtype = next(self.model.parameters()).dtype
                     if model_dtype == torch.float16:
-                        print("Model is float16, converting input tensor...") # Add print for confirmation
+                        print("MainThread: Converting input tensor to float16...")
                         tensor = tensor.to(dtype=torch.float16)
-                    # else: # Optional: print if model is not float16
-                    #    print(f"Model dtype is {model_dtype}, tensor remains unchanged.")
                 except StopIteration:
-                    # Handle case where model has no parameters (shouldn't happen here)
                     print("Warning: Could not determine model parameter dtype.")
-
             end_preprocess = time.time()
-            print(f"Preprocessing took {end_preprocess - start_preprocess:.3f} seconds.")
+            print(f"MainThread: Preprocessing took {end_preprocess - start_preprocess:.3f} seconds.")
 
-            # --- Inference ---
-            print("Running inference...")
-            start_inference = time.time()
-            with torch.no_grad(): # Ensure gradients are off
-                logits = self.model(tensor)
-            end_inference = time.time()
-            print(f"Inference took {end_inference - start_inference:.3f} seconds.")
-            print(f"Output logits shape: {logits.shape}")
-            print(f"Output logits sample (first 5): {logits[0, :5]}") # Print sample output
+            # --- Dispatch Worker ---
+            print("MainThread: Dispatching worker to thread pool...")
+            # Create worker instance - pass necessary data
+            # TODO: Make threshold configurable later
+            worker = AnalysisWorker(
+                image_tensor=tensor,
+                model=self.model,
+                device=self.device, # Pass device just in case, though maybe not needed
+                allowed_tags=self.allowed_tags,
+                threshold=0.3 # Hardcoded threshold for now
+            )
 
-            return logits # Return raw logits for this phase
+            # Connect worker signals to manager's SLOTS (methods)
+            # These slots will then emit the manager's SIGNALS
+            worker.signals.finished.connect(self._handle_worker_result)
+            worker.signals.error.connect(self._handle_worker_error)
+
+            # Emit the analysis_started signal *before* starting the thread
+            self.analysis_started.emit()
+            print("MainThread: Emitted analysis_started signal.")
+
+            # Start the worker
+            self.thread_pool.start(worker)
+            print("MainThread: Worker started.")
 
         except FileNotFoundError:
-            print(f"ERROR: Image file not found at {image_path}")
-            return None
+            error_msg = f"Image file not found at {image_path}"
+            print(f"ERROR: {error_msg}")
+            self.error_occurred.emit(error_msg)
         except Exception as e:
-            print(f"ERROR during image analysis: {e}")
-            return None
-        finally:
-            print("--- Synchronous Analysis Complete ---")
+            error_msg = f"ERROR during preprocessing or dispatch: {e}"
+            print(error_msg)
+            import traceback
+            traceback.print_exc()
+            self.error_occurred.emit(error_msg)
+
+    # --- Slots to receive results from worker ---
+    @Slot(list)
+    def _handle_worker_result(self, results):
+        print("MainThread: Received analysis_finished signal from worker.")
+        self.analysis_finished.emit(results) # Relay the signal
+
+    @Slot(str)
+    def _handle_worker_error(self, error_message):
+        print(f"MainThread: Received error signal from worker: {error_message}")
+        self.error_occurred.emit(error_message) # Relay the signal
+
+# --- Helper Class for Signals from Worker Thread ---
+class WorkerSignals(QObject):
+    finished = Signal(list) # Emits list of (tag, score)
+    error = Signal(str)
+
+
+# --- Analysis Worker (Runs on Background Thread) ---
+class AnalysisWorker(QRunnable):
+    def __init__(self, image_tensor, model, device, allowed_tags, threshold):
+        super().__init__()
+        self.signals = WorkerSignals()
+        self.tensor = image_tensor # Preprocessed tensor (already on correct device & dtype)
+        self.model = model
+        self.device = device # Needed? Tensor is already on device. Model too. Maybe not needed here.
+        self.allowed_tags = allowed_tags
+        self.threshold = threshold # Set the threshold (e.g., 0.3)
+
+    @Slot() # Decorator indicating this is the entry point for the runnable
+    def run(self):
+        try:
+            # --- Inference (already done in background thread) ---
+            print("Worker: Running inference...")
+            start_inference = time.time()
+            with torch.no_grad():
+                # Model expects batch dimension, tensor should already have it
+                logits = self.model(self.tensor)
+            end_inference = time.time()
+            print(f"Worker: Inference took {end_inference - start_inference:.3f} seconds.")
+
+            # --- Post-processing ---
+            print("Worker: Post-processing results...")
+            # 1. Apply Sigmoid (get probabilities 0-1)
+            probabilities = torch.nn.functional.sigmoid(logits[0]) # Remove batch dim
+
+            # 2. Thresholding (find indices above threshold)
+            # Move probabilities to CPU for numpy operations if needed, or keep on GPU
+            probabilities_cpu = probabilities.cpu() # Move to CPU for thresholding/indexing
+            indices = torch.where(probabilities_cpu > self.threshold)[0]
+            values = probabilities_cpu[indices] # Get corresponding scores
+
+            # 3. Map indices to tags and store scores
+            results = []
+            for i in range(indices.size(0)):
+                tag_index = indices[i].item()
+                if 0 <= tag_index < len(self.allowed_tags):
+                    tag_name = self.allowed_tags[tag_index]
+                    score = values[i].item()
+                    results.append((tag_name, score))
+                else:
+                    print(f"Warning: Index {tag_index} out of bounds for allowed_tags.")
+
+
+            # 4. Sort by score (descending)
+            results.sort(key=lambda x: x[1], reverse=True)
+
+            print(f"Worker: Found {len(results)} tags above threshold {self.threshold}.")
+            # 5. Emit results
+            self.signals.finished.emit(results)
+
+        except Exception as e:
+            print(f"Worker: ERROR during analysis - {e}")
+            import traceback
+            traceback.print_exc() # Print detailed traceback
+            self.signals.error.emit(str(e))
