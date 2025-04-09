@@ -1,15 +1,17 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QLabel,
                              QScrollArea, QFrame)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 
 # Import TagWidget - it will be needed for placeholder logic
 from tag_widget import TagWidget
+from tag_list_model import TagData
 
 class ClassifierPanel(QWidget):
-    def __init__(self, main_window, parent=None):
+    def __init__(self, main_window, classifier_manager, parent=None):
         super().__init__(parent)
         self.main_window = main_window
+        self.classifier_manager = classifier_manager
 
         print("ClassifierPanel Initialized") # Basic check
 
@@ -46,10 +48,15 @@ class ClassifierPanel(QWidget):
         self.results_container.setLayout(self.results_layout)
         self.results_scroll_area.setWidget(self.results_container)
 
-        # --- Connect Button Signal (Placeholder Logic) ---
-        self.analyze_button.clicked.connect(self._handle_analyze_clicked_placeholder)
+        # --- Connect Button Signal ---
+        self.analyze_button.clicked.connect(self._handle_analyze_clicked)
 
-        print("ClassifierPanel UI Setup Complete")
+        # --- Connect ClassifierManager Signals ---
+        self.classifier_manager.analysis_started.connect(self._on_analysis_started)
+        self.classifier_manager.analysis_finished.connect(self._on_analysis_finished)
+        self.classifier_manager.error_occurred.connect(self._on_analysis_error)
+
+        print("ClassifierPanel UI Setup Complete and signals connected.")
 
     def _clear_results_widgets(self):
         """Helper to clear existing widgets from the results layout."""
@@ -68,39 +75,75 @@ class ClassifierPanel(QWidget):
                              print(f"Error removing observer during clear: {e}")
                     widget.deleteLater()
 
-    def _handle_analyze_clicked_placeholder(self):
-        """Placeholder logic for the analyze button click."""
-        print("Analyze Button Clicked (Placeholder)")
-        self._clear_results_widgets() # Clear previous placeholders
-        self.status_label.setText("Displaying placeholders...")
+    def _handle_analyze_clicked(self):
+        """Handles clicks on the 'Analyze Image' button."""
+        print("Analyze Button Clicked - Requesting analysis...")
+        current_path = self.main_window.current_image_path
+        if current_path and self.classifier_manager:
+            self.analyze_button.setEnabled(False) # Disable button during analysis
+            self.status_label.setText("Requesting analysis...") # Initial status update
+            self.classifier_manager.request_analysis(current_path)
+        elif not current_path:
+            print("No image loaded to analyze.")
+            self.status_label.setText("No image loaded.")
+        else:
+            print("Classifier Manager not available.")
+            self.status_label.setText("Error: Classifier not ready.")
+    
+    @Slot()
+    def _on_analysis_started(self):
+        """Slot called when analysis starts."""
+        print("ClassifierPanel received: analysis_started")
+        self.status_label.setText("Analyzing image...")
+        self._clear_results_widgets() # Clear previous results immediately
+        self.analyze_button.setEnabled(False) # Ensure button is disabled
 
-        # --- Get some placeholder tags ---
-        # Access the model via main_window
-        if not self.main_window or not self.main_window.tag_list_model:
-            print("Error: Cannot access TagListModel from MainWindow.")
-            self.status_label.setText("Error: Model not found.")
+    @Slot(list)
+    def _on_analysis_finished(self, results):
+        """Slot called when analysis finishes successfully."""
+        # results is expected to be a list of [(tag_name, score), ...] sorted by score
+        print(f"ClassifierPanel received: analysis_finished with {len(results)} results.")
+        self._clear_results_widgets() # Clear again just in case
+
+        if not results:
+            self.status_label.setText("Analysis complete: No tags found above threshold.")
+            self.analyze_button.setEnabled(True) # Re-enable button
             return
 
-        known_tags = self.main_window.tag_list_model.get_known_tags()
-        placeholder_tag_data_list = known_tags[:5] # Get the first 5 known tags
+        # --- Populate results area ---
+        tag_model = self.main_window.tag_list_model
+        for tag_name, score in results:
+            tag_data = None
+            # Check efficiently if tag exists (known or unknown)
+            tag_data = tag_model.tags_by_name.get(tag_name)
 
-        if not placeholder_tag_data_list:
-            self.status_label.setText("No placeholder tags found.")
-            return
+            if tag_data is None:
+                # Tag doesn't exist in the model at all, add as unknown
+                print(f"Suggested tag '{tag_name}' not found in model. Adding as unknown.")
+                # Important: Ensure TagData init handles default values appropriately if needed
+                tag_data = TagData(name=tag_name, is_known=False)
+                tag_model.add_tag(tag_data) # Add to the central model
 
-        # --- Create and add TagWidgets ---
-        for tag_data in placeholder_tag_data_list:
-            # Check if tag_data is valid
-            if tag_data and hasattr(tag_data, 'name'):
+            # Create and add the TagWidget
+            if tag_data: # Double check tag_data is valid before creating widget
                 tag_widget = TagWidget(tag_data=tag_data)
-                # Classifier suggestions likely won't dim on select, similar to search
-                tag_widget.set_styling_mode("dim_on_select") # Or "ignore_select" if preferred
-                # Connect signals if needed (e.g., to add tag to selection)
-                # tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Example
+                # Optional: Display score? Maybe later. Add tooltip?
+                tag_widget.setToolTip(f"Confidence: {score:.2%}")
+                tag_widget.set_styling_mode("dim_on_select") # Match search panel styling
+                # We connect the click signal in Phase 4
+                # tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
                 self.results_layout.addWidget(tag_widget)
             else:
-                print(f"Warning: Invalid placeholder tag data encountered.")
+                print(f"Error: Failed to get or create TagData for '{tag_name}'")
 
 
-        self.status_label.setText(f"{len(placeholder_tag_data_list)} placeholders displayed.")
-        print(f"Added {len(placeholder_tag_data_list)} placeholder TagWidgets.")
+        self.status_label.setText(f"Analysis complete: {len(results)} suggestions found.")
+        self.analyze_button.setEnabled(True) # Re-enable button
+
+    @Slot(str)
+    def _on_analysis_error(self, error_message):
+        """Slot called when analysis encounters an error."""
+        print(f"ClassifierPanel received: error_occurred: {error_message}")
+        self.status_label.setText(f"Error: {error_message}")
+        self._clear_results_widgets()
+        self.analyze_button.setEnabled(True) # Re-enable button

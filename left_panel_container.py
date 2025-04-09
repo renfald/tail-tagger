@@ -8,9 +8,10 @@ from favorites_panel import FavoritesPanel
 from classifier_panel import ClassifierPanel
 
 class LeftPanelContainer(QWidget):
-    def __init__(self, main_window, parent=None):
+    def __init__(self, main_window, classifier_manager, parent=None):
         super().__init__(parent)
         self.main_window = main_window
+        self.classifier_manager = classifier_manager
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
@@ -31,8 +32,9 @@ class LeftPanelContainer(QWidget):
         self.frequently_used_panel = FrequentlyUsedPanel(main_window=self.main_window)
         self.middle_tab_widget.addTab(self.frequently_used_panel, "Frequent")
 
-        # --- Classifier Suggest Panel ---                 
-        self.classifier_suggest_panel = ClassifierPanel(main_window=self.main_window)
+        # --- Classifier Suggest Panel ---
+        # TODO: rename classifier_suggest_panel to classifier_panel
+        self.classifier_suggest_panel = ClassifierPanel(main_window=self.main_window, classifier_manager=self.classifier_manager)
         self.middle_tab_widget.addTab(self.classifier_suggest_panel, "Classifier")  
 
         # --- Favorites Panel ---

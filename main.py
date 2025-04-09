@@ -17,7 +17,7 @@ from selected_tags_panel import SelectedTagsPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QSplitter, QMessageBox)
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 
 from classifier_manager import ClassifierManager
@@ -51,10 +51,11 @@ class MainWindow(QMainWindow):
         self.file_operations = FileOperations()
         self.tag_list_model = TagListModel()
 
-        # --- Keyboard Manager --- <--- ADD THIS SECTION
+        # --- Managers ---
         self.keyboard_manager = KeyboardManager(self)
+        self.classifier_manager = ClassifierManager(use_gpu=True)
 
-        # --- Global Keyboard Shortcuts --- <--- ADD THIS SECTION
+        # --- Global Keyboard Shortcuts ---
         self.prev_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
         self.prev_shortcut.activated.connect(self._prev_image)
         self.prev_shortcut.setContext(Qt.ApplicationShortcut)  # Works throughout application
@@ -95,36 +96,6 @@ class MainWindow(QMainWindow):
             print("No valid last opened folder, attempting to load initial directory.")
             self._load_initial_directory()            # self._load_image_folder(None) # May deprecate
 
-        # --- TEMPORARY TEST FOR ClassifierManager Phase 2 ---
-        print("\n[--- STARTING CLASSIFIER MANAGER PHASE 2 TEST ---]")
-        # Keep instantiation the same
-        self.temp_classifier_manager = ClassifierManager(use_gpu=True) # Use self. to keep reference
-
-        # --- Connect Signals for Testing ---
-        self.temp_classifier_manager.analysis_started.connect(self._test_on_analysis_started)
-        self.temp_classifier_manager.analysis_finished.connect(self._test_on_analysis_finished)
-        self.temp_classifier_manager.error_occurred.connect(self._test_on_error)
-        print("Connected test slots to ClassifierManager signals.")
-        # ---
-
-        test_image_path = None
-        if self.image_paths:
-            test_image_path = self.image_paths[0]
-            print(f"Requesting analysis for test image: {test_image_path}")
-            # Call the NEW asynchronous analysis method
-            self.temp_classifier_manager.request_analysis(test_image_path)
-            print("Request submitted (test code continues execution).")
-
-        else:
-            print("No images loaded in MainWindow, skipping ClassifierManager test.")
-            print("Please load an image folder first to run this test.")
-
-        print("[--- ONGOING CLASSIFIER MANAGER PHASE 2 TEST (Waiting for async result...) ---]\n")
-        # Test code finishes here, but app keeps running waiting for signals
-        # --- END TEMPORARY TEST ---
-
-
-
     def _setup_ui(self):
         """Sets up the main user interface layout and elements."""
         central_widget = QWidget()
@@ -151,7 +122,7 @@ class MainWindow(QMainWindow):
 
 
         # --- Left Panel (Resizable) ---
-        self.left_panel_container = LeftPanelContainer(main_window=self)
+        self.left_panel_container = LeftPanelContainer(main_window=self, classifier_manager=self.classifier_manager)
         main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
 
 
@@ -533,26 +504,6 @@ class MainWindow(QMainWindow):
         self.tag_list_model.tags_selected_changed.emit() 
         # Updates are needed for SelectedTagsPanel if we just promoted a tag that's in the current image
         self.selected_tags_panel.update_display()
-
-
-    @Slot()
-    def _test_on_analysis_started(self):
-        print("[MainWindow SLOT]: Analysis STARTED.")
-
-
-    @Slot(list)
-    def _test_on_analysis_finished(self, results):
-        print(f"[MainWindow SLOT]: Analysis FINISHED. Found {len(results)} tags.")
-        # Optional: Print top 5 results
-        for i, (tag, score) in enumerate(results[:5]):
-            print(f"  - {tag}: {score:.4f}")
-        if len(results) > 5:
-            print("  ...")
-
-    @Slot(str)
-    def _test_on_error(self, error_msg):
-        print(f"[MainWindow SLOT]: Analysis ERRORED: {error_msg}")
-
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)
