@@ -46,6 +46,7 @@ class ClassifierManager(QObject):
 
         self.thread_pool = QThreadPool.globalInstance()
         self.is_loading = False
+        self.pending_analysis_path = None
         print(f"Using thread pool with max threads: {self.thread_pool.maxThreadCount()}")
 
         print(f"ClassifierManager initialized for model '{model_id}'.")
@@ -96,15 +97,29 @@ class ClassifierManager(QObject):
         """
         
         print(f"\n--- Requesting Asynchronous Analysis for: {os.path.basename(image_path)} ---")
-        # --- Check if model is ready using new ensure_loaded ---
-        if not self._ensure_loaded():
-            # _ensure_loaded already printed a message and started loading if needed
-            # Optionally emit a status signal or let the UI handle the 'is_loading' state
-            self.error_occurred.emit("Model is loading, please wait...") # Inform UI
+
+        # --- Check if model is ready or start loading ---
+        model_ready = self._ensure_loaded()
+
+        if not model_ready:
+            if self.is_loading:
+                # Loading just started or is in progress
+                print("Analysis queued pending model load.")
+                self.pending_analysis_path = image_path # Store path for later
+                # Let the UI know loading is happening (optional signal, or UI checks is_loading)
+                # self.status_update.emit("Model loading...") # Example if using dedicated status signal
+            else:
+                # _ensure_loaded returned false, but we're not loading? Indicates prior error.
+                # Error should have been emitted by _handle_loading_error previously.
+                print("Cannot request analysis, model failed to load previously.")
+                # Optionally re-emit error?
+                self.error_occurred.emit("Model failed to load previously.")
             return # Cannot proceed with analysis yet
 
-        # --- Model is loaded, proceed with preprocessing ---
-        # Make sure self.device is set correctly (should be handled by _handle_model_loaded)
+        # --- Model IS ready, proceed with analysis ---
+        print("Model is loaded. Proceeding with analysis dispatch...")
+        # Reset pending path if we are proceeding now
+        self.pending_analysis_path = None # Clear any stale pending path
         if self.device is None:
             # This case should ideally not happen if loading succeeded
             error_msg = "Cannot analyze, device not set after model load."
@@ -190,7 +205,14 @@ class ClassifierManager(QObject):
         self.device = next(model.parameters()).device
         print(f"ClassifierManager updated with loaded model on {self.device} and {len(allowed_tags)} tags.")
         self.is_loading = False
-        # Potential enhancement: If analysis requests were queued while loading, trigger one now.
+        
+        if self.pending_analysis_path:
+            print(f"Model loaded. Triggering queued analysis for: {os.path.basename(self.pending_analysis_path)}")
+            path_to_analyze = self.pending_analysis_path
+            self.pending_analysis_path = None # Clear pending path *before* recursive call
+            # Now that model is loaded, call request_analysis again for the original path
+            # This will now skip the loading check and proceed directly to inference dispatch
+            self.request_analysis(path_to_analyze)
 
     @Slot(str)
     def _handle_loading_error(self, error_message):
@@ -199,6 +221,7 @@ class ClassifierManager(QObject):
         self.model = None
         self.allowed_tags = None
         self.is_loading = False
+        self.pending_analysis_path = None
         self.error_occurred.emit(f"Model loading failed: {error_message}") # Emit manager's error signal
 
 

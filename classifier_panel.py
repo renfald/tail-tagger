@@ -80,9 +80,26 @@ class ClassifierPanel(QWidget):
         print("Analyze Button Clicked - Requesting analysis...")
         current_path = self.main_window.current_image_path
         if current_path and self.classifier_manager:
-            self.analyze_button.setEnabled(False) # Disable button during analysis
-            self.status_label.setText("Requesting analysis...") # Initial status update
+            # --- Check loading state BEFORE requesting ---
+            if self.classifier_manager.is_loading:
+                self.status_label.setText("Model is loading, please wait...")
+                # Optionally disable button here too, although request_analysis might handle it
+                self.analyze_button.setEnabled(False)
+                # We could queue the request here in the panel too, but manager handles it now
+                print("Analysis request ignored, model load in progress.")
+                return # Don't send another request
+
+            # --- Proceed with request ---
+            self.analyze_button.setEnabled(False)
+            self.status_label.setText("Requesting analysis...")
+            # request_analysis will handle the case where loading needs to START
+            # and will store the pending path. If already loading, it returns quickly.
             self.classifier_manager.request_analysis(current_path)
+            # Status will be updated by signals (started, error, finished)
+            # OR if loading starts, the manager should maybe emit error/status?
+            # Let's check manager state AGAIN after requesting, just in case loading was triggered
+            if self.classifier_manager.is_loading:
+                self.status_label.setText("Model is loading, please wait...")
         elif not current_path:
             print("No image loaded to analyze.")
             self.status_label.setText("No image loaded.")
@@ -95,8 +112,8 @@ class ClassifierPanel(QWidget):
         """Slot called when analysis starts."""
         print("ClassifierPanel received: analysis_started")
         self.status_label.setText("Analyzing image...")
-        self._clear_results_widgets() # Clear previous results immediately
-        self.analyze_button.setEnabled(False) # Ensure button is disabled
+        self._clear_results_widgets()
+        self.analyze_button.setEnabled(False)
 
     @Slot(list)
     def _on_analysis_finished(self, results):
@@ -144,6 +161,19 @@ class ClassifierPanel(QWidget):
     def _on_analysis_error(self, error_message):
         """Slot called when analysis encounters an error."""
         print(f"ClassifierPanel received: error_occurred: {error_message}")
-        self.status_label.setText(f"Error: {error_message}")
-        self._clear_results_widgets()
-        self.analyze_button.setEnabled(True) # Re-enable button
+        # Handle the specific "Model is loading" message - don't show "Error:"
+        if "Model is loading" in error_message:
+            self.status_label.setText(error_message)
+            # Keep button disabled while loading
+            self.analyze_button.setEnabled(False)
+        elif "Model failed to load" in error_message:
+            self.status_label.setText(error_message)
+            self.analyze_button.setEnabled(True) # Re-enable button on load failure
+        else:
+            # Genuine analysis error
+            self.status_label.setText(f"Analysis Error: {error_message}")
+            self.analyze_button.setEnabled(True) # Re-enable button on analysis error
+
+        # Don't clear results on loading message
+        if "Model is loading" not in error_message:
+            self._clear_results_widgets()
