@@ -157,6 +157,7 @@ class ClassifierPanel(QWidget):
                 tag_widget.setToolTip(f"Confidence: {score:.2%}")
                 tag_widget.set_styling_mode("dim_on_select") # Match search panel styling
                 tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
+                tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
                 self.results_layout.addWidget(tag_widget)
             else:
                 print(f"Error: Failed to get or create TagData for '{tag_name}'")
