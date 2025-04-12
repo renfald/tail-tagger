@@ -1,7 +1,8 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QLabel,
-                             QScrollArea, QFrame)
+                             QScrollArea, QFrame, QMenu)
 from PySide6.QtCore import Qt, Slot
+from PySide6.QtGui import QAction
 
 # Import TagWidget - it will be needed for placeholder logic
 from tag_widget import TagWidget
@@ -30,6 +31,7 @@ class ClassifierPanel(QWidget):
         # --- Status Label ---
         self.status_label = QLabel("Ready")
         self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
         # --- Scroll Area for Results ---
@@ -158,12 +160,15 @@ class ClassifierPanel(QWidget):
                 tag_widget.set_styling_mode("dim_on_select") # Match search panel styling
                 tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
                 tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
+                tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
                 self.results_layout.addWidget(tag_widget)
             else:
                 print(f"Error: Failed to get or create TagData for '{tag_name}'")
 
 
-        self.status_label.setText(f"Analysis complete: {len(results)} suggestions found.")
+        # self.status_label.setText(f"Analysis complete: {len(results)} suggestions found.")
+        self.status_label.setText(f"Found {len(results)} suggestions.")
+        # self.status_label.setText(f"Analysis complete\n{len(results)} suggestions found.")
         self.analyze_button.setEnabled(True) # Re-enable button
 
     @Slot(str)
@@ -186,3 +191,37 @@ class ClassifierPanel(QWidget):
         # Don't clear results on loading message
         if "Model is loading" not in error_message:
             self._clear_results_widgets()
+
+    @Slot(str) # Receives the tag name emitted by the signal
+    def _handle_tag_right_clicked(self, tag_name):
+        """Handles right-clicks on TagWidgets in the results area."""
+        print(f"Right-click detected on tag: {tag_name}")
+
+        # Find the TagData object for the clicked tag
+        tag_data = self.main_window.tag_list_model.tags_by_name.get(tag_name)
+
+        if not tag_data:
+            print(f"Warning: TagData not found for right-clicked tag '{tag_name}'")
+            return
+
+        # Create the context menu
+        menu = QMenu(self)
+        actions_added = False
+
+        # --- Add "Add to Known Tags" action ONLY for unknown tags ---
+        if not tag_data.is_known:
+            add_action = QAction("Add to Known Tags", self)
+            # Use a lambda to pass the tag name to the main window's method
+            add_action.triggered.connect(lambda: self.main_window.add_new_tag_to_model(tag_name))
+            menu.addAction(add_action)
+            actions_added = True
+            print(f"  Added 'Add to Known Tags' action for '{tag_name}'")
+
+        # --- Show the menu only if actions were added ---
+        if actions_added:
+            menu.popup(self.cursor().pos())
+            from PySide6.QtGui import QCursor
+            menu.popup(QCursor.pos())
+
+        else:
+            print(f"  No context actions applicable for tag '{tag_name}'")

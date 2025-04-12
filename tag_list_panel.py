@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy, QScrollArea
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QKeyEvent
-from tag_widget import TagWidget  # Import for type hints
+from tag_widget import TagWidget
 
 class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget), type(ABC)), {})):  # Explicit metaclass
     """Abstract base class for tag list panels."""
@@ -323,13 +323,14 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
     def is_tag_draggable(self, tag_name):
         """Returns True if draggable, False otherwise."""
         return False
-        
+    
+    @Slot(str)
     def _handle_tag_right_clicked(self, tag_name):
         """Handles right-click events on TagWidgets. Creates and displays a context menu with panel-specific actions."""
         print(f"Right-clicked tag: {tag_name}")
         
         from PySide6.QtWidgets import QMenu
-        from PySide6.QtGui import QAction
+        from PySide6.QtGui import QCursor, QAction
         
         # Find tag data for the clicked tag
         tag_data = None
@@ -350,7 +351,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         
         # Only show menu if actions were added
         if actions_added:
-            menu.popup(self.mapToGlobal(self.rect().topLeft()) + self.mapFromGlobal(self.cursor().pos()))
+            menu.popup(QCursor.pos())
             
     @abstractmethod
     def _add_context_menu_actions(self, menu, tag_data):
