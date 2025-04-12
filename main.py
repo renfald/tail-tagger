@@ -269,6 +269,8 @@ class MainWindow(QMainWindow):
         # current_image_path used for workfile updates
         self.current_image_path = image_path
 
+        self.left_panel_container.classifier_panel.clear_results()
+
         # --- Load Tags for Image ---
         loaded_tag_names = self.file_operations.load_tags_for_image(image_path, self.last_folder_path) # Get list of tag *names*
         self.selected_tags_for_current_image = []  # Clear the list of selected tag widgets

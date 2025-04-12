@@ -107,6 +107,15 @@ class ClassifierPanel(QWidget):
             print("Classifier Manager not available.")
             self.status_label.setText("Error: Classifier not ready.")
     
+    def clear_results(self):
+        """Clears the results area and resets the status label."""
+        print("ClassifierPanel: Clearing results.")
+        self._clear_results_widgets()
+        self.status_label.setText("Ready (New Image)") # Or simply "Ready"
+        # Ensure button is enabled when results are cleared due to image change
+        self.analyze_button.setEnabled(True)
+    
+    
     @Slot()
     def _on_analysis_started(self):
         """Slot called when analysis starts."""

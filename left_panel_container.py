@@ -33,9 +33,8 @@ class LeftPanelContainer(QWidget):
         self.middle_tab_widget.addTab(self.frequently_used_panel, "Frequent")
 
         # --- Classifier Suggest Panel ---
-        # TODO: rename classifier_suggest_panel to classifier_panel
-        self.classifier_suggest_panel = ClassifierPanel(main_window=self.main_window, classifier_manager=self.classifier_manager)
-        self.middle_tab_widget.addTab(self.classifier_suggest_panel, "Classifier")  
+        self.classifier_panel = ClassifierPanel(main_window=self.main_window, classifier_manager=self.classifier_manager)
+        self.middle_tab_widget.addTab(self.classifier_panel, "Classifier")  
 
         # --- Favorites Panel ---
         self.favorites_panel = FavoritesPanel(main_window=self.main_window)
