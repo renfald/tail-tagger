@@ -204,6 +204,8 @@ class TagWidget(QFrame):
 
             # --- Apply the Combined Stylesheet to label ---
             self.tag_label.setStyleSheet(style)
+            # Setting a separate stylesheet for the widget itself to set tooltip colors. Baindaid because I did a bad job setting overall styling in this app
+            self.setStyleSheet("QToolTip { color: #FFFFFF; background-color: #353535; border: 1px solid #555555; }")
 
 
     def set_selected(self, is_selected):

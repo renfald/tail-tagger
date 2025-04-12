@@ -157,7 +157,7 @@ class ClassifierPanel(QWidget):
                 tag_widget = TagWidget(tag_data=tag_data)
                 # Optional: Display score? Maybe later. Add tooltip?
                 tag_widget.setToolTip(f"Confidence: {score:.2%}")
-                tag_widget.set_styling_mode("dim_on_select") # Match search panel styling
+                tag_widget.set_styling_mode("dim_on_select")
                 tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
                 tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
                 tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
