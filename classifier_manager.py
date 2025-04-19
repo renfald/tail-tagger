@@ -156,8 +156,7 @@ class ClassifierManager(QObject):
                 image_tensor=tensor,
                 model=self.model,
                 device=self.device, # Pass device just in case, though maybe not needed
-                allowed_tags=self.allowed_tags,
-                threshold=0.3 # Hardcoded threshold for now
+                allowed_tags=self.allowed_tags
             )
 
             # Connect worker signals to manager's SLOTS (methods)
@@ -313,14 +312,13 @@ class LoadModelWorker(QRunnable):
 
 # --- Analysis Worker (Runs on Background Thread) ---
 class AnalysisWorker(QRunnable):
-    def __init__(self, image_tensor, model, device, allowed_tags, threshold):
+    def __init__(self, image_tensor, model, device, allowed_tags):
         super().__init__()
         self.signals = WorkerSignals()
         self.tensor = image_tensor # Preprocessed tensor (already on correct device & dtype)
         self.model = model
         self.device = device # Needed? Tensor is already on device. Model too. Maybe not needed here.
         self.allowed_tags = allowed_tags
-        self.threshold = threshold # Set the threshold (e.g., 0.3)
 
     @Slot() # Decorator indicating this is the entry point for the runnable
     def run(self):
@@ -337,13 +335,14 @@ class AnalysisWorker(QRunnable):
             # --- Post-processing ---
             print("Worker: Post-processing results...")
             # 1. Apply Sigmoid (get probabilities 0-1)
-            probabilities = torch.nn.functional.sigmoid(logits[0]) # Remove batch dim
+            probabilities = torch.nn.functional.sigmoid(logits[0])
 
             # 2. Thresholding (find indices above threshold)
             # Move probabilities to CPU for numpy operations if needed, or keep on GPU
             probabilities_cpu = probabilities.cpu() # Move to CPU for thresholding/indexing
-            indices = torch.where(probabilities_cpu > self.threshold)[0]
-            values = probabilities_cpu[indices] # Get corresponding scores
+            INTERNAL_THRESHOLD = 0.01 # Filter out only extremely unlikely tags
+            indices = torch.where(probabilities_cpu > INTERNAL_THRESHOLD)[0]
+            values = probabilities_cpu[indices]
 
             # 3. Map indices to tags and store scores
             results = []
@@ -360,7 +359,7 @@ class AnalysisWorker(QRunnable):
             # 4. Sort by score (descending)
             results.sort(key=lambda x: x[1], reverse=True)
 
-            print(f"Worker: Found {len(results)} tags above threshold {self.threshold}.")
+            print(f"Worker: Found {len(results)} tags above INTERNAL threshold {INTERNAL_THRESHOLD}.")
             # 5. Emit results
             self.signals.finished.emit(results)
 

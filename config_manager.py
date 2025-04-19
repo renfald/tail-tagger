@@ -7,7 +7,8 @@ class ConfigManager:
     def __init__(self):
         self.config_path = os.path.join(os.getcwd(), "data", "config.json")
         self.default_config = {
-            "last_opened_folder": ""
+            "last_opened_folder": "",
+            "classifier_threshold": 0.30
         }
         self.config = self._load_config()
 

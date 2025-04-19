@@ -1,6 +1,6 @@
 # classifier_panel.py
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QPushButton, QLabel,
-                             QScrollArea, QFrame, QMenu)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+                             QScrollArea, QFrame, QMenu, QDoubleSpinBox)
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QAction
 
@@ -13,12 +13,15 @@ class ClassifierPanel(QWidget):
         super().__init__(parent)
         self.main_window = main_window
         self.classifier_manager = classifier_manager
+        self.raw_results: list[tuple[str, float]] | None = None
 
         print("ClassifierPanel Initialized") # Basic check
 
         self._setup_ui()
 
     def _setup_ui(self):
+        """Sets up the UI components for the ClassifierPanel."""
+
         # --- Main Layout ---
         layout = QVBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2) # Small margins
@@ -27,6 +30,26 @@ class ClassifierPanel(QWidget):
         # --- Analyze Button (Top) ---
         self.analyze_button = QPushButton("Analyze Image")
         layout.addWidget(self.analyze_button)
+
+        threshold_layout = QHBoxLayout() # Horizontal layout
+        threshold_layout.setContentsMargins(0, 0, 0, 0)
+        threshold_layout.setSpacing(5)
+
+        threshold_label = QLabel("Confidence Threshold:")
+        threshold_layout.addWidget(threshold_label)
+
+        self.threshold_spinbox = QDoubleSpinBox()
+        self.threshold_spinbox.setRange(0.05, 0.95) # Example range
+        self.threshold_spinbox.setSingleStep(0.05) # Example step
+        self.threshold_spinbox.setDecimals(2)
+
+        # --- Set initial threshold from config ---
+        initial_threshold = self.main_window.config_manager.get_config_value("classifier_threshold")
+        self.threshold_spinbox.setValue(initial_threshold)
+        
+        threshold_layout.addWidget(self.threshold_spinbox)
+
+        layout.addLayout(threshold_layout) # Add horizontal layout to main vertical layout
 
         # --- Status Label ---
         self.status_label = QLabel("Ready")
@@ -57,6 +80,9 @@ class ClassifierPanel(QWidget):
         self.classifier_manager.analysis_started.connect(self._on_analysis_started)
         self.classifier_manager.analysis_finished.connect(self._on_analysis_finished)
         self.classifier_manager.error_occurred.connect(self._on_analysis_error)
+
+        self.threshold_spinbox.valueChanged.connect(self._update_displayed_tags)
+        self.threshold_spinbox.valueChanged.connect(self._save_threshold_setting)
 
         print("ClassifierPanel UI Setup Complete and signals connected.")
 
@@ -109,12 +135,63 @@ class ClassifierPanel(QWidget):
             print("Classifier Manager not available.")
             self.status_label.setText("Error: Classifier not ready.")
     
+    def _update_displayed_tags(self):
+        """Filters stored raw results based on current threshold and updates display."""
+        if self.raw_results is None:
+            # No analysis run yet or results cleared
+            # print("Update skipped: No raw results available.")
+            self._clear_results_widgets() # Ensure display is clear
+            # Reset status if called before analysis? Or assume status is handled elsewhere?
+            # Let's only clear here. Status is set elsewhere.
+            return
+
+        current_threshold = self.threshold_spinbox.value()
+        print(f"Updating display based on threshold: {current_threshold:.2f}")
+
+        self._clear_results_widgets() # Clear previous widgets
+
+        # --- Filter results based on current threshold ---
+        filtered_results = [
+            (tag_name, score) for tag_name, score in self.raw_results
+            if score >= current_threshold
+        ]
+
+        # --- Populate results area with filtered results ---
+        tag_model = self.main_window.tag_list_model
+        widgets_added = 0
+        for tag_name, score in filtered_results:
+            tag_data = tag_model.tags_by_name.get(tag_name)
+            if tag_data is None:
+                tag_data = TagData(name=tag_name, is_known=False)
+                tag_model.add_tag(tag_data)
+
+            if tag_data:
+                tag_widget = TagWidget(tag_data=tag_data)
+                tag_widget.setToolTip(f"Confidence: {score:.2%}")
+                tag_widget.set_styling_mode("dim_on_select")
+                tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
+                tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
+                tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
+                self.results_layout.addWidget(tag_widget)
+                widgets_added += 1
+            else:
+                print(f"Error: Failed to get or create TagData for '{tag_name}'")
+
+        # --- Update status label ---
+        if widgets_added > 0:
+            self.status_label.setText(f"Displaying {widgets_added} suggestions (Threshold: {current_threshold:.2f})")
+        else:
+            if self.raw_results: # Check if analysis actually ran
+                self.status_label.setText(f"No suggestions above threshold {current_threshold:.2f}")
+            # else: status is likely "Ready" or "Loading", don't overwrite
+        print(f"Displayed {widgets_added} widgets.")
+
     def clear_results(self):
         """Clears the results area and resets the status label."""
         print("ClassifierPanel: Clearing results.")
+        self.raw_results = None # ADD THIS LINE
         self._clear_results_widgets()
-        self.status_label.setText("Ready (New Image)") # Or simply "Ready"
-        # Ensure button is enabled when results are cleared due to image change
+        self.status_label.setText("Ready (New Image)")
         self.analyze_button.setEnabled(True)
     
     
@@ -130,46 +207,11 @@ class ClassifierPanel(QWidget):
     def _on_analysis_finished(self, results):
         """Slot called when analysis finishes successfully."""
         # results is expected to be a list of [(tag_name, score), ...] sorted by score
-        print(f"ClassifierPanel received: analysis_finished with {len(results)} results.")
-        self._clear_results_widgets() # Clear again just in case
+        print(f"ClassifierPanel received: analysis_finished with {len(results)} raw results.")
+        self.raw_results = results
+        self.analyze_button.setEnabled(True)
+        self._update_displayed_tags()
 
-        if not results:
-            self.status_label.setText("Analysis complete: No tags found above threshold.")
-            self.analyze_button.setEnabled(True) # Re-enable button
-            return
-
-        # --- Populate results area ---
-        tag_model = self.main_window.tag_list_model
-        for tag_name, score in results:
-            tag_data = None
-            # Check efficiently if tag exists (known or unknown)
-            tag_data = tag_model.tags_by_name.get(tag_name)
-
-            if tag_data is None:
-                # Tag doesn't exist in the model at all, add as unknown
-                print(f"Suggested tag '{tag_name}' not found in model. Adding as unknown.")
-                # Important: Ensure TagData init handles default values appropriately if needed
-                tag_data = TagData(name=tag_name, is_known=False)
-                tag_model.add_tag(tag_data) # Add to the central model
-
-            # Create and add the TagWidget
-            if tag_data: # Double check tag_data is valid before creating widget
-                tag_widget = TagWidget(tag_data=tag_data)
-                # Optional: Display score? Maybe later. Add tooltip?
-                tag_widget.setToolTip(f"Confidence: {score:.2%}")
-                tag_widget.set_styling_mode("dim_on_select")
-                tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
-                tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
-                tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
-                self.results_layout.addWidget(tag_widget)
-            else:
-                print(f"Error: Failed to get or create TagData for '{tag_name}'")
-
-
-        # self.status_label.setText(f"Analysis complete: {len(results)} suggestions found.")
-        self.status_label.setText(f"Found {len(results)} suggestions.")
-        # self.status_label.setText(f"Analysis complete\n{len(results)} suggestions found.")
-        self.analyze_button.setEnabled(True) # Re-enable button
 
     @Slot(str)
     def _on_analysis_error(self, error_message):
@@ -225,3 +267,9 @@ class ClassifierPanel(QWidget):
 
         else:
             print(f"  No context actions applicable for tag '{tag_name}'")
+    
+    @Slot(float) # Use float since spinbox emits float
+    def _save_threshold_setting(self, value):
+        """Saves the new threshold value to the config file."""
+        # print(f"Saving new threshold: {value:.2f}") # Debug
+        self.main_window.config_manager.set_config_value("classifier_threshold", value)
