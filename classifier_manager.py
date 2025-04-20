@@ -12,13 +12,20 @@ from PySide6.QtCore import QObject, Signal, QRunnable, Slot, QThreadPool
 # Import the transformation function
 from transformations import get_transform
 
+# --- Known/Supported Models and Display Names ---
+# Maps internal model_id (folder name) to user-friendly display name
+SUPPORTED_MODELS = {
+    "JTP_PILOT": "JTP Pilot v1",
+    "JTP_PILOT2": "JTP Pilot v2",
+    # Add future supported models here
+}
 class ClassifierManager(QObject):
     analysis_started = Signal()
     analysis_finished = Signal(list) # Will emit list of (tag, score) tuples
     error_occurred = Signal(str)
 
 
-    def __init__(self, model_id="vit_so400m", use_gpu=True, parent=None): # Added use_gpu flag
+    def __init__(self, use_gpu=True, parent=None): # Added use_gpu flag
         """
         Initializes the ClassifierManager.
 
@@ -28,30 +35,56 @@ class ClassifierManager(QObject):
             parent (QObject): Parent QObject for signal-slot connections.
         """
         super().__init__(parent)
-        self.model_id = model_id
+        # Basic setup
         self.use_gpu_preference = use_gpu
-        self.device = None # Will be set during model load
+        self.base_path = os.path.dirname(__file__)
+        self.classifiers_dir = os.path.join(self.base_path, "classifiers")
 
-        # Construct paths based on model_id
-        base_path = os.path.dirname(__file__) # Gets directory of classifier_manager.py
-        model_dir = os.path.join(base_path, "classifiers", self.model_id)
-        # --- TODO: Adjust model filename if needed ---
-        self.model_path = os.path.join(model_dir, "JTP_PILOT-e4-vit_so400m_patch14_siglip_384.safetensors")
-        self.tags_path = os.path.join(model_dir, "tags.json")
-        # ---
-
-        self.model: VisionTransformer | None = None # Type hint for the model
+        # State for the ACTIVE model
+        self.active_model_id: str | None = None
+        self.model_path: str | None = None # Path to the .safetensors file for the active model
+        self.tags_path: str | None = None # Path to the tags.json file for the active model
+        self.model: VisionTransformer | None = None
         self.allowed_tags: list[str] | None = None
-        self.transform = get_transform() # Get the transformation pipeline
+        self.device = None
+        self.transform = get_transform() # Transform is currently shared
 
+        # Other state
         self.thread_pool = QThreadPool.globalInstance()
         self.is_loading = False
         self.pending_analysis_path = None
-        print(f"Using thread pool with max threads: {self.thread_pool.maxThreadCount()}")
 
-        print(f"ClassifierManager initialized for model '{model_id}'.")
-        print(f" - Model path: {self.model_path}")
-        print(f" - Tags path: {self.tags_path}")
+        # --- Discover available models ---
+        self.available_model_ids = self._discover_models()
+        if not self.available_model_ids:
+            print("WARNING: No valid classifier models discovered!")
+            # Handle error state? Emit signal? For now, just print.
+            self.error_occurred.emit("No valid classifier models found.")
+
+
+        # --- Set initial active model ID ---
+        # TODO: Read from ConfigManager later in MainWindow/integration step
+        # For now, just set default if possible
+        default_id = next(iter(SUPPORTED_MODELS.keys()), None) # Get first key from supported
+        if default_id and default_id in self.available_model_ids:
+             self._set_paths_for_active_model(default_id) # Set internal paths
+        elif self.available_model_ids:
+             # If default isn't available, use the first one found
+             print(f"Default model '{default_id}' not found/valid, using first discovered: {self.available_model_ids[0]}")
+             self._set_paths_for_active_model(self.available_model_ids[0])
+        else:
+             # No models available at all
+             print("Cannot set initial active model - none available.")
+             self.active_model_id = None # Ensure it's None
+
+
+        print(f"ClassifierManager initialized. Available models: {self.available_model_ids}")
+        if self.active_model_id:
+             print(f" - Initial Active Model ID: {self.active_model_id}")
+             print(f" - Active Model Path: {self.model_path}")
+             print(f" - Active Tags Path: {self.tags_path}")
+
+        print(f"Using thread pool with max threads: {self.thread_pool.maxThreadCount()}")
 
     def _ensure_loaded(self):
         """
@@ -65,15 +98,22 @@ class ClassifierManager(QObject):
         if self.is_loading:
             print("Model is currently loading in the background.")
             return False # Not ready yet, but loading initiated
-
+        
         # --- Trigger background loading ---
-        print("Model not loaded. Triggering background load...")
+        print(f"Model '{self.active_model_id}' not loaded. Triggering background load...")
+        if not self.model_path or not self.tags_path:
+            print("ERROR: Cannot load model - active model paths are not set.")
+            self.error_occurred.emit("Internal error: Active model paths not set.")
+            return False # Failed
+
         self.is_loading = True
+        # --- Pass the paths for the CURRENTLY ACTIVE model ---
         worker = LoadModelWorker(
             model_path=self.model_path,
             tags_path=self.tags_path,
             device_preference=self.use_gpu_preference
         )
+
         # Connect worker's signals to SLOTS in THIS manager instance
         worker.signals.model_loaded.connect(self._handle_model_loaded)
         worker.signals.loading_error.connect(self._handle_loading_error)
@@ -182,6 +222,78 @@ class ClassifierManager(QObject):
             import traceback
             traceback.print_exc()
             self.error_occurred.emit(error_msg)
+
+    # Add this method to ClassifierManager
+    def _discover_models(self) -> list[str]:
+        """Scans the classifiers directory for valid, supported models."""
+        print(f"Scanning for models in: {self.classifiers_dir}")
+        discovered_ids = []
+        if not os.path.isdir(self.classifiers_dir):
+            print(f"Warning: Classifiers directory not found: {self.classifiers_dir}")
+            return []
+
+        for potential_id in os.listdir(self.classifiers_dir):
+            model_folder_path = os.path.join(self.classifiers_dir, potential_id)
+            if os.path.isdir(model_folder_path):
+                # Check if this ID is in our known/supported list
+                if potential_id not in SUPPORTED_MODELS:
+                    print(f"  Skipping '{potential_id}': Not in SUPPORTED_MODELS list.")
+                    continue
+
+                # Check for required files (tags.json and *.safetensors)
+                tags_file = os.path.join(model_folder_path, "tags.json")
+                has_tags = os.path.isfile(tags_file)
+                has_model_file = False
+                for filename in os.listdir(model_folder_path):
+                    if filename.lower().endswith(".safetensors"):
+                        has_model_file = True
+                        break # Found one, that's enough
+
+                if has_tags and has_model_file:
+                    print(f"  Found valid supported model: '{potential_id}'")
+                    discovered_ids.append(potential_id)
+                else:
+                    print(f"  Skipping '{potential_id}': Missing tags.json or *.safetensors file.")
+
+        return discovered_ids
+    
+    def get_available_models(self) -> list[str]:
+        """Returns the list of discovered, valid, supported model IDs."""
+        return self.available_model_ids
+
+    def get_active_model_id(self) -> str | None:
+        """Returns the internal ID of the currently active model."""
+        return self.active_model_id
+
+    def get_display_name(self, model_id: str) -> str:
+        """Gets the user-friendly display name for a given model ID."""
+        return SUPPORTED_MODELS.get(model_id, model_id) # Return ID if no display name found
+
+    def _set_paths_for_active_model(self, model_id: str):
+        """Helper to set the internal paths based on the active model ID."""
+        if model_id not in self.available_model_ids:
+            print(f"ERROR: Cannot set paths for invalid/unavailable model ID '{model_id}'")
+            # Keep existing paths or set to None? Set to None to be safe.
+            self.active_model_id = None
+            self.model_path = None
+            self.tags_path = None
+            return
+
+        self.active_model_id = model_id
+        model_folder_path = os.path.join(self.classifiers_dir, model_id)
+        self.tags_path = os.path.join(model_folder_path, "tags.json")
+
+        # Find the specific .safetensors file
+        self.model_path = None # Reset first
+        for filename in os.listdir(model_folder_path):
+            if filename.lower().endswith(".safetensors"):
+                self.model_path = os.path.join(model_folder_path, filename)
+                break # Found it
+
+        if not self.model_path:
+            print(f"ERROR: Could not find .safetensors file in {model_folder_path}")
+            # This shouldn't happen if discovery worked, but belt-and-suspenders
+            self.active_model_id = None # Invalidate state
 
     # --- Slots to receive results from worker ---
     @Slot(list)
