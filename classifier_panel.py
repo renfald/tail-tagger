@@ -1,6 +1,6 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-                             QScrollArea, QFrame, QMenu, QDoubleSpinBox)
+                             QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox)
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QAction
 
@@ -31,7 +31,22 @@ class ClassifierPanel(QWidget):
         self.analyze_button = QPushButton("Analyze Image")
         layout.addWidget(self.analyze_button)
 
-        threshold_layout = QHBoxLayout() # Horizontal layout
+        # --- Model Selector (ComboBox) ---
+        model_selector_layout = QHBoxLayout()
+        model_selector_layout.setContentsMargins(0,0,0,0)
+        model_selector_layout.setSpacing(5)
+
+        model_label = QLabel("Classifier Model:")
+        model_selector_layout.addWidget(model_label)
+
+        self.model_selector = QComboBox()
+        # Populate the ComboBox
+        self._populate_model_selector()
+
+        model_selector_layout.addWidget(self.model_selector)
+        layout.addLayout(model_selector_layout)
+
+        threshold_layout = QHBoxLayout()
         threshold_layout.setContentsMargins(0, 0, 0, 0)
         threshold_layout.setSpacing(5)
 
@@ -46,7 +61,7 @@ class ClassifierPanel(QWidget):
         # --- Set initial threshold from config ---
         initial_threshold = self.main_window.config_manager.get_config_value("classifier_threshold")
         self.threshold_spinbox.setValue(initial_threshold)
-        
+
         threshold_layout.addWidget(self.threshold_spinbox)
 
         layout.addLayout(threshold_layout) # Add horizontal layout to main vertical layout
@@ -194,6 +209,36 @@ class ClassifierPanel(QWidget):
         self.status_label.setText("Ready (New Image)")
         self.analyze_button.setEnabled(True)
     
+    def _populate_model_selector(self):
+        """Gets available models from manager and populates the ComboBox."""
+        self.model_selector.clear() # Clear existing items first
+
+        available_ids = self.classifier_manager.get_available_models()
+        active_id = self.classifier_manager.get_active_model_id()
+        active_index = -1 # Initialize active index
+
+        print(f"Populating model selector. Available: {available_ids}, Active: {active_id}")
+
+        if not available_ids:
+            self.model_selector.addItem("No Models Found")
+            self.model_selector.setEnabled(False)
+            return
+
+        for index, model_id in enumerate(available_ids):
+            display_name = self.classifier_manager.get_display_name(model_id)
+            # Add item with display name (user visible) and internal ID (as data)
+            self.model_selector.addItem(display_name, userData=model_id)
+            if model_id == active_id:
+                active_index = index # Found the index of the active model
+
+        if active_index != -1:
+            self.model_selector.setCurrentIndex(active_index)
+            print(f"  Set initial selection to index {active_index} ('{self.model_selector.currentText()}')")
+        elif available_ids: # If active_id wasn't found but list isn't empty
+            print(f"Warning: Active model ID '{active_id}' not found in available list. Setting to first item.")
+            self.model_selector.setCurrentIndex(0) # Default to first item
+
+        self.model_selector.setEnabled(True)
     
     @Slot()
     def _on_analysis_started(self):

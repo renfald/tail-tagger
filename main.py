@@ -51,9 +51,14 @@ class MainWindow(QMainWindow):
         self.file_operations = FileOperations()
         self.tag_list_model = TagListModel()
 
+        # --- Load Configuration ---
+        self.config_manager = ConfigManager()
+        config = self.config_manager.config  # Get the loaded config
+        self.last_folder_path = config.get("last_opened_folder") # Set last folder from config
+
         # --- Managers ---
         self.keyboard_manager = KeyboardManager(self)
-        self.classifier_manager = ClassifierManager(use_gpu=True)
+        self.classifier_manager = ClassifierManager(config_manager=self.config_manager, use_gpu=True)
 
         # --- Global Keyboard Shortcuts ---
         self.prev_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
@@ -69,12 +74,6 @@ class MainWindow(QMainWindow):
         if not os.path.isdir(self.staging_folder_path):
             os.makedirs(self.staging_folder_path, exist_ok=True)
         self.file_operations.staging_folder_path = self.staging_folder_path
-
-
-        # --- Load Configuration ---
-        self.config_manager = ConfigManager()
-        config = self.config_manager.config  # Get the loaded config
-        self.last_folder_path = config.get("last_opened_folder") # Set last folder from config
 
         # --- Load Tags from CSV ---
         csv_load_start = time.time()

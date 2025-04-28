@@ -25,7 +25,7 @@ class ClassifierManager(QObject):
     error_occurred = Signal(str)
 
 
-    def __init__(self, use_gpu=True, parent=None): # Added use_gpu flag
+    def __init__(self, config_manager, use_gpu=True, parent=None):
         """
         Initializes the ClassifierManager.
 
@@ -35,6 +35,7 @@ class ClassifierManager(QObject):
             parent (QObject): Parent QObject for signal-slot connections.
         """
         super().__init__(parent)
+        self.config_manager = config_manager
         # Basic setup
         self.use_gpu_preference = use_gpu
         self.base_path = os.path.dirname(__file__)
@@ -58,24 +59,28 @@ class ClassifierManager(QObject):
         self.available_model_ids = self._discover_models()
         if not self.available_model_ids:
             print("WARNING: No valid classifier models discovered!")
-            # Handle error state? Emit signal? For now, just print.
             self.error_occurred.emit("No valid classifier models found.")
-
-
-        # --- Set initial active model ID ---
-        # TODO: Read from ConfigManager later in MainWindow/integration step
-        # For now, just set default if possible
-        default_id = next(iter(SUPPORTED_MODELS.keys()), None) # Get first key from supported
-        if default_id and default_id in self.available_model_ids:
-             self._set_paths_for_active_model(default_id) # Set internal paths
-        elif self.available_model_ids:
-             # If default isn't available, use the first one found
-             print(f"Default model '{default_id}' not found/valid, using first discovered: {self.available_model_ids[0]}")
-             self._set_paths_for_active_model(self.available_model_ids[0])
+            self.active_model_id = None
         else:
-             # No models available at all
-             print("Cannot set initial active model - none available.")
-             self.active_model_id = None # Ensure it's None
+            # --- Set initial active model ID from Config ---
+            saved_id = self.config_manager.get_config_value("classifier_active_model_id")
+            print(f"Read 'classifier_active_model_id' from config: {saved_id}") # Debug
+
+            if saved_id and saved_id in self.available_model_ids:
+                # Saved ID is valid and available, use it
+                print(f"Setting active model from config: {saved_id}")
+                self._set_paths_for_active_model(saved_id)
+            elif self.available_model_ids:
+                # Saved ID is invalid/missing/unavailable, use the first discovered one
+                first_available_id = self.available_model_ids[0]
+                print(f"Saved model ID '{saved_id}' not valid/available. Defaulting to first discovered: {first_available_id}")
+                self._set_paths_for_active_model(first_available_id)
+                # --- Optionally update config with the valid default ---
+                # self.config_manager.set_config_value("classifier_active_model_id", first_available_id)
+            else:
+                # Should not happen if discovery found models, but safety check
+                print("Cannot set initial active model - discovery failed or list empty.")
+                self.active_model_id = None
 
 
         print(f"ClassifierManager initialized. Available models: {self.available_model_ids}")
