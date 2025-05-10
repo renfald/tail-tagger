@@ -19,6 +19,30 @@ SUPPORTED_MODELS = {
     "JTP_PILOT2": "JTP Pilot v2",
     # Add future supported models here
 }
+
+# --- Custom Head for JTP_PILOT2 ---
+class GatedHead(torch.nn.Module):
+    def __init__(self,
+        num_features: int,
+        num_classes: int
+    ):
+        super().__init__()
+        self.num_classes = num_classes
+        self.linear = torch.nn.Linear(num_features, num_classes * 2)
+
+        self.act = torch.nn.Sigmoid()
+        self.gate = torch.nn.Sigmoid()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Assuming x is batch x num_features
+        x = self.linear(x) # Output shape: batch x (num_classes * 2)
+        # Split the output into two parts for activation and gating
+        activation_output = x[:, :self.num_classes]
+        gate_output = x[:, self.num_classes:]
+        # Apply activation and gating
+        x = self.act(activation_output) * self.gate(gate_output)
+        return x
+
 class ClassifierManager(QObject):
     analysis_started = Signal()
     analysis_finished = Signal(list) # Will emit list of (tag, score) tuples
@@ -114,6 +138,7 @@ class ClassifierManager(QObject):
         self.is_loading = True
         # --- Pass the paths for the CURRENTLY ACTIVE model ---
         worker = LoadModelWorker(
+            model_id=self.active_model_id,
             model_path=self.model_path,
             tags_path=self.tags_path,
             device_preference=self.use_gpu_preference
@@ -195,9 +220,8 @@ class ClassifierManager(QObject):
 
             # --- Dispatch Worker ---
             print("MainThread: Dispatching worker to thread pool...")
-            # Create worker instance - pass necessary data
-            # TODO: Make threshold configurable later
             worker = AnalysisWorker(
+                model_id=self.active_model_id,
                 image_tensor=tensor,
                 model=self.model,
                 device=self.device, # Pass device just in case, though maybe not needed
@@ -300,6 +324,68 @@ class ClassifierManager(QObject):
             # This shouldn't happen if discovery worked, but belt-and-suspenders
             self.active_model_id = None # Invalidate state
 
+    def set_active_model(self, new_model_id: str):
+        """
+        Sets the active classifier model, unloading the previous one if necessary.
+
+        Args:
+            new_model_id (str): The internal ID (folder name) of the model to activate.
+        """
+        print(f"\n--- Request to set active model to: '{new_model_id}' ---")
+
+        # --- Guard Clause 1: Already active? ---
+        if new_model_id == self.active_model_id:
+            print(f"Model '{new_model_id}' is already active. No change needed.")
+            return
+
+        # --- Guard Clause 2: Is the requested ID valid and available? ---
+        if new_model_id not in self.available_model_ids:
+            print(f"ERROR: Cannot switch to model '{new_model_id}'. Not found or invalid.")
+            # Optionally emit an error signal? For now, just log.
+            # self.error_occurred.emit(f"Model '{new_model_id}' is not available.")
+            return
+
+        # --- Unload Current Model (if one is loaded) ---
+        if self.model is not None:
+            print(f"Unloading current model: {self.active_model_id}")
+            was_cuda = self.device and self.device.type == 'cuda'
+
+            # Delete references to allow GC
+            del self.model
+            del self.allowed_tags
+            self.model = None
+            self.allowed_tags = None
+            self.device = None # Reset device associated with the model
+
+            if was_cuda and torch.cuda.is_available():
+                print("Clearing CUDA cache...")
+                torch.cuda.empty_cache() # Release GPU memory
+                print("CUDA cache cleared.")
+            else:
+                print("No model loaded or not on CUDA, no cache clearing needed.")
+        else:
+            print("No model currently loaded.")
+
+        # --- Set New Active Model ID and Paths ---
+        self._set_paths_for_active_model(new_model_id) # This updates self.active_model_id, paths
+        if self.active_model_id != new_model_id:
+            # _set_paths failed (shouldn't happen if guard clause passed, but check)
+            print(f"ERROR: Failed to set paths for '{new_model_id}'. Aborting switch.")
+            return # Prevent saving invalid state to config
+
+        print(f"Successfully set active model to: '{self.active_model_id}'")
+
+        # --- Reset Loading/Pending State for the new model ---
+        print("Resetting loading state for new model.")
+        self.is_loading = False
+        self.pending_analysis_path = None
+
+        # --- Persist the New Choice ---
+        print(f"Saving active model choice '{self.active_model_id}' to config...")
+        self.config_manager.set_config_value("classifier_active_model_id", self.active_model_id)
+
+        print(f"--- Model switch to '{self.active_model_id}' complete ---")
+    
     # --- Slots to receive results from worker ---
     @Slot(list)
     def _handle_worker_result(self, results):
@@ -351,9 +437,10 @@ class WorkerSignals(QObject):
 
 # --- Load Model Worker (Runs on Background Thread) ---
 class LoadModelWorker(QRunnable):
-    def __init__(self, model_path, tags_path, device_preference):
+    def __init__(self, model_id, model_path, tags_path, device_preference):
         super().__init__()
         self.signals = WorkerSignals()
+        self.model_id = model_id
         self.model_path = model_path
         self.tags_path = tags_path
         self.use_gpu_preference = device_preference # Renamed for clarity
@@ -397,8 +484,15 @@ class LoadModelWorker(QRunnable):
                 num_classes=len(allowed_tags),
             )
             print(f"LoadWorker: Loading model weights from {self.model_path}...")
+
             # Load to CPU first to avoid potential CUDA init on this thread? Or load direct?
             # Let's try loading directly to target device based on path device str
+            if self.model_id == "JTP_PILOT2":
+                print("LoadWorker: Replacing model head with GatedHead for JTP_PILOT2.")
+                # Get num_features from the base model's original head (before replacement)
+                num_features = model.head.in_features
+                model.head = GatedHead(num_features, len(allowed_tags))
+
             state_dict = safetensors.torch.load_file(self.model_path, device=str(self.device))
             model.load_state_dict(state_dict)
             model.eval()
@@ -429,9 +523,10 @@ class LoadModelWorker(QRunnable):
 
 # --- Analysis Worker (Runs on Background Thread) ---
 class AnalysisWorker(QRunnable):
-    def __init__(self, image_tensor, model, device, allowed_tags):
+    def __init__(self, model_id, image_tensor, model, device, allowed_tags):
         super().__init__()
         self.signals = WorkerSignals()
+        self.model_id = model_id
         self.tensor = image_tensor # Preprocessed tensor (already on correct device & dtype)
         self.model = model
         self.device = device # Needed? Tensor is already on device. Model too. Maybe not needed here.
@@ -452,7 +547,14 @@ class AnalysisWorker(QRunnable):
             # --- Post-processing ---
             print("Worker: Post-processing results...")
             # 1. Apply Sigmoid (get probabilities 0-1)
-            probabilities = torch.nn.functional.sigmoid(logits[0])
+            if self.model_id == "JTP_PILOT2":
+                print("Worker: Using direct output probabilities for JTP_PILOT2.")
+                # Output is already probabilities from GatedHead
+                probabilities = logits[0] # Remove batch dim
+            else:
+                print("Worker: Applying sigmoid to logits.")
+                # Apply Sigmoid for models like JTP_PILOT (standard head)
+                probabilities = torch.nn.functional.sigmoid(logits[0]) # Remove batch dim
 
             # 2. Thresholding (find indices above threshold)
             # Move probabilities to CPU for numpy operations if needed, or keep on GPU

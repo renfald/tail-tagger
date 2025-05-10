@@ -99,6 +99,8 @@ class ClassifierPanel(QWidget):
         self.threshold_spinbox.valueChanged.connect(self._update_displayed_tags)
         self.threshold_spinbox.valueChanged.connect(self._save_threshold_setting)
 
+        self.model_selector.textActivated.connect(self._handle_model_selection_changed)
+
         print("ClassifierPanel UI Setup Complete and signals connected.")
 
     def _clear_results_widgets(self):
@@ -318,3 +320,31 @@ class ClassifierPanel(QWidget):
         """Saves the new threshold value to the config file."""
         # print(f"Saving new threshold: {value:.2f}") # Debug
         self.main_window.config_manager.set_config_value("classifier_threshold", value)
+
+    @Slot(str) # Receives the display text of the selected item
+    def _handle_model_selection_changed(self, display_name):
+        """Handles a change in the selected model from the ComboBox."""
+        print(f"Model selector changed. Selected display name: '{display_name}'")
+
+        # Get the internal model ID (stored as userData)
+        selected_model_id = self.model_selector.currentData()
+
+        if not selected_model_id or not isinstance(selected_model_id, str):
+            print(f"ERROR: Could not retrieve valid model ID for selected item '{display_name}'. Aborting switch.")
+            self.status_label.setText("Error: Invalid model selection.")
+            # Optionally reset ComboBox selection? Complex, maybe defer.
+            return
+
+        print(f"Switching to internal model ID: '{selected_model_id}'")
+
+        # --- Call the ClassifierManager method to perform the switch ---
+        self.classifier_manager.set_active_model(selected_model_id)
+
+        # --- Update UI State for the new model ---
+        # Clear previous analysis results (they are for the old model)
+        self.clear_results() # This also sets status to "Ready (New Image)" and enables button
+
+        # Optionally refine status message
+        self.status_label.setText(f"Model '{display_name}' selected. Ready to Analyze.")
+
+        print(f"Model selection switch to '{display_name}' handled.")
