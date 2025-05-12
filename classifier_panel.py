@@ -1,14 +1,17 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-                             QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox)
-from PySide6.QtCore import Qt, Slot
-from PySide6.QtGui import QAction
+                             QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox, QCheckBox)
+from PySide6.QtCore import Qt, Slot, QSize, Signal
+from PySide6.QtGui import QAction, QIcon
 
 # Import TagWidget - it will be needed for placeholder logic
 from tag_widget import TagWidget
 from tag_list_model import TagData
 
 class ClassifierPanel(QWidget):
+    # Custom signals
+    auto_analyze_toggled = Signal(bool)  # Emits True when enabled, False when disabled
+
     def __init__(self, main_window, classifier_manager, parent=None):
         super().__init__(parent)
         self.main_window = main_window
@@ -24,47 +27,56 @@ class ClassifierPanel(QWidget):
 
         # --- Main Layout ---
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(2, 2, 2, 2) # Small margins
-        layout.setSpacing(3) # Small spacing
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(3)
 
-        # --- Analyze Button (Top) ---
+        # --- Controls Row 1: Analyze Button & Auto-Analyze Toggle ---
+        controls_row1_layout = QHBoxLayout()
+        controls_row1_layout.setContentsMargins(0,0,0,0)
+        controls_row1_layout.setSpacing(5)
+
         self.analyze_button = QPushButton("Analyze Image")
-        layout.addWidget(self.analyze_button)
+        controls_row1_layout.addWidget(self.analyze_button)
 
-        # --- Model Selector (ComboBox) ---
-        model_selector_layout = QHBoxLayout()
-        model_selector_layout.setContentsMargins(0,0,0,0)
-        model_selector_layout.setSpacing(5)
+        self.auto_analyze_toggle_button = QPushButton()
+        self.auto_analyze_toggle_button.setIcon(QIcon(":/icons/auto-analyze.svg")) # Path to your icon
+        self.auto_analyze_toggle_button.setToolTip("Toggle Auto-Analyze on image load")
+        self.auto_analyze_toggle_button.setCheckable(True)
+        self.auto_analyze_toggle_button.setChecked(False)
+        self.auto_analyze_toggle_button.setFixedSize(30, 30) # Maintain square shape
+        self.auto_analyze_toggle_button.setIconSize(QSize(15, 15)) # Adjust icon size within button
+        # Style to match exact_match_toggle_button with rounded corners
+        self.auto_analyze_toggle_button.setStyleSheet("""
+            QPushButton:checked {
+                background-color: green;
+            }
+        """)
+        controls_row1_layout.addWidget(self.auto_analyze_toggle_button)
 
-        model_label = QLabel("Classifier Model:")
-        model_selector_layout.addWidget(model_label)
+        layout.addLayout(controls_row1_layout)
+
+        # --- Controls Row 2: Model Selector & Threshold ---
+        controls_row2_layout = QHBoxLayout()
+        controls_row2_layout.setContentsMargins(0,0,0,0)
+        controls_row2_layout.setSpacing(5)
 
         self.model_selector = QComboBox()
-        # Populate the ComboBox
+        self.model_selector.setToolTip("Select Classifier Model")
         self._populate_model_selector()
-
-        model_selector_layout.addWidget(self.model_selector)
-        layout.addLayout(model_selector_layout)
-
-        threshold_layout = QHBoxLayout()
-        threshold_layout.setContentsMargins(0, 0, 0, 0)
-        threshold_layout.setSpacing(5)
-
-        threshold_label = QLabel("Confidence Threshold:")
-        threshold_layout.addWidget(threshold_label)
+        controls_row2_layout.addWidget(self.model_selector, 1)
 
         self.threshold_spinbox = QDoubleSpinBox()
-        self.threshold_spinbox.setRange(0.05, 0.95) # Example range
-        self.threshold_spinbox.setSingleStep(0.05) # Example step
+        self.threshold_spinbox.setRange(0.05, 0.95)
+        self.threshold_spinbox.setSingleStep(0.05)
         self.threshold_spinbox.setDecimals(2)
 
         # --- Set initial threshold from config ---
         initial_threshold = self.main_window.config_manager.get_config_value("classifier_threshold")
         self.threshold_spinbox.setValue(initial_threshold)
 
-        threshold_layout.addWidget(self.threshold_spinbox)
+        controls_row2_layout.addWidget(self.threshold_spinbox)
 
-        layout.addLayout(threshold_layout) # Add horizontal layout to main vertical layout
+        layout.addLayout(controls_row2_layout)
 
         # --- Status Label ---
         self.status_label = QLabel("Ready")
@@ -88,8 +100,9 @@ class ClassifierPanel(QWidget):
         self.results_container.setLayout(self.results_layout)
         self.results_scroll_area.setWidget(self.results_container)
 
-        # --- Connect Button Signal ---
+        # --- Connect Button Signals ---
         self.analyze_button.clicked.connect(self._handle_analyze_clicked)
+        self.auto_analyze_toggle_button.clicked.connect(self._handle_auto_analyze_toggled)
 
         # --- Connect ClassifierManager Signals ---
         self.classifier_manager.analysis_started.connect(self._on_analysis_started)
@@ -348,3 +361,12 @@ class ClassifierPanel(QWidget):
         self.status_label.setText(f"Model '{display_name}' selected. Ready to Analyze.")
 
         print(f"Model selection switch to '{display_name}' handled.")
+
+    @Slot()
+    def _handle_auto_analyze_toggled(self):
+        """Handles the toggle of the auto-analyze button."""
+        is_enabled = self.auto_analyze_toggle_button.isChecked()
+        print(f"Auto-analyze toggle button clicked. New state: {'enabled' if is_enabled else 'disabled'}")
+
+        # Emit signal for MainWindow to connect to
+        self.auto_analyze_toggled.emit(is_enabled)

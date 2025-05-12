@@ -6,5 +6,6 @@
         <file>icons/add-tag.svg</file>
         <file>icons/approx.svg</file>
         <file>icons/equal.svg</file>
+        <file>icons/auto-analyze.svg</file>
     </qresource>
 </RCC>

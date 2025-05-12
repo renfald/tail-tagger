@@ -17,7 +17,7 @@ from selected_tags_panel import SelectedTagsPanel
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
                              QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
                              QFileDialog, QSplitter, QMessageBox)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QKeySequence, QShortcut
 
 from classifier_manager import ClassifierManager
@@ -59,6 +59,13 @@ class MainWindow(QMainWindow):
         # --- Managers ---
         self.keyboard_manager = KeyboardManager(self)
         self.classifier_manager = ClassifierManager(config_manager=self.config_manager, use_gpu=True)
+
+        # --- Auto-Analyze Timer ---
+        self.auto_analyze_timer = QTimer(self)
+        self.auto_analyze_timer.setSingleShot(True) # Important: only fire once per start
+        self.auto_analyze_timer.timeout.connect(self._trigger_auto_analysis_from_timer)
+        self.AUTO_ANALYZE_DELAY_MS = 1500 # 1.5 seconds (configurable if needed later)
+        self.auto_analyze_enabled = False # Track state internally
 
         # --- Global Keyboard Shortcuts ---
         self.prev_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
@@ -123,6 +130,9 @@ class MainWindow(QMainWindow):
         # --- Left Panel (Resizable) ---
         self.left_panel_container = LeftPanelContainer(main_window=self, classifier_manager=self.classifier_manager)
         main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
+
+        # Connect auto-analyze signal from classifier panel
+        self.left_panel_container.classifier_panel.auto_analyze_toggled.connect(self._handle_auto_analyze_toggled)
 
 
         # --- Center Panel (Image Display) ---
@@ -269,6 +279,16 @@ class MainWindow(QMainWindow):
         self.current_image_path = image_path
 
         self.left_panel_container.classifier_panel.clear_results()
+
+        # Use our internal state variable instead of walking the widget tree
+        if self.auto_analyze_enabled:
+            print("Auto-analyze is enabled. Resetting/starting timer.")
+            self.auto_analyze_timer.stop() # Stop any pending timer
+            self.auto_analyze_timer.start(self.AUTO_ANALYZE_DELAY_MS) # Start new delay
+        else:
+            # If auto-analyze is disabled, ensure timer is stopped
+            self.auto_analyze_timer.stop()
+            print("Auto-analyze is disabled. Timer stopped.")
 
         # --- Load Tags for Image ---
         loaded_tag_names = self.file_operations.load_tags_for_image(image_path, self.last_folder_path) # Get list of tag *names*
@@ -505,6 +525,40 @@ class MainWindow(QMainWindow):
         self.tag_list_model.tags_selected_changed.emit() 
         # Updates are needed for SelectedTagsPanel if we just promoted a tag that's in the current image
         self.selected_tags_panel.update_display()
+
+    @Slot(bool)
+    def _handle_auto_analyze_toggled(self, enabled):
+        """Handles the auto_analyze_toggled signal from ClassifierPanel."""
+        print(f"Main window received auto-analyze toggle: {enabled}")
+        self.auto_analyze_enabled = enabled
+
+        # If auto-analyze was just enabled and we have a current image,
+        # start the timer to trigger analysis after a delay
+        if enabled and self.current_image_path:
+            print("Auto-analyze is enabled. Starting timer for current image.")
+            self.auto_analyze_timer.stop() # Ensure any previous timer is stopped
+            self.auto_analyze_timer.start(self.AUTO_ANALYZE_DELAY_MS)
+        elif not enabled:
+            # If auto-analyze was disabled, make sure the timer is stopped
+            self.auto_analyze_timer.stop()
+            print("Auto-analyze is disabled. Timer stopped.")
+
+    @Slot()
+    def _trigger_auto_analysis_from_timer(self):
+        """Called when the auto-analyze timer fires."""
+        print("Auto-analyze timer fired.")
+        if self.current_image_path and hasattr(self, 'left_panel_container') and \
+        hasattr(self.left_panel_container, 'classifier_panel'):
+            # Check if auto-analyze is STILL enabled (user might have disabled it during delay)
+            if self.auto_analyze_enabled:
+                print("  Auto-analyze is enabled. Triggering analysis.")
+                # Call the panel's existing analyze button click handler
+                # This ensures UI updates (button disable, status) are consistent
+                self.left_panel_container.classifier_panel._handle_analyze_clicked()
+            else:
+                print("  Auto-analyze was disabled during delay. Analysis cancelled.")
+        else:
+            print("  Auto-analyze: No current image or panel not ready. Analysis skipped.")
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)
