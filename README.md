@@ -77,13 +77,14 @@ run.bat
 
 - **Left Panel**: Tag search, frequently used tags, AI classifier controls, favorites
 - **Center Panel**: Image display and navigation
-- **Right Panel**: Currently selected tags for the active image
+- **Right Panel**: Currently selected tags for the active image. Tags can be reordered by dragging up or down
 
 ### AI Models
 
 Tail Tagger supports the two Joint Tagger Project classifier models trained on furry art:
 - **JTP_PILOT**
 - **JTP_PILOT2**
+
 Use whichever (or both) according to your preferences 
 
 Models are optional - the app provides full manual tagging functionality without them.
