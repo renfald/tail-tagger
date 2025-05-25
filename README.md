@@ -22,7 +22,7 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/tail-tagger.git
+   git clone https://github.com/renfald/tail-tagger.git
    cd tail-tagger
    ```
 
@@ -81,9 +81,10 @@ run.bat
 
 ### AI Models
 
-Tail Tagger supports two classifier models trained on furry art:
-- **JTP_PILOT**:
-- **JTP_PILOT2**:
+Tail Tagger supports the two Joint Tagger Project classifier models trained on furry art:
+- **JTP_PILOT**
+- **JTP_PILOT2**
+Use whichever (or both) according to your preferences 
 
 Models are optional - the app provides full manual tagging functionality without them.
 
