@@ -163,8 +163,10 @@ class TagSearchPanel(QWidget):
     def _on_tags_changed(self):
         """
         Handles updates when the tag selection state changes.
+        Uses debounce timer to avoid redundant searches during batch tag loading.
         """
-        self._execute_search()
+        # Use the same debounce timer as text changes to batch multiple tag updates
+        self.search_timer.start(50)  # Shorter delay for tag changes since they're typically batched
 
     def _on_search_text_changed(self, text):
         """
