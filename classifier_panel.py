@@ -62,7 +62,6 @@ class ClassifierPanel(QWidget):
 
         self.model_selector = QComboBox()
         self.model_selector.setToolTip("Select Classifier Model")
-        self._populate_model_selector()
         controls_row2_layout.addWidget(self.model_selector, 1)
 
         self.threshold_spinbox = QDoubleSpinBox()
@@ -113,6 +112,9 @@ class ClassifierPanel(QWidget):
         self.threshold_spinbox.valueChanged.connect(self._save_threshold_setting)
 
         self.model_selector.textActivated.connect(self._handle_model_selection_changed)
+
+        # Populate model selector after all UI elements are created
+        self._populate_model_selector()
 
         print("ClassifierPanel UI Setup Complete and signals connected.")
 
@@ -219,10 +221,14 @@ class ClassifierPanel(QWidget):
     def clear_results(self):
         """Clears the results area and resets the status label."""
         print("ClassifierPanel: Clearing results.")
-        self.raw_results = None # ADD THIS LINE
+        self.raw_results = None
         self._clear_results_widgets()
         self.status_label.setText("Ready (New Image)")
-        self.analyze_button.setEnabled(True)
+        # Only enable analyze button if models are available
+        if self.classifier_manager.get_available_models():
+            self.analyze_button.setEnabled(True)
+        else:
+            self.analyze_button.setEnabled(False)
     
     def _populate_model_selector(self):
         """Gets available models from manager and populates the ComboBox."""
@@ -237,6 +243,10 @@ class ClassifierPanel(QWidget):
         if not available_ids:
             self.model_selector.addItem("No Models Found")
             self.model_selector.setEnabled(False)
+            # Disable analyze buttons when no models are available
+            self.analyze_button.setEnabled(False)
+            self.auto_analyze_toggle_button.setEnabled(False)
+            self.status_label.setText("No classifier models available")
             return
 
         for index, model_id in enumerate(available_ids):
@@ -254,6 +264,10 @@ class ClassifierPanel(QWidget):
             self.model_selector.setCurrentIndex(0) # Default to first item
 
         self.model_selector.setEnabled(True)
+        # Enable analyze buttons when models are available
+        self.analyze_button.setEnabled(True)
+        self.auto_analyze_toggle_button.setEnabled(True)
+        self.status_label.setText("Ready")
     
     @Slot()
     def _on_analysis_started(self):
@@ -284,11 +298,15 @@ class ClassifierPanel(QWidget):
             self.analyze_button.setEnabled(False)
         elif "Model failed to load" in error_message:
             self.status_label.setText(error_message)
-            self.analyze_button.setEnabled(True) # Re-enable button on load failure
+            # Only re-enable if models are available
+            if self.classifier_manager.get_available_models():
+                self.analyze_button.setEnabled(True)
         else:
             # Genuine analysis error
             self.status_label.setText(f"Analysis Error: {error_message}")
-            self.analyze_button.setEnabled(True) # Re-enable button on analysis error
+            # Only re-enable if models are available
+            if self.classifier_manager.get_available_models():
+                self.analyze_button.setEnabled(True)
 
         # Don't clear results on loading message
         if "Model is loading" not in error_message:
