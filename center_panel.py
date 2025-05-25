@@ -7,6 +7,7 @@ class CenterPanel(QLabel):
         super().__init__()
         self.setAlignment(Qt.AlignCenter)  # Keep alignment from MainWindow
         self.image_path = None  # Store image path
+        self.setText("No image loaded. Select a folder from the file menu")
 
         self.setFocusPolicy(Qt.ClickFocus)
 
@@ -23,7 +24,7 @@ class CenterPanel(QLabel):
     def update_image_display(self):
         """Loads and scales the image to fit the center panel."""
         if not self.image_path:
-            self.clear() # Clear if no image path set
+            self.setText("No image loaded. Select a folder from the file menu")
             return
 
         pixmap = QPixmap(self.image_path)

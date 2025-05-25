@@ -2,28 +2,29 @@ import sys
 import os
 import time
 import theme
-from config_manager import ConfigManager
 from file_operations import FileOperations
-from tag_list_model import TagListModel, TagData
+from config_manager import ConfigManager
 from keyboard_manager import KeyboardManager
+from classifier_manager import ClassifierManager
+from tag_list_model import TagListModel, TagData
 
 from left_panel_container import LeftPanelContainer
 from center_panel import CenterPanel
+from selected_tags_panel import SelectedTagsPanel
 
 # Start application timer
 app_start_time = time.time()
-from selected_tags_panel import SelectedTagsPanel
-
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel,
-                             QSizePolicy, QVBoxLayout, QScrollArea, QPushButton, QSpacerItem,
-                             QFileDialog, QSplitter, QMessageBox)
+import resources.resources_rc as resources_rc  
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel, QSizePolicy, 
+                               QVBoxLayout, QPushButton, QSpacerItem, QFileDialog, QSplitter, QMessageBox)
 from PySide6.QtCore import Qt, QTimer, Slot
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut, QIcon
 
-from classifier_manager import ClassifierManager
+# TODO: its probably better for tag widget shading to not need every panel to rebuild their tag list and instead just 
+# check their current state. better yet a single tag should be able to know if it needs an update
 
-# TODO: its probably better for tag widget shading to not need every panel to rebuild their tag list and instead just check their current state. better yet a single
-# tag should be able to know if it needs an update
+# Import compiled resources for icons
+# pyside6-rcc resources/resources.qrc -o resources/resources_rc.py
 
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
@@ -31,7 +32,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         """Initializes the main application window."""
         super().__init__()
-        self.setWindowTitle("Image Tagger")
+        self.setWindowTitle("Tail Tagger")
+        self.setWindowIcon(QIcon(":/icons/app-icon.png"))
         self.resize(1280, 960)
 
         # --- Instance Variables ---
@@ -99,8 +101,8 @@ class MainWindow(QMainWindow):
             print(f"Loading last opened folder: {self.last_folder_path}")
             self._load_image_folder(self.last_folder_path)
         else:
-            print("No valid last opened folder, attempting to load initial directory.")
-            self._load_initial_directory()            # self._load_image_folder(None) # May deprecate
+            print("No valid last opened folder. Select a folder from the file menu.")
+            self._load_image_folder(None)
 
     def _setup_ui(self):
         """Sets up the main user interface layout and elements."""
@@ -182,24 +184,6 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(bottom_panel) # Add bottom panel to main layout
 
-    def _load_initial_directory(self):
-        """Loads images from an initial directory (environment variable)."""
-        initial_directory = os.environ.get("IMAGE_TAGGER_INITIAL_DIR")
-
-        if initial_directory:
-            initial_directory = os.path.normpath(initial_directory)
-            if os.path.isdir(initial_directory):
-                print(f"Loading initial directory: {initial_directory}")
-                self._load_image_folder(initial_directory)
-                self.last_folder_path = initial_directory
-                self.config_manager.set_config_value("last_opened_folder", self.last_folder_path) # Save to config
-            else:
-                print("No valid initial directory found.")
-                self._load_image_folder(None)
-        else:
-            print("No initial directory found in env variable")
-            self._load_image_folder(None)
-
     def _open_folder_dialog(self):
         """Opens a folder selection dialog and loads images."""
         start_directory = os.path.expanduser("~")
@@ -225,7 +209,6 @@ class MainWindow(QMainWindow):
             print("No folder path, handling as no images.")
             self.image_paths = []
             self.center_panel.clear()
-            self.center_panel.setText("Initial directory not found:\ninput")
             self.filename_label.setText("No Image")
             self.index_label.setText("0 of 0")
             self.prev_button.setEnabled(False)
