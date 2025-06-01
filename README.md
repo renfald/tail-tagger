@@ -2,7 +2,7 @@
 
 A desktop application built with PySide6 for manual and AI-assisted image tagging, designed for the furry community using the e621 tagging system. Features machine learning model integration for automatic tag suggestions and comprehensive tag management.
 
-This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https://github.com/arenasys/sd-tagging-helper)** application, which I think has a fantastic workflow for manual and AI assisted image tagging. Unfortunately, it does not support more recent, greatly improved image classifiers, limiting the accuracy of AI assisted tagging suggestions. Thus, I created this app, mimicing the workflow and layout, but aimed towards e621 tagging and image classification.
+This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https://github.com/arenasys/sd-tagging-helper)** application, which I think has a fantastic workflow for manual and AI assisted image tagging. Unfortunately, it does not support more recent, greatly improved image classifiers, limiting the accuracy of AI assisted tagging suggestions. Thus, I created this app, mimicking the workflow and layout, but aimed towards e621 tagging and image classification.
 
 ![Screenshot of Tail Tagger](assets/images/app-screenshot.jpg)
 
@@ -125,7 +125,7 @@ When loading an image, the following steps occur:
     - `image_name.txt`
     - `image_name.png.txt` (aka, image name with image extension)
 4. If found, it parses for comma separated tags and loads them into a staging file. The application will use the staging file going forward.
-5. If no txt. file found or cannot be parsed, a taging file is created with zero tags selected
+5. If no txt. file found or cannot be parsed, a tagging file is created with zero tags selected
 
 For now there is no way to 'reset' the tags back to the original state of a .txt file. If you need that, simply modify the staging file in a text editor.
 
