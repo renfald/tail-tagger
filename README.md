@@ -4,6 +4,8 @@ A desktop application built with PySide6 for manual and AI-assisted image taggin
 
 This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https://github.com/arenasys/sd-tagging-helper)** application, which I think has a fantastic workflow for manual and AI assisted image tagging. Unfortunately, it does not support more recent, greatly improved image classifiers, limiting the accuracy of AI assisted tagging suggestions. Thus, I created this app, mimicing the workflow and layout, but aimed towards e621 tagging and image classification.
 
+![Screenshot of Tail Tagger](assets/images/app-screenshot.jpg)
+
 ## Features
 
 - **Manual Image Tagging**: Browse and tag images with the comprehensive e621 tag system
