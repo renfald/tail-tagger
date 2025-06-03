@@ -43,8 +43,8 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
    
    - Visit [RedRocket/JointTaggerProject on Hugging Face](https://huggingface.co/RedRocket/JointTaggerProject)
    - Download model files following instructions in:
-     - `classifiers/JTP_PILOT/DOWNLOAD_INSTRUCTIONS.md`
-     - `classifiers/JTP_PILOT2/DOWNLOAD_INSTRUCTIONS.md`
+     - [`classifiers/JTP_PILOT/DOWNLOAD_INSTRUCTIONS.md`](classifiers/JTP_PILOT/DOWNLOAD_INSTRUCTIONS.md)
+     - [`classifiers/JTP_PILOT2/DOWNLOAD_INSTRUCTIONS.md`](classifiers/JTP_PILOT2/DOWNLOAD_INSTRUCTIONS.md)
 
 That's it! The setup script automatically creates a virtual environment and installs all dependencies.
 
