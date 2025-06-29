@@ -50,10 +50,7 @@ class TagWidget(QFrame):
         tag_layout.setContentsMargins(0, 0, 0, 0) # Removing any default margins and letting the label control it
         tag_layout.setSpacing(0) # Removing any default spacing
 
-        # --- Category Color Stripe ---
-        self.color_stripe = QFrame()
-        self.color_stripe.setFixedWidth(2)
-        tag_layout.addWidget(self.color_stripe)
+        
 
         self.tag_label = QLabel(FileOperations.convert_underscores_to_spaces(self.tag_name)) # Tag name with underscores replaced by spaces
         self.tag_label.setAlignment(Qt.AlignCenter)
@@ -181,20 +178,14 @@ class TagWidget(QFrame):
         category_color = TAG_CATEGORY_COLORS.get(self.tag_data.category, TAG_CATEGORY_COLORS["9"])
 
         # --- Base Styles (Apply to all states) ---
-        # Note: border-radius is split between color_stripe and tag_label for seamless look
+        # Apply border-radius to all corners of the tag_label
         base_style = f"""
             background-color: #353535;
             color: white;
             border: 1px solid #121212;
-            border-top-right-radius: 5px;
-            border-bottom-right-radius: 5px;
-            border-top-left-radius: 0px;
-            border-bottom-left-radius: 0px;
+            border-radius: 5px;
         """
         
-        # Style for the category color stripe
-        stripe_style = f"background-color: {category_color}; border-top-left-radius: 5px; border-bottom-left-radius: 5px;"
-
         # --- Font Settings (Apply to all states) ---
         font = QFont()
         font.setPointSize(8)
@@ -204,17 +195,21 @@ class TagWidget(QFrame):
         if not self.is_known_tag:
             # Unknown Tag Style: overrides background and text color, and uses 'invalid' stripe color
             style = base_style + "background-color: #552121; color: #855252;"
-            stripe_style = f"background-color: {TAG_CATEGORY_COLORS['6']}; border-top-left-radius: 5px; border-bottom-left-radius: 5px;" # Invalid tag color
+            # For unknown tags, the left border is always the invalid color
+            style += f"border-left: 2px solid {TAG_CATEGORY_COLORS['6']};"
         elif self.styling_mode == "dim_on_select" and self.is_selected:
             # Selected (Dimmed) Style: overrides background and text color
             style = base_style + "background-color: #242424; color: #888888;"
+            # Apply category color to left border for dimmed tags
+            style += f"border-left: 2px solid {category_color};"
         else:
             # Default (Known, Unselected) Style: uses base_style
             style = base_style  # No additional changes needed
+            # Apply category color to left border for normal tags
+            style += f"border-left: 2px solid {category_color};"
 
-        # --- Apply the Combined Stylesheet to label and stripe ---
+        # --- Apply the Combined Stylesheet to label ---
         self.tag_label.setStyleSheet(style)
-        self.color_stripe.setStyleSheet(stripe_style) # Apply stripe style
         # Setting a separate stylesheet for the widget itself to set tooltip colors. Baindaid because I did a bad job setting overall styling in this app
         self.setStyleSheet("QToolTip { color: #FFFFFF; background-color: #353535; border: 1px solid #555555; }")
 
