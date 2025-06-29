@@ -1,6 +1,19 @@
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtCore import Qt
 
+TAG_CATEGORY_COLORS = {
+    "0": "#b4c7d9",  # General
+    "1": "#f2ac08",  # Artist
+    "2": "#c0c0c0",  # Contributor (silver)
+    "3": "#d000d0",  # Copyright
+    "4": "#00aa00",  # Character
+    "5": "#ed5d1f",  # Species
+    "6": "#ff3d3d",  # Invalid
+    "7": "#ffffff",  # Meta
+    "8": "#282",    # Lore
+    "9": "#555555"   # New/Unknown category
+}
+
 def setup_dark_mode(app):
     """Sets up the application-wide dark mode theme."""
     app.setStyle("Fusion")  # Use the Fusion style for a consistent look.

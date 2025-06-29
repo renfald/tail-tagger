@@ -3,6 +3,7 @@ from PySide6.QtCore import Qt, QSize, Signal, QMimeData, QPoint
 from PySide6.QtGui import QDrag, QFont, QPixmap, QContextMenuEvent
 from math import sqrt
 from file_operations import FileOperations
+from theme import TAG_CATEGORY_COLORS
 class TagWidget(QFrame):
     """Widget to display a tag."""
 
@@ -48,6 +49,11 @@ class TagWidget(QFrame):
         tag_layout = QHBoxLayout()
         tag_layout.setContentsMargins(0, 0, 0, 0) # Removing any default margins and letting the label control it
         tag_layout.setSpacing(0) # Removing any default spacing
+
+        # --- Category Color Stripe ---
+        self.color_stripe = QFrame()
+        self.color_stripe.setFixedWidth(2)
+        tag_layout.addWidget(self.color_stripe)
 
         self.tag_label = QLabel(FileOperations.convert_underscores_to_spaces(self.tag_name)) # Tag name with underscores replaced by spaces
         self.tag_label.setAlignment(Qt.AlignCenter)
@@ -170,37 +176,47 @@ class TagWidget(QFrame):
         super().mouseReleaseEvent(event) # keep default functionality just in case
 
     def _update_style(self):
-            """Updates the visual style."""
+        """Updates the visual style."""
+        # Get category color, defaulting to '9' (unknown) if category is not found
+        category_color = TAG_CATEGORY_COLORS.get(self.tag_data.category, TAG_CATEGORY_COLORS["9"])
 
-            # --- Base Styles (Apply to all states) ---
-            base_style = """
-                background-color: #353535;
-                color: white;
-                border: 1px solid #121212;
-                border-radius: 5px;
-            """
-            
-            # --- Font Settings (Apply to all states) ---
-            font = QFont()
-            font.setPointSize(8)
-            self.tag_label.setFont(font)
-            
-            # --- State-Specific Styles ---
-            if not self.is_known_tag:
-                # Unknown Tag Style
-                style = base_style + "background-color: #552121; color: #855252;"
+        # --- Base Styles (Apply to all states) ---
+        # Note: border-radius is split between color_stripe and tag_label for seamless look
+        base_style = f"""
+            background-color: #353535;
+            color: white;
+            border: 1px solid #121212;
+            border-top-right-radius: 5px;
+            border-bottom-right-radius: 5px;
+            border-top-left-radius: 0px;
+            border-bottom-left-radius: 0px;
+        """
+        
+        # Style for the category color stripe
+        stripe_style = f"background-color: {category_color}; border-top-left-radius: 5px; border-bottom-left-radius: 5px;"
 
-            elif self.styling_mode == "dim_on_select" and self.is_selected:
-                # Selected (Dimmed) Style
-                style = base_style + "background-color: #242424; color: #888888;"
-            else:
-                # Default (Known, Unselected) Style
-                style = base_style  # No additional changes needed
+        # --- Font Settings (Apply to all states) ---
+        font = QFont()
+        font.setPointSize(8)
+        self.tag_label.setFont(font)
+        
+        # --- State-Specific Styles ---
+        if not self.is_known_tag:
+            # Unknown Tag Style: overrides background and text color, and uses 'invalid' stripe color
+            style = base_style + "background-color: #552121; color: #855252;"
+            stripe_style = f"background-color: {TAG_CATEGORY_COLORS['6']}; border-top-left-radius: 5px; border-bottom-left-radius: 5px;" # Invalid tag color
+        elif self.styling_mode == "dim_on_select" and self.is_selected:
+            # Selected (Dimmed) Style: overrides background and text color
+            style = base_style + "background-color: #242424; color: #888888;"
+        else:
+            # Default (Known, Unselected) Style: uses base_style
+            style = base_style  # No additional changes needed
 
-            # --- Apply the Combined Stylesheet to label ---
-            self.tag_label.setStyleSheet(style)
-            # Setting a separate stylesheet for the widget itself to set tooltip colors. Baindaid because I did a bad job setting overall styling in this app
-            self.setStyleSheet("QToolTip { color: #FFFFFF; background-color: #353535; border: 1px solid #555555; }")
+        # --- Apply the Combined Stylesheet to label and stripe ---
+        self.tag_label.setStyleSheet(style)
+        self.color_stripe.setStyleSheet(stripe_style) # Apply stripe style
+        # Setting a separate stylesheet for the widget itself to set tooltip colors. Baindaid because I did a bad job setting overall styling in this app
+        self.setStyleSheet("QToolTip { color: #FFFFFF; background-color: #353535; border: 1px solid #555555; }")
 
 
     def set_selected(self, is_selected):
