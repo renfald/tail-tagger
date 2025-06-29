@@ -289,35 +289,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         """Abstract method: Handle updates after a tag is dropped. Must be implemented by subclasses."""
         pass
 
-    @abstractmethod
-    def add_tag(self, tag_name, is_known=True):
-        """Adds a tag."""
-        pass
-
-    @abstractmethod
-    def remove_tag(self, tag_name):
-        """Removes a tag."""
-        pass
-
-    @abstractmethod
-    def clear_tags(self):
-        """Clears all tags."""
-        pass
-
-    @abstractmethod
-    def get_tags(self):
-        """Returns a list of all tags."""
-        return []
-
-    @abstractmethod
-    def set_tags(self, tags):
-        """Sets the tags."""
-        pass
-
-    @abstractmethod
-    def set_tag_selected(self, tag_name, is_selected):
-        """Sets the selection state."""
-        pass
+    
 
     @abstractmethod
     def is_tag_draggable(self, tag_name):

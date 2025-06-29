@@ -50,21 +50,4 @@ class SelectedTagsPanel(TagListPanel):
         self.main_window.update_workfile_for_current_image()
         print("  Workfile updated with new tag order.")
 
-    # These methods are not needed for SelectedTagsPanel
-    def add_tag(self, tag_name, is_known=True):
-        pass
     
-    def remove_tag(self, tag_name):
-        pass
-    
-    def clear_tags(self):
-        pass
-    
-    def get_tags(self):
-        pass
-    
-    def set_tags(self, tags):
-        pass
-    
-    def set_tag_selected(self, tag_name, is_selected):
-        pass

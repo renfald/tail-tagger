@@ -31,24 +31,7 @@ class FavoritesPanel(TagListPanel):
         self.main_window.file_operations.save_favorites(self.main_window.favorite_tags_ordered)
         print(f"  favorites.json updated with new tag order.")
 
-    # These methods are not needed for FavoritesPanel
-    def add_tag(self, tag_name, is_known=True):
-        pass  # Not needed
-
-    def remove_tag(self, tag_name):
-        pass  # Not needed
-
-    def clear_tags(self):
-        pass  # Not needed
-
-    def get_tags(self):
-        pass  # Not needed
-
-    def set_tags(self, tags):
-        pass # Not needed
-
-    def set_tag_selected(self, tag_name, is_selected):
-        pass  # Not needed
+    
         
     def _add_context_menu_actions(self, menu, tag_data):
         """Add panel-specific context menu actions for FavoritesPanel.

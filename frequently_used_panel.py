@@ -50,21 +50,4 @@ class FrequentlyUsedPanel(TagListPanel):
         """Not used in non-draggable panel."""
         pass
     
-    # Implementing abstract methods to meet TagListPanel requirements
-    def add_tag(self, tag_name, is_known=True):
-        pass  # Not needed
-
-    def remove_tag(self, tag_name):
-        pass  # Not needed
-
-    def clear_tags(self):
-        pass  # Not needed
-
-    def get_tags(self):
-        pass  # Not needed
-
-    def set_tags(self, tags):
-        pass # Not needed
-
-    def set_tag_selected(self, tag_name, is_selected):
-        pass  # Not needed
+    
