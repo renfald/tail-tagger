@@ -45,7 +45,7 @@ class LeftPanelContainer(QWidget):
         self.splitter.addWidget(self.favorites_panel)
 
         self.splitter.setChildrenCollapsible(False)
-        self.splitter.setSizes([300, 200, 200])
+        self.splitter.setSizes([300, 350, 200])
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 0)
         self.splitter.setStretchFactor(2, 1)

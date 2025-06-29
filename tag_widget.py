@@ -52,7 +52,7 @@ class TagWidget(QFrame):
         self.tag_label = QLabel(FileOperations.convert_underscores_to_spaces(self.tag_name)) # Tag name with underscores replaced by spaces
         self.tag_label.setAlignment(Qt.AlignCenter)
         self.tag_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.tag_label.setContentsMargins(3, 4, 3, 4) # The widget will shrink to 6 pixels larger than the text before scrolling
+        self.tag_label.setContentsMargins(3, 3, 3, 3) # The widget will shrink to 6 pixels larger than the text before scrolling
         
         # Enable text eliding with ellipsis for long text
         self.tag_label.setTextFormat(Qt.PlainText)
