@@ -17,7 +17,7 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.8 - 3.11 (3.12 compatibility pending)
 - Git
 
 ### Setup
@@ -175,7 +175,7 @@ If using WSL with Windows:
 ## System Requirements
 
 - **OS**: Windows 10/11, macOS 10.14+, or Linux
-- **Python**: 3.8 or higher
+- **Python**: 3.11
 - **RAM**: 4GB minimum (8GB+ recommended with AI models)
 - **Storage**: 6GB for app + 1.75GB per AI model
 - **GPU**: Optional, CUDA-compatible GPU for faster AI inference

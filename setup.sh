@@ -6,15 +6,21 @@
 echo "=== Tail Tagger Setup ==="
 echo "Setting up your environment..."
 
-# Check if Python 3 is installed
-if ! command -v python3 &> /dev/null; then
+# Find a suitable python command
+if command -v py &> /dev/null; then
+    PYTHON_CMD="py"
+elif command -v python3 &> /dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+else
     echo "❌ Error: Python 3 is not installed or not in PATH"
-    echo "Please install Python 3.8 or higher and try again"
+    echo "Please install Python 3.11 and try again"
     exit 1
 fi
 
 # Display Python version
-PYTHON_VERSION=$(python3 --version)
+PYTHON_VERSION=$($PYTHON_CMD --version)
 echo "✓ Found $PYTHON_VERSION"
 
 # Check if we're already in the right directory
@@ -32,7 +38,7 @@ fi
 
 # Create virtual environment
 echo "🔧 Creating virtual environment..."
-python3 -m venv venv
+$PYTHON_CMD -m venv venv
 
 if [ $? -ne 0 ]; then
     echo "❌ Error: Failed to create virtual environment"
@@ -90,3 +96,5 @@ echo "1. [Optional] Download AI models following instructions in classifiers/*/D
 echo "2. Run the application with: ./run.sh"
 echo ""
 echo "The application works perfectly without AI models for manual tagging."
+
+exit 0
