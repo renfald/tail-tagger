@@ -12,7 +12,7 @@ elif command -v python &> /dev/null; then
     PYTHON_CMD="python"
 else
     echo "❌ Error: Python 3 is not installed or not in PATH"
-    echo "Please install Python 3.11 or higher and try again"
+    echo "Please install Python 3.11 and try again"
     exit 1
 fi
 

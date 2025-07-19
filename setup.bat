@@ -12,7 +12,7 @@ if errorlevel 1 (
     set "PYTHON_CMD=python"
     %PYTHON_CMD% --version >nul 2>&1
     if errorlevel 1 (
-        echo ❌ Error: Python is not installed or not in PATH.
+        echo Error: Python is not installed or not in PATH.
         echo Please install Python 3.11 from python.org and try again.
         echo The 'py' launcher is recommended.
         pause
@@ -22,11 +22,11 @@ if errorlevel 1 (
 
 REM Display Python version
 for /f "tokens=*" %%i in ('%PYTHON_CMD% --version') do set PYTHON_VERSION=%%i
-echo ✓ Found %PYTHON_VERSION%
+echo Found %PYTHON_VERSION%
 
 REM Check if we're in the right directory
 if not exist "main.py" (
-    echo ❌ Error: main.py not found
+    echo Error: main.py not found
     echo Please run this script from the Tail Tagger directory
     pause
     exit /b 1
@@ -34,66 +34,66 @@ if not exist "main.py" (
 
 REM Remove existing venv if it exists
 if exist "venv" (
-    echo 🗑️  Removing existing virtual environment...
+    echo Removing existing virtual environment...
     rmdir /s /q venv
 )
 
 REM Create virtual environment
-echo 🔧 Creating virtual environment...
+echo Creating virtual environment...
 %PYTHON_CMD% -m venv venv
 
 if errorlevel 1 (
-    echo ❌ Error: Failed to create virtual environment
+    echo Error: Failed to create virtual environment
     echo Make sure you have a complete Python installation
     pause
     exit /b 1
 )
 
 REM Activate virtual environment
-echo 🔌 Activating virtual environment...
+echo Activating virtual environment...
 call venv\Scripts\activate.bat
 
 if errorlevel 1 (
-    echo ❌ Error: Failed to activate virtual environment
+    echo Error: Failed to activate virtual environment
     pause
     exit /b 1
 )
 
 REM Upgrade pip
-echo ⬆️  Upgrading pip...
+echo Upgrading pip...
 python -m pip install --upgrade pip
 
 REM Install requirements
-echo 📦 Installing dependencies...
+echo Installing dependencies...
 if exist "requirements.txt" (
     pip install -r requirements.txt
     
     if errorlevel 1 (
-        echo ❌ Error: Failed to install dependencies
+        echo Error: Failed to install dependencies
         echo Check the error messages above and try again
         pause
         exit /b 1
     )
 ) else (
-    echo ❌ Error: requirements.txt not found
+    echo Error: requirements.txt not found
     pause
     exit /b 1
 )
 
 REM Test the installation
-echo 🧪 Testing installation...
-python -c "import PySide6; print('✓ PySide6 imported successfully')" 2>nul
+echo Testing installation...
+python -c "import PySide6; print('PySide6 imported successfully')" 2>nul
 if errorlevel 1 (
-    echo ❌ Warning: PySide6 import failed - there may be an issue with the installation
+    echo Warning: PySide6 import failed - there may be an issue with the installation
 )
 
-python -c "import torch; print('✓ PyTorch imported successfully')" 2>nul
+python -c "import torch; print('PyTorch imported successfully')" 2>nul
 if errorlevel 1 (
-    echo ❌ Warning: PyTorch import failed - AI features may not work
+    echo Warning: PyTorch import failed - AI features may not work
 )
 
 echo.
-echo 🎉 Setup complete!
+echo Setup complete!
 echo.
 echo Next steps:
 echo 1. [Optional] Download AI models following instructions in classifiers\*\DOWNLOAD_INSTRUCTIONS.md
