@@ -17,7 +17,7 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
 
 ### Prerequisites
 
-- Python 3.8 - 3.11 (3.12 compatibility pending)
+- Python 3.10 - 3.11 (3.12 compatibility pending)
 - Git
 
 ### Setup
@@ -36,6 +36,10 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
    # Linux/macOS
    ./setup.sh
    ```
+
+   During setup, you'll be asked first if you want GPU acceleration (NVIDIA only).
+   - No: Installs pytorch for CPU.
+   - Yes: Installs NVIDIA CUDA 12.8 wheels.
 
 3. **[Optional] Download AI Models:**
    
@@ -156,7 +160,7 @@ If you encounter problems during setup:
 ### GPU/CUDA Support
 
 - Tail Tagger automatically detects and uses GPU acceleration if available
-- Falls back gracefully to CPU if no GPU is detected
+- Falls back to CPU if no GPU is detected
 - For GPU support, ensure compatible CUDA drivers are installed
 
 ### Model Loading Issues
@@ -165,20 +169,6 @@ If you encounter problems during setup:
 - Check `DOWNLOAD_INSTRUCTIONS.md` files in classifier folders
 - Restart the application after adding new models
 - The app works fine without models for manual tagging
-
-### WSL/Windows Path Issues
-
-If using WSL with Windows:
-- Ensure paths are correctly formatted for your environment
-- For Windows drive access, use mount paths (e.g., `/mnt/c/...`)
-
-## System Requirements
-
-- **OS**: Windows 10/11, macOS 10.14+, or Linux
-- **Python**: 3.11
-- **RAM**: 4GB minimum (8GB+ recommended with AI models)
-- **Storage**: 6GB for app + 1.75GB per AI model
-- **GPU**: Optional, CUDA-compatible GPU for faster AI inference
 
 ## License
 

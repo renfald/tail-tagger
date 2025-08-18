@@ -61,19 +61,27 @@ fi
 echo "⬆️  Upgrading pip..."
 pip install --upgrade pip
 
-# Install requirements
-echo "📦 Installing dependencies..."
-if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt
-    
-    if [ $? -ne 0 ]; then
-        echo "❌ Error: Failed to install dependencies"
-        echo "Check the error messages above and try again"
-        exit 1
-    fi
+# Prompt for GPU acceleration before installing dependencies
+echo ""
+read -p "Enable GPU acceleration (NVIDIA only)? Requires a recent NVIDIA driver. [y/N]: " USE_GPU
+if [[ "$USE_GPU" =~ ^[Yy]$ ]]; then
+    REQ_FILE="requirements-cu128.txt"
 else
-    echo "❌ Error: requirements.txt not found"
-    exit 1
+    REQ_FILE="requirements.txt"
+fi
+
+# Install requirements
+echo "📦 Installing dependencies from $REQ_FILE ..."
+if [ -f "$REQ_FILE" ]; then
+        pip install -r "$REQ_FILE"
+        if [ $? -ne 0 ]; then
+                echo "❌ Error: Failed to install dependencies from $REQ_FILE"
+                echo "Check the error messages above and try again"
+                exit 1
+        fi
+else
+        echo "❌ Error: $REQ_FILE not found"
+        exit 1
 fi
 
 # Test the installation

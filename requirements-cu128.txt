@@ -1,3 +1,5 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+
 PySide6>=6.9.0
 torch~=2.8.0
 torchvision~=0.23.0

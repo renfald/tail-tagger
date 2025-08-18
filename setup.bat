@@ -63,19 +63,27 @@ REM Upgrade pip
 echo Upgrading pip...
 python -m pip install --upgrade pip
 
-REM Install requirements
-echo Installing dependencies...
-if exist "requirements.txt" (
-    pip install -r requirements.txt
-    
+REM Prompt for GPU acceleration before installing dependencies
+echo.
+set /p USE_GPU="Enable GPU acceleration (NVIDIA only)? Requires a recent NVIDIA driver. [Y/N]: "
+if /I "%USE_GPU%"=="Y" (
+    set "REQ_FILE=requirements-cu128.txt"
+) else (
+    set "REQ_FILE=requirements.txt"
+)
+
+REM Install requirements based on choice
+echo Installing dependencies from %REQ_FILE% ...
+if exist "%REQ_FILE%" (
+    pip install -r "%REQ_FILE%"
     if errorlevel 1 (
-        echo Error: Failed to install dependencies
+        echo Error: Failed to install dependencies from %REQ_FILE%
         echo Check the error messages above and try again
         pause
         exit /b 1
     )
 ) else (
-    echo Error: requirements.txt not found
+    echo Error: %REQ_FILE% not found
     pause
     exit /b 1
 )
