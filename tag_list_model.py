@@ -10,7 +10,7 @@ class TagData:
         self.post_count = post_count
         self.selected = selected
         self.favorite = favorite
-        self.is_known = is_known
+        self.is_known = is_known # Indicates if the tag is loaded from CSV (known) or from the .txt file for the image. 
         self.observers = []  # List of functions to call when this tag's state changes
     
     def add_observer(self, callback):

@@ -37,10 +37,10 @@ class MainWindow(QMainWindow):
         self.resize(1280, 960)
 
         # --- Instance Variables ---
-        self.image_paths = []  # List of image file paths.
-        self.current_image_index = 0  # Index of the currently displayed image.
-        self.current_image_path = None  # Path of the currently displayed image.
-        self.last_folder_path = None  # Initialize.
+        self.image_paths = []  # List of image file paths for the loaded folder.
+        self.current_image_index = 0
+        self.current_image_path = None
+        self.last_folder_path = None
         
         # --- Tag Management ---
         """These lists are used by panels that need to display tags in a particular order.
@@ -55,7 +55,7 @@ class MainWindow(QMainWindow):
 
         # --- Load Configuration ---
         self.config_manager = ConfigManager()
-        config = self.config_manager.config  # Get the loaded config
+        config = self.config_manager.config
         self.last_folder_path = config.get("last_opened_folder") # Set last folder from config
 
         # --- Managers ---
@@ -67,12 +67,12 @@ class MainWindow(QMainWindow):
         self.auto_analyze_timer.setSingleShot(True) # Important: only fire once per start
         self.auto_analyze_timer.timeout.connect(self._trigger_auto_analysis_from_timer)
         self.AUTO_ANALYZE_DELAY_MS = 1500 # 1.5 seconds (configurable if needed later)
-        self.auto_analyze_enabled = False # Track state internally
+        self.auto_analyze_enabled = False
 
         # --- Global Keyboard Shortcuts ---
         self.prev_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
         self.prev_shortcut.activated.connect(self._prev_image)
-        self.prev_shortcut.setContext(Qt.ApplicationShortcut)  # Works throughout application
+        self.prev_shortcut.setContext(Qt.ApplicationShortcut)
 
         self.next_shortcut = QShortcut(QKeySequence(Qt.Key_Right), self)
         self.next_shortcut.setContext(Qt.ApplicationShortcut)
@@ -86,7 +86,7 @@ class MainWindow(QMainWindow):
 
         # --- Load Tags from CSV ---
         csv_load_start = time.time()
-        self.csv_path = os.path.join(os.getcwd(), "data", "tags-list.csv")
+        self.csv_path = os.path.join(os.getcwd(), "data", "e621-tags-list.csv")
         self.tag_list_model.load_tags_from_csv(self.csv_path)
         csv_load_end = time.time()
         print(f"CSV loading complete in {csv_load_end - csv_load_start:.4f} seconds")
@@ -115,13 +115,12 @@ class MainWindow(QMainWindow):
         open_folder_action = file_menu.addAction("Open Folder...")
         open_folder_action.triggered.connect(self._open_folder_dialog)
 
-        export_action = file_menu.addAction("Export Tags...")  # Add the Export action
+        export_action = file_menu.addAction("Export Tags...")
         export_action.triggered.connect(self._export_tags)
         # --- End Menu Bar ---
 
         main_layout = QVBoxLayout(central_widget) # Set layout on central widget
         main_layout.setSpacing(0)
-        # central_widget.setLayout(main_layout) # Removed
 
         # --- Main Horizontal Splitter (Left, Center, Right) ---
         main_splitter = QSplitter(Qt.Horizontal)
@@ -129,7 +128,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(main_splitter) # Add splitter to main layout
 
 
-        # --- Left Panel (Resizable) ---
+        # --- Left Panel ---
         self.left_panel_container = LeftPanelContainer(main_window=self, classifier_manager=self.classifier_manager)
         main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
 
