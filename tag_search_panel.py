@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, QScrollArea, QPushButton, QInputDialog, QSpacerItem, QSizePolicy
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import QKeyEvent, QIcon
 
 from tag_widget import TagWidget
@@ -31,27 +31,41 @@ class TagSearchPanel(QWidget):
         layout.setSpacing(1)
         self.setLayout(layout)
 
-        # --- Header Layout (Search Label + Exact Match Toggle) ---
+        # --- Header Layout (Search Label + Tag Source + Exact Match Toggle) ---
         header_layout = QHBoxLayout() # Horizontal layout for header
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(1) # Add some spacing between label and toggle
-        layout.addLayout(header_layout) # Add header layout to main vertical layout
+        header_container = QWidget() # Container being added so we can set max height and allow buttons to auto size vertically
+        header_container.setLayout(header_layout)
+        header_container.setMaximumHeight(25)
+        layout.addWidget(header_container)
         
         # Search Label
         search_label = QLabel("Search") # Create QLabel for "Search" text
         search_label.setStyleSheet("color: white; font-weight: bold; padding: 3px; background-color: rgb(53,53,53);") # Match TagListPanel title style
-        search_label.setAlignment(Qt.AlignLeft) # Left-align this title since it has the toggle button on the right
-        header_layout.addWidget(search_label) # Add label to header layout
+        search_label.setAlignment(Qt.AlignLeft)
+        header_layout.addWidget(search_label)
 
         header_spacer = QSpacerItem(10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum) # Create horizontal spacer
         header_layout.addItem(header_spacer) # Add spacer to header layout
 
+        # Tag Source Toggle Button (E621 / Danbooru)
+        self.tag_source_toggle_button = QPushButton()
+        self.tag_source_toggle_button.setMinimumWidth(25)
+        self.tag_source_toggle_button.setCheckable(True)
+        self.tag_source_toggle_button.setChecked(self.main_window.current_tag_source == "booru") # Set based on current source
+        self.tag_source_toggle_button.clicked.connect(self._toggle_tag_source)
+        header_layout.addWidget(self.tag_source_toggle_button)
+        self._update_tag_source_toggle_icon() # Initial icon setup
+
         # Exact Match Toggle Button
-        self.exact_match_toggle_button = QPushButton() # Create push button for toggle icon
-        self.exact_match_toggle_button.setMinimumWidth(35) # Set minimum width for the button
-        self.exact_match_toggle_button.setCheckable(True) # Make it checkable for toggle behavior
+        self.exact_match_toggle_button = QPushButton()
+        self.exact_match_toggle_button.setMinimumWidth(25)
+        self.exact_match_toggle_button.setCheckable(True)
         self.exact_match_toggle_button.setChecked(False) # Default to Fuzzy Match (not checked)
         self.exact_match_toggle_button.clicked.connect(self._toggle_exact_match_mode) # Connect toggle signal
+        self.exact_match_toggle_button.setIconSize(QSize(12, 12))
+        self.exact_match_toggle_button.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding) # Fill vertical space
         header_layout.addWidget(self.exact_match_toggle_button) # Add toggle button to header layout
         self._update_exact_match_toggle_icon() # Initial icon and tooltip setup (call helper method below)
         
@@ -105,6 +119,23 @@ class TagSearchPanel(QWidget):
         else:
             self.exact_match_toggle_button.setIcon(QIcon(":/icons/approx.svg")) # Set icon for Fuzzy Match mode
             self.exact_match_toggle_button.setToolTip("Fuzzy Match (Default) (Toggle to Exact Match)") # Tooltip for Fuzzy Match
+
+    def _toggle_tag_source(self):
+        """Toggles between e621 and danbooru tag sources and updates the button icon."""
+        new_source = "booru" if self.main_window.current_tag_source == "e621" else "e621"
+        self.main_window.switch_tag_source(new_source)
+        self._update_tag_source_toggle_icon()
+
+    def _update_tag_source_toggle_icon(self):
+        """Updates the tag source toggle button icon and tooltip based on the current source."""
+        if self.main_window.current_tag_source == "e621":
+            self.tag_source_toggle_button.setIcon(QIcon(":/icons/e621.svg"))
+            self.tag_source_toggle_button.setToolTip("Currently using e621 tags (Click to switch to Danbooru)")
+            self.tag_source_toggle_button.setChecked(False)
+        else:
+            self.tag_source_toggle_button.setIcon(QIcon(":/icons/booru.svg"))
+            self.tag_source_toggle_button.setToolTip("Currently using Danbooru tags (Click to switch to e621)")
+            self.tag_source_toggle_button.setChecked(True)
     
     def _display_search_results(self, tag_data_list):
         """

@@ -9,7 +9,8 @@ class ConfigManager:
         self.default_config = {
             "last_opened_folder": "",
             "classifier_threshold": 0.30,
-            "classifier_active_model_id": "JTP_PILOT2"
+            "classifier_active_model_id": "JTP_PILOT2",
+            "tag_source": "e621"
         }
         self.config = self._load_config()
 

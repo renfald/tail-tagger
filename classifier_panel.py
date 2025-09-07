@@ -211,7 +211,7 @@ class ClassifierPanel(QWidget):
 
         # --- Update status label ---
         if widgets_added > 0:
-            self.status_label.setText(f"Displaying {widgets_added} suggestions (Threshold: {current_threshold:.2f})")
+            self.status_label.setText(f"Displaying {widgets_added} suggestions")
         else:
             if self.raw_results: # Check if analysis actually ran
                 self.status_label.setText(f"No suggestions above threshold {current_threshold:.2f}")

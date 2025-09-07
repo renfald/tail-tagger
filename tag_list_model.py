@@ -10,7 +10,7 @@ class TagData:
         self.post_count = post_count
         self.selected = selected
         self.favorite = favorite
-        self.is_known = is_known
+        self.is_known = is_known # Indicates if the tag is loaded from CSV (known) or from the .txt file for the image. 
         self.observers = []  # List of functions to call when this tag's state changes
     
     def add_observer(self, callback):
@@ -322,3 +322,19 @@ class TagListModel(QAbstractListModel):
             print(f"  Usage data removed for tag: '{underscored_tag_name}'") # Debug message
         else:
             print(f"  Warning: No usage data found for tag '{underscored_tag_name}' to remove.") # Warning if no data found
+
+    # TODO: I suspect that tags_selected_changed isn't doing anything useful due to what happens in the method that calls this
+    def switch_tag_source(self, csv_path):
+        """Reloads tags from a different CSV source"""
+        print(f"Switching to tag source: {csv_path}")
+        
+        # Clear existing data
+        self.tags = []
+        self.search_index = {}
+        self.tags_by_name = {}
+        
+        # Load new source
+        self.load_tags_from_csv(csv_path)
+        
+        # Emit signals for UI updates
+        self.tags_selected_changed.emit()

@@ -24,6 +24,7 @@ from PySide6.QtGui import QKeySequence, QShortcut, QIcon
 # check their current state. better yet a single tag should be able to know if it needs an update
 
 # Import compiled resources for icons
+# Update resources.qrc and run this command to recompile:
 # pyside6-rcc resources/resources.qrc -o resources/resources_rc.py
 
 class MainWindow(QMainWindow):
@@ -37,10 +38,10 @@ class MainWindow(QMainWindow):
         self.resize(1280, 960)
 
         # --- Instance Variables ---
-        self.image_paths = []  # List of image file paths.
-        self.current_image_index = 0  # Index of the currently displayed image.
-        self.current_image_path = None  # Path of the currently displayed image.
-        self.last_folder_path = None  # Initialize.
+        self.image_paths = []  # List of image file paths for the loaded folder.
+        self.current_image_index = 0
+        self.current_image_path = None
+        self.last_folder_path = None
         
         # --- Tag Management ---
         """These lists are used by panels that need to display tags in a particular order.
@@ -55,8 +56,9 @@ class MainWindow(QMainWindow):
 
         # --- Load Configuration ---
         self.config_manager = ConfigManager()
-        config = self.config_manager.config  # Get the loaded config
+        config = self.config_manager.config
         self.last_folder_path = config.get("last_opened_folder") # Set last folder from config
+        self.current_tag_source = config.get("tag_source", "e621")  # Default to e621 tags
 
         # --- Managers ---
         self.keyboard_manager = KeyboardManager(self)
@@ -67,12 +69,12 @@ class MainWindow(QMainWindow):
         self.auto_analyze_timer.setSingleShot(True) # Important: only fire once per start
         self.auto_analyze_timer.timeout.connect(self._trigger_auto_analysis_from_timer)
         self.AUTO_ANALYZE_DELAY_MS = 1500 # 1.5 seconds (configurable if needed later)
-        self.auto_analyze_enabled = False # Track state internally
+        self.auto_analyze_enabled = False
 
         # --- Global Keyboard Shortcuts ---
         self.prev_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
         self.prev_shortcut.activated.connect(self._prev_image)
-        self.prev_shortcut.setContext(Qt.ApplicationShortcut)  # Works throughout application
+        self.prev_shortcut.setContext(Qt.ApplicationShortcut)
 
         self.next_shortcut = QShortcut(QKeySequence(Qt.Key_Right), self)
         self.next_shortcut.setContext(Qt.ApplicationShortcut)
@@ -86,10 +88,13 @@ class MainWindow(QMainWindow):
 
         # --- Load Tags from CSV ---
         csv_load_start = time.time()
-        self.csv_path = os.path.join(os.getcwd(), "data", "tags-list.csv")
+        self.csv_path = os.path.join(os.getcwd(), "data", f"{self.current_tag_source}-tags-list.csv")
         self.tag_list_model.load_tags_from_csv(self.csv_path)
         csv_load_end = time.time()
         print(f"CSV loading complete in {csv_load_end - csv_load_start:.4f} seconds")
+
+        # --- Load Favorites After Tag Model is Ready ---
+        self._load_favorites()
 
         # --- Tag Panels ---
         self.selected_tags_panel = SelectedTagsPanel(self)
@@ -115,13 +120,12 @@ class MainWindow(QMainWindow):
         open_folder_action = file_menu.addAction("Open Folder...")
         open_folder_action.triggered.connect(self._open_folder_dialog)
 
-        export_action = file_menu.addAction("Export Tags...")  # Add the Export action
+        export_action = file_menu.addAction("Export Tags...")
         export_action.triggered.connect(self._export_tags)
         # --- End Menu Bar ---
 
         main_layout = QVBoxLayout(central_widget) # Set layout on central widget
         main_layout.setSpacing(0)
-        # central_widget.setLayout(main_layout) # Removed
 
         # --- Main Horizontal Splitter (Left, Center, Right) ---
         main_splitter = QSplitter(Qt.Horizontal)
@@ -129,7 +133,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(main_splitter) # Add splitter to main layout
 
 
-        # --- Left Panel (Resizable) ---
+        # --- Left Panel ---
         self.left_panel_container = LeftPanelContainer(main_window=self, classifier_manager=self.classifier_manager)
         main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
 
@@ -217,17 +221,6 @@ class MainWindow(QMainWindow):
 
         self.file_operations.create_default_workfile(folder_path) # Create workfile if it doesn't exist
         
-        # --- Load Favorites ---
-        # TODO - not sure if this is the best place for loading favorites to happen. Need to think this through more
-        # probably better to get loaded during init of app
-        favorite_tag_names = self.file_operations.load_favorites()
-        for tag_name in favorite_tag_names:
-            for tag in self.tag_list_model.get_all_tags():
-                if tag.name == tag_name:
-                    tag.favorite = True
-                    self.favorite_tags_ordered.append(tag)
-                    break # Move to next fav tag name
-
         image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
         self.image_paths = []
 
@@ -271,44 +264,28 @@ class MainWindow(QMainWindow):
         else:
             # If auto-analyze is disabled, ensure timer is stopped
             self.auto_analyze_timer.stop()
-            print("Auto-analyze is disabled. Timer stopped.")
 
         # --- Load Tags for Image ---
         loaded_tag_names = self.file_operations.load_tags_for_image(image_path, self.last_folder_path) # Get list of tag *names*
         self.selected_tags_for_current_image = []  # Clear the list of selected tag widgets
         self.tag_list_model.clear_selected_tags() # Clear selections attrs in model
         self.tag_list_model.remove_unknown_tags() # Remove any unknown tags
-        for tag_name in loaded_tag_names:
-            # Find the TagData object in the model
-            existing_tag_data = None
-            for tag in self.tag_list_model.get_all_tags():
-                if tag.name == tag_name:
-                    existing_tag_data = tag
-                    break
-
-            if existing_tag_data:
-                # Known tag found in model:
-                self.tag_list_model.set_tag_selected_state(tag_name, True) # Set selected in model
-                self.selected_tags_for_current_image.append(existing_tag_data) # Add TagData object to selected list
-            else:
-                # Unknown tag: create TagData object (is_known=False)
-                new_tag_data = TagData(name=tag_name, selected=True, is_known=False)
-                self.tag_list_model.add_tag(new_tag_data) # Add to model
-                self.selected_tags_for_current_image.append(new_tag_data) # Add TagData object to selected list
+        # Process tag names against current model to get proper TagData objects
+        self.selected_tags_for_current_image = self._process_tag_names_for_selection(loaded_tag_names)
 
         self.update_workfile_for_current_image() # Update workfile with current tags
 
         # Now that we've updated the model, all panels must be populated with the appropriate tags
         self._update_tag_panels()
 
+        # we load the search panel differently than the others (update_display()) because I'm a bad developer
+        self.left_panel_container.tag_search_panel._on_tags_changed()  
+
         # Debugging prints to be deleted later!
         total_tags = len(self.tag_list_model.tags)
         selected_tags = len([tag for tag in self.tag_list_model.tags if tag.selected])
         unknown_tags = len([tag for tag in self.tag_list_model.tags if not tag.is_known])
         
-        # we load the search panel differently than the others (update_display()) because I'm a bad developer
-        self.left_panel_container.tag_search_panel._on_tags_changed()  
-
         print(f"Total tags in model: {total_tags}")
         print(f"Selected tags: {selected_tags}")
         print(f"Unknown tags: {unknown_tags}")
@@ -361,6 +338,26 @@ class MainWindow(QMainWindow):
         """
         self.left_panel_container.update_all_displays()
         self.selected_tags_panel.update_display()
+
+    def _load_favorites(self):
+        """Loads favorite tags from favorites.json and populates favorite_tags_ordered list."""
+        print("Loading favorites...")
+        
+        # Clear existing favorites
+        self.favorite_tags_ordered = []
+        
+        # Load favorite tag names from file
+        favorite_tag_names = self.file_operations.load_favorites()
+        
+        # Find matching TagData objects in the current model and mark as favorites
+        for tag_name in favorite_tag_names:
+            for tag in self.tag_list_model.get_all_tags():
+                if tag.name == tag_name:
+                    tag.favorite = True
+                    self.favorite_tags_ordered.append(tag)
+                    break # Move to next fav tag name
+                    
+        print(f"Loaded {len(self.favorite_tags_ordered)} favorite tags")
 
     def _handle_tag_clicked(self, clicked_tag_name):
         """Handles tag click events, updates model, workfile, and selected tags list."""
@@ -542,6 +539,72 @@ class MainWindow(QMainWindow):
                 print("  Auto-analyze was disabled during delay. Analysis cancelled.")
         else:
             print("  Auto-analyze: No current image or panel not ready. Analysis skipped.")
+
+    # TODO: I really don't like this. This method does seemingly arbitrary things to the model and UI
+    # fundamentally its solving the problem of determining what the current state of unknown tags is
+    # and ensuring the model and UI are in sync. But that entire process needs to be reworked. This works. But it should be cleaner.
+
+    def _process_tag_names_for_selection(self, tag_names):
+        """
+        Process a list of tag names against the current model to produce TagData objects
+        ready for selection. This is the shared logic between loading image tags and
+        reprocessing tags after switching the tag source.
+
+        Args:
+            tag_names: List of tag name strings to process
+            
+        Returns:
+            List of TagData objects (known tags from model or newly created unknown tags)
+        """
+        result_tag_data_list = []
+        
+        for tag_name in tag_names:
+            # Find existing TagData in current model
+            existing_tag_data = None
+            for tag in self.tag_list_model.get_all_tags():
+                if tag.name == tag_name:
+                    existing_tag_data = tag
+                    break
+
+            if existing_tag_data:
+                # Known tag found in model
+                self.tag_list_model.set_tag_selected_state(tag_name, True)
+                result_tag_data_list.append(existing_tag_data)
+            else:
+                # Unknown tag: create TagData object (is_known=False)
+                new_tag_data = TagData(name=tag_name, selected=True, is_known=False)
+                self.tag_list_model.add_tag(new_tag_data)
+                result_tag_data_list.append(new_tag_data)
+        
+        return result_tag_data_list
+
+    def switch_tag_source(self, source_type):
+        """Switches between e621 and danbooru tag sources"""
+        print(f"Switching tag source from {self.current_tag_source} to {source_type}")
+        
+        # Update config for persistence
+        self.config_manager.set_config_value("tag_source", source_type)
+        self.current_tag_source = source_type
+        
+        # Reload tags from new source
+        csv_path = os.path.join(os.getcwd(), "data", f"{source_type}-tags-list.csv")
+        self.tag_list_model.switch_tag_source(csv_path)
+        
+        # Reload favorites with new tag model. We only load favorites that exist in the currently loaded model
+        self._load_favorites()
+        
+        # Reprocess current image tags against new model (if we have a current image)
+        if self.current_image_path and self.selected_tags_for_current_image:
+            current_tag_names = [tag.name for tag in self.selected_tags_for_current_image]
+            self.selected_tags_for_current_image = []
+            self.tag_list_model.clear_selected_tags()
+            self.tag_list_model.remove_unknown_tags()
+            
+            self.selected_tags_for_current_image = self._process_tag_names_for_selection(current_tag_names)
+            self.update_workfile_for_current_image()
+        
+        # Full UI refresh
+        self._update_tag_panels()
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)
