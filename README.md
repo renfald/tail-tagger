@@ -98,16 +98,17 @@ Models are optional - the app provides full manual tagging functionality without
 ## File Structure
 
 ```
-├── main.py               # Main application entry point
-├── classifiers/          # AI model directory (download separately)
-│   ├── JTP_PILOT/        # First classifier model files
-│   └── JTP_PILOT2/       # Second classifier model files
-├── data/                 # Application data (auto-generated)
-│   ├── config.json       # User settings
-│   ├── favorites.json    # Favorite tags
-│   ├── usage_data.json   # Tag usage statistics
-│   └── tags-list.csv     # Master list of known tags
-└── staging/              # Tagging progress saved in staging files
+├── main.py                   # Main application entry point
+├── classifiers/              # AI model directory (download separately)
+│   ├── JTP_PILOT/            # First classifier model files
+│   └── JTP_PILOT2/           # Second classifier model files
+├── data/                     # Application data (auto-generated)
+│   ├── config.json           # User settings
+│   ├── favorites.json        # Favorite tags
+│   ├── usage_data.json       # Tag usage statistics
+│   ├── booru-tags-list.csv   # Master list of booru tags
+│   └── e621-tags-list.csv    # Master list of e621 tags
+└── staging/                  # Tagging progress saved in staging files
 ```
 
 ## Configuration

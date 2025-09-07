@@ -7,6 +7,8 @@
         <file>icons/approx.svg</file>
         <file>icons/equal.svg</file>
         <file>icons/auto-analyze.svg</file>
+        <file>icons/booru.svg</file>
+        <file>icons/e621.svg</file>
         <file>icons/app-icon.png</file>
     </qresource>
 </RCC>
