@@ -102,6 +102,12 @@ class MainWindow(QMainWindow):
         # --- Setup UI and Load Tags/Images ---
         self._setup_ui()
 
+        # --- Validate and Load Last Opened Folder ---
+        if self.last_folder_path and not os.path.isdir(self.last_folder_path):
+            print(f"Last opened folder not found: {self.last_folder_path}. Clearing from config.")
+            self.last_folder_path = None
+            self.config_manager.set_config_value("last_opened_folder", None)
+
         if (self.last_folder_path):
             print(f"Loading last opened folder: {self.last_folder_path}")
             self._load_image_folder(self.last_folder_path)
