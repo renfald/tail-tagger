@@ -91,13 +91,7 @@ class FileOperations:
         """Gathers tag data for all images in the specified folder."""
         all_tags = {}
         workfile_path = self.get_workfile_path(folder_path)
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
-        image_paths = []
-
-        for filename in os.listdir(folder_path):
-            if any(filename.lower().endswith(ext) for ext in image_extensions):
-                image_path = os.path.join(folder_path, filename)
-                image_paths.append(image_path)
+        image_paths = self.get_sorted_image_files(folder_path)
 
         try:
             with open(workfile_path, 'r', encoding='utf-8') as f:
@@ -335,3 +329,18 @@ class FileOperations:
         """Creates a default usage data file if it doesn't exist."""
         usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json")
         return self._save_json_file(usage_data_path, {})
+
+    def get_sorted_image_files(self, folder_path):
+        """Gets a naturally sorted list of image file paths from a directory."""
+        import re
+
+        def natural_sort_key(s):
+            return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', s)]
+
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        try:
+            filenames = [f for f in os.listdir(folder_path) if any(f.lower().endswith(ext) for ext in image_extensions)]
+            filenames.sort(key=natural_sort_key)
+            return [os.path.join(folder_path, f) for f in filenames]
+        except FileNotFoundError:
+            return []

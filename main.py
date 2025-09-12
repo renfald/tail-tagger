@@ -221,13 +221,7 @@ class MainWindow(QMainWindow):
 
         self.file_operations.create_default_workfile(folder_path) # Create workfile if it doesn't exist
         
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
-        self.image_paths = []
-
-        for filename in os.listdir(folder_path):
-            if any(filename.lower().endswith(ext) for ext in image_extensions):
-                image_path = os.path.join(folder_path, filename)
-                self.image_paths.append(image_path)
+        self.image_paths = self.file_operations.get_sorted_image_files(folder_path)
 
         if self.image_paths:
             print(f"Found {len(self.image_paths)} images in folder: {folder_path}")
