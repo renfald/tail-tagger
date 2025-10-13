@@ -17,8 +17,8 @@ app_start_time = time.time()
 import resources.resources_rc as resources_rc  
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel, QSizePolicy, 
                                QVBoxLayout, QPushButton, QSpacerItem, QFileDialog, QSplitter, QMessageBox)
-from PySide6.QtCore import Qt, QTimer, Slot
-from PySide6.QtGui import QKeySequence, QShortcut, QIcon
+from PySide6.QtCore import Qt, QTimer, Slot, QUrl
+from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QDesktopServices
 
 # TODO: its probably better for tag widget shading to not need every panel to rebuild their tag list and instead just 
 # check their current state. better yet a single tag should be able to know if it needs an update
@@ -172,14 +172,18 @@ class MainWindow(QMainWindow):
         bottom_layout.setSpacing(10)
         bottom_layout.setContentsMargins(10, 5, 10, 5)
 
+        # Folder path label
+        self.folder_path_label = QLabel("Opened Folder: (none)")
+        self.folder_path_label.setTextFormat(Qt.RichText)
+        self.folder_path_label.setOpenExternalLinks(False)
+        self.folder_path_label.linkActivated.connect(self._open_current_folder)
+        bottom_layout.addWidget(self.folder_path_label)
+
         left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         bottom_layout.addItem(left_spacer)
 
         self.filename_label = QLabel("No Image")
         bottom_layout.addWidget(self.filename_label)
-
-        self.index_label = QLabel("0 of 0")
-        bottom_layout.addWidget(self.index_label)
 
         right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         bottom_layout.addItem(right_spacer)
@@ -187,6 +191,12 @@ class MainWindow(QMainWindow):
         self.prev_button = QPushButton("< Prev")
         self.prev_button.clicked.connect(self._prev_image)
         bottom_layout.addWidget(self.prev_button)
+
+        # Index label with fixed width to prevent button shifting
+        self.index_label = QLabel("0 of 0")
+        self.index_label.setFixedWidth(55)  # Wide enough for "xxx of xxx"
+        self.index_label.setAlignment(Qt.AlignCenter)
+        bottom_layout.addWidget(self.index_label)
 
         self.next_button = QPushButton("Next >")
         self.next_button.clicked.connect(self._next_image)
@@ -221,11 +231,16 @@ class MainWindow(QMainWindow):
             self.center_panel.clear()
             self.filename_label.setText("No Image")
             self.index_label.setText("0 of 0")
+            self.folder_path_label.setText("Opened Folder: (none)")
+            self.folder_path_label.setToolTip("")
             self.prev_button.setEnabled(False)
             self.next_button.setEnabled(False)
             return
 
         self.file_operations.create_default_workfile(folder_path) # Create workfile if it doesn't exist
+        
+        # Update folder path label with elided text
+        self._update_folder_path_label(folder_path)
         
         self.image_paths = self.file_operations.get_sorted_image_files(folder_path)
 
@@ -297,6 +312,28 @@ class MainWindow(QMainWindow):
         else:
             index_text = "0 of 0"
         self.index_label.setText(index_text)
+
+    def _update_folder_path_label(self, folder_path):
+        """Updates the folder path label with elided text."""
+        if folder_path:
+            # Set full path as tooltip
+            self.folder_path_label.setToolTip(folder_path)
+            # Use elided text from the left
+            display_prefix = "Opened Folder: "
+            font_metrics = self.folder_path_label.fontMetrics()
+            elided_path = font_metrics.elidedText(folder_path, Qt.ElideLeft, self.folder_path_label.width() - font_metrics.horizontalAdvance(display_prefix))
+            # Use rich text with link for hover effect and theme color
+            self.folder_path_label.setText(f'{display_prefix}<a href="#">{elided_path}</a>')
+        else:
+            self.folder_path_label.setText("Opened Folder: (none)")
+            self.folder_path_label.setToolTip("")
+
+    def _open_current_folder(self, link=None):
+        """Opens the current folder in the system file manager."""
+        if self.last_folder_path and os.path.isdir(self.last_folder_path):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self.last_folder_path))
+        else:
+            print("No valid folder to open.")
 
     def _prev_image(self):
         """Navigates to the previous image."""
