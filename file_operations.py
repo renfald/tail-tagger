@@ -198,8 +198,11 @@ class FileOperations:
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 
+        # Use the currently loaded folder as the starting point of the Dialogif available, otherwise fall back to the output directory
+        starting_dir = last_folder_path if last_folder_path and os.path.isdir(last_folder_path) else output_dir
+
         # Get the export directory from the user.
-        export_dir = QFileDialog.getExistingDirectory(parent, "Select Export Directory", output_dir)
+        export_dir = QFileDialog.getExistingDirectory(parent, "Select Export Directory", starting_dir)
 
         if export_dir:  # Proceed only if the user selected a directory.
             export_dir = os.path.normpath(export_dir)
