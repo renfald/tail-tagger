@@ -172,35 +172,44 @@ class MainWindow(QMainWindow):
         bottom_layout.setSpacing(10)
         bottom_layout.setContentsMargins(10, 5, 10, 5)
 
-        # Folder path label
+        # Left container (folder path)
+        left_bottom_container = QWidget()
+        left_bottom_layout = QHBoxLayout(left_bottom_container)
+        left_bottom_layout.setContentsMargins(0, 0, 0, 0)
         self.folder_path_label = QLabel("Opened Folder: (none)")
         self.folder_path_label.setTextFormat(Qt.RichText)
         self.folder_path_label.setOpenExternalLinks(False)
         self.folder_path_label.linkActivated.connect(self._open_current_folder)
-        bottom_layout.addWidget(self.folder_path_label)
+        left_bottom_layout.addWidget(self.folder_path_label)
+        left_bottom_layout.addStretch()
+        bottom_layout.addWidget(left_bottom_container, 1)  # stretch factor 1
 
-        left_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-        bottom_layout.addItem(left_spacer)
-
+        # Center filename
         self.filename_label = QLabel("No Image")
-        bottom_layout.addWidget(self.filename_label)
+        self.filename_label.setAlignment(Qt.AlignCenter)
+        bottom_layout.addWidget(self.filename_label, 0)  # no stretch
 
-        right_spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-        bottom_layout.addItem(right_spacer)
-
+        # Right container (buttons and index)
+        right_bottom_container = QWidget()
+        right_bottom_layout = QHBoxLayout(right_bottom_container)
+        right_bottom_layout.setContentsMargins(0, 0, 0, 0)
+        right_bottom_layout.addStretch()
+        
         self.prev_button = QPushButton("< Prev")
         self.prev_button.clicked.connect(self._prev_image)
-        bottom_layout.addWidget(self.prev_button)
+        right_bottom_layout.addWidget(self.prev_button)
 
         # Index label with fixed width to prevent button shifting
         self.index_label = QLabel("0 of 0")
         self.index_label.setFixedWidth(55)  # Wide enough for "xxx of xxx"
         self.index_label.setAlignment(Qt.AlignCenter)
-        bottom_layout.addWidget(self.index_label)
+        right_bottom_layout.addWidget(self.index_label)
 
         self.next_button = QPushButton("Next >")
         self.next_button.clicked.connect(self._next_image)
-        bottom_layout.addWidget(self.next_button)
+        right_bottom_layout.addWidget(self.next_button)
+        
+        bottom_layout.addWidget(right_bottom_container, 1)  # stretch factor 1 (equal to left)
 
         main_layout.addWidget(bottom_panel) # Add bottom panel to main layout
 
