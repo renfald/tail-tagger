@@ -152,6 +152,7 @@ class TagSearchPanel(QWidget):
                         widget.tag_data.remove_observer(widget._on_tag_data_changed)
                     except:
                         pass  # In case there are errors during cleanup
+                self.results_area_layout.removeWidget(widget)
                 widget.deleteLater()
 
         self.search_results_tag_widgets = []
