@@ -44,7 +44,7 @@ class BulkOperationWorker(QRunnable):
         self.signals.progress.emit(phase, current, total, message)
 
 
-class BulkOperationDialog(QDialog):
+class TagBulkOperationDialog(QDialog):
     """Dialog that shows progress during bulk tag operations."""
 
     def __init__(self, parent, operation_type, tag_name, position=None):

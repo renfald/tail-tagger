@@ -7,8 +7,7 @@ from config_manager import ConfigManager
 from keyboard_manager import KeyboardManager
 from classifier_manager import ClassifierManager
 from tag_list_model import TagListModel, TagData
-from bulk_operations_manager import BulkOperationsManager
-from bulk_operation_dialog import BulkOperationDialog
+from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationDialog
 
 from left_panel_container import LeftPanelContainer
 from center_panel import CenterPanel
@@ -540,7 +539,7 @@ class MainWindow(QMainWindow):
                     break
 
         # Create and show progress dialog
-        dialog = BulkOperationDialog(self, operation_type, tag_name)
+        dialog = TagBulkOperationDialog(self, operation_type, tag_name)
         result = dialog.execute_operation(self.bulk_operations_manager, self.last_folder_path)
 
         # If operation was successful, reload current image to sync UI
