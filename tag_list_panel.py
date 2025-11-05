@@ -295,7 +295,18 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
     def is_tag_draggable(self, tag_name):
         """Returns True if draggable, False otherwise."""
         return False
-    
+
+    @abstractmethod
+    def _get_bulk_operations(self):
+        """Abstract method: Returns a list of allowed bulk operations for this panel.
+
+        Returns:
+            list: List of operation strings. Valid operations:
+                  'add_front', 'add_end', 'remove'
+                  Return empty list to disable bulk operations for this panel.
+        """
+        return []
+
     @Slot(str)
     def _handle_tag_right_clicked(self, tag_name):
         """Handles right-click events on TagWidgets. Creates and displays a context menu with panel-specific actions."""
@@ -317,10 +328,41 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             
         # Create context menu
         menu = QMenu(self)
-        
+
         # Add panel-specific actions to menu
         actions_added = self._add_context_menu_actions(menu, tag_data)
-        
+
+        # Add bulk operations submenu if this panel supports them
+        bulk_ops = self._get_bulk_operations()
+        if bulk_ops:
+            # Add separator if panel-specific actions were added
+            if actions_added:
+                menu.addSeparator()
+
+            # Create bulk operations submenu
+            bulk_menu = menu.addMenu("Bulk Operations")
+
+            if 'add_front' in bulk_ops:
+                add_front_action = QAction(f"Add to All Images (Beginning)", self)
+                add_front_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('add_front', tag_name))
+                bulk_menu.addAction(add_front_action)
+
+            if 'add_end' in bulk_ops:
+                add_end_action = QAction(f"Add to All Images (End)", self)
+                add_end_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('add_end', tag_name))
+                bulk_menu.addAction(add_end_action)
+
+            if 'remove' in bulk_ops:
+                # Add separator between add and remove if both exist
+                if ('add_front' in bulk_ops or 'add_end' in bulk_ops):
+                    bulk_menu.addSeparator()
+
+                remove_action = QAction(f"Remove from All Images", self)
+                remove_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('remove', tag_name))
+                bulk_menu.addAction(remove_action)
+
+            actions_added = True  # Bulk operations count as actions
+
         # Only show menu if actions were added
         if actions_added:
             menu.popup(QCursor.pos())

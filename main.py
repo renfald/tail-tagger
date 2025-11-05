@@ -7,6 +7,8 @@ from config_manager import ConfigManager
 from keyboard_manager import KeyboardManager
 from classifier_manager import ClassifierManager
 from tag_list_model import TagListModel, TagData
+from bulk_operations_manager import BulkOperationsManager
+from bulk_operation_dialog import BulkOperationDialog
 
 from left_panel_container import LeftPanelContainer
 from center_panel import CenterPanel
@@ -63,6 +65,7 @@ class MainWindow(QMainWindow):
         # --- Managers ---
         self.keyboard_manager = KeyboardManager(self)
         self.classifier_manager = ClassifierManager(config_manager=self.config_manager, use_gpu=True)
+        self.bulk_operations_manager = BulkOperationsManager(self.file_operations)
 
         # --- Auto-Analyze Timer ---
         self.auto_analyze_timer = QTimer(self)
@@ -494,6 +497,58 @@ class MainWindow(QMainWindow):
             self.current_image_path,
             self.selected_tags_for_current_image
         )
+
+    def execute_bulk_operation(self, operation_type, tag_name):
+        """Executes a bulk tag operation across all images in the current folder.
+
+        Args:
+            operation_type (str): 'add_front', 'add_end', or 'remove'
+            tag_name (str): Name of the tag to operate on
+        """
+        # Validate that a folder is loaded
+        if not self.last_folder_path:
+            QMessageBox.warning(
+                self,
+                "No Folder Loaded",
+                "Please open a folder before performing bulk operations."
+            )
+            return
+
+        # Find the tag in the model
+        tag_data = None
+        for tag in self.tag_list_model.get_all_tags():
+            if tag.name == tag_name:
+                tag_data = tag
+                break
+
+        if not tag_data:
+            QMessageBox.warning(
+                self,
+                "Tag Not Found",
+                f"Tag '{tag_name}' not found in the tag model."
+            )
+            return
+
+        # For add operations on unknown tags, promote them to known tags
+        if operation_type in ['add_front', 'add_end'] and not tag_data.is_known:
+            print(f"Auto-promoting unknown tag '{tag_name}' to known tag for bulk add operation")
+            self.add_new_tag_to_model(tag_name)
+            # Re-fetch tag_data after promotion
+            for tag in self.tag_list_model.get_all_tags():
+                if tag.name == tag_name:
+                    tag_data = tag
+                    break
+
+        # Create and show progress dialog
+        dialog = BulkOperationDialog(self, operation_type, tag_name)
+        result = dialog.execute_operation(self.bulk_operations_manager, self.last_folder_path)
+
+        # If operation was successful, reload current image to sync UI
+        if result and result.get('success'):
+            print(f"Bulk operation completed successfully. Reloading current image to sync UI.")
+            # Reload current image to refresh tag state
+            if self.current_image_path:
+                self._load_and_display_image(self.current_image_path)
 
     def add_new_tag_to_model(self, tag_name):
         """

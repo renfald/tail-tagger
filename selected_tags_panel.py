@@ -37,6 +37,10 @@ class SelectedTagsPanel(TagListPanel):
         """Always allow dragging in this panel."""
         return True
 
+    def _get_bulk_operations(self):
+        """Returns list of allowed bulk operations for this panel."""
+        return ['add_front', 'add_end', 'remove']
+
     def _remove_tag_from_data_list(self, tag_data):
         """Remove tag from the selected tags list."""
         self.main_window.selected_tags_for_current_image.remove(tag_data)

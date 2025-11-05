@@ -11,6 +11,7 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
 - **Manual Image Tagging**: Browse and tag images with the comprehensive e621 tag system
 - **AI-Assisted Tagging**: Install the JTP models for fast and accurate tag suggestions
 - **Tag Management**: Search, favorite, and track frequently used tags. Add new tags to the searchable list
+- **Bulk Operations**: Apply tags to all images in a folder at once. Add tags to the beginning or end of every image, or remove tags from the entire dataset.
 - **Persistent Data**: Saves in progress work, favorites, and usage statistics
 
 ## Installation
@@ -68,10 +69,11 @@ run.bat
 
 1. **Load Images**: File → Open Folder to select a directory containing images
 2. **Navigate**: Use arrow keys or Next/Previous buttons to change selected image
-3. **Manual Tagging**: 
+3. **Manual Tagging**:
    - Search for e621-compatible tags in the top left panel
    - Click tags to select/deselect them. You can also use up down arrow keys and enter key. Selected tags appear on the right hand panel
    - Use favorites panel for commonly used tags. Tags can be favorited by clicking the star on the tag
+   - Right-click any tag and select Bulk Operations to add or remove the tag across all images in the folder (saves backup in `staging/backups` folder)
 4. **AI-Assisted Tagging** (if models installed):
    - Click "Analyze Image" for intelligent tag suggestions
    - Enable "Auto-Analyze" toggle for automatic analysis on image load
