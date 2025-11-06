@@ -125,14 +125,8 @@ class ClassifierPanel(QWidget):
             if widget_item is not None:
                 widget = widget_item.widget()
                 if widget is not None:
-                    # Important: If widgets have observers (like TagWidget), remove them
-                    if hasattr(widget, 'tag_data') and hasattr(widget, '_on_tag_data_changed'):
-                         try:
-                             # Check if tag_data exists before attempting removal
-                             if widget.tag_data:
-                                 widget.tag_data.remove_observer(widget._on_tag_data_changed)
-                         except Exception as e:
-                             print(f"Error removing observer during clear: {e}")
+                    if hasattr(widget, 'cleanup'):
+                        widget.cleanup()
                     widget.deleteLater()
 
     def _handle_analyze_clicked(self):

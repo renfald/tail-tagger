@@ -142,16 +142,11 @@ class TagSearchPanel(QWidget):
         Clears the current results and displays the provided list of TagData objects as TagWidgets.
         Displays "Add New Tag" button if no results are found.
         """
-        # Clear existing widgets in the results area
         for i in reversed(range(self.results_area_layout.count())):
             widget = self.results_area_layout.itemAt(i).widget()
             if widget is not None:
-                # Make sure to remove observer if it's a TagWidget
-                if hasattr(widget, 'tag_data') and hasattr(widget, '_on_tag_data_changed'):
-                    try:
-                        widget.tag_data.remove_observer(widget._on_tag_data_changed)
-                    except:
-                        pass  # In case there are errors during cleanup
+                if hasattr(widget, 'cleanup'):
+                    widget.cleanup()
                 widget.deleteLater()
 
         self.search_results_tag_widgets = []
