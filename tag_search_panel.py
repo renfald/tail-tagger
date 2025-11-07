@@ -173,6 +173,7 @@ class TagSearchPanel(QWidget):
                 tag_widget.set_styling_mode("dim_on_select")
                 tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
                 tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
+                tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
                 self.results_area_layout.addWidget(tag_widget)
                 self.search_results_tag_widgets.append(tag_widget)
                 
@@ -302,3 +303,46 @@ class TagSearchPanel(QWidget):
         """
         # No need to do anything - the TagWidget will update itself
         # This handler is here for future expandability
+
+    def _handle_tag_right_clicked(self, tag_name):
+        """Handles right-click events on TagWidgets in search results.
+        Creates and displays a context menu with bulk operations.
+        """
+        print(f"Right-clicked tag in search: {tag_name}")
+
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtGui import QCursor, QAction
+
+        # Find tag data for the clicked tag
+        tag_data = None
+        for td in self.main_window.tag_list_model.tags:
+            if td.name == tag_name:
+                tag_data = td
+                break
+
+        if not tag_data:
+            print(f"Warning: Tag data not found for right-clicked tag '{tag_name}'")
+            return
+
+        # Create context menu
+        menu = QMenu(self)
+
+        # Add bulk operations submenu
+        bulk_menu = menu.addMenu("Bulk Operations")
+
+        add_front_action = QAction("Add to All Images (Beginning)", self)
+        add_front_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('add_front', tag_name))
+        bulk_menu.addAction(add_front_action)
+
+        add_end_action = QAction("Add to All Images (End)", self)
+        add_end_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('add_end', tag_name))
+        bulk_menu.addAction(add_end_action)
+
+        bulk_menu.addSeparator()
+
+        remove_action = QAction("Remove from All Images", self)
+        remove_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('remove', tag_name))
+        bulk_menu.addAction(remove_action)
+
+        # Show menu
+        menu.popup(QCursor.pos())

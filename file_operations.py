@@ -246,6 +246,91 @@ class FileOperations:
             except Exception as e:
                 print(f"Error creating default workfile: {e}")
 
+    def ensure_workfile_complete(self, folder_path, progress_callback=None):
+        """Ensures workfile has entries for all images in the folder.
+
+        This utility scans all images in the folder and populates the workfile with
+        any missing entries by loading tags from .txt files (or creating empty entries).
+        Designed for bulk operations that need to operate on all images at once.
+
+        Args:
+            folder_path (str): Path to the image folder
+            progress_callback (callable, optional): Callback function(current, total) for progress updates
+
+        Returns:
+            tuple: (workfile_data dict, count of newly initialized images)
+        """
+        workfile_path = self.get_workfile_path(folder_path)
+
+        # Load existing workfile or create default structure
+        try:
+            with open(workfile_path, 'r', encoding='utf-8') as f:
+                workfile_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            workfile_data = {"image_tags": {}}
+            print(f"Creating new workfile structure for {folder_path}")
+
+        # Get all image files in folder
+        image_paths = self.get_sorted_image_files(folder_path)
+
+        if not image_paths:
+            print(f"No images found in folder: {folder_path}")
+            return workfile_data, 0
+
+        # Track how many images we initialize
+        initialized_count = 0
+
+        # Process each image
+        for index, image_path in enumerate(image_paths):
+            # Update progress if callback provided
+            if progress_callback:
+                progress_callback(index + 1, len(image_paths))
+
+            # Skip if already in workfile
+            if image_path in workfile_data["image_tags"]:
+                continue
+
+            # Load tags from .txt file or default to empty
+            tag_file_path_no_ext = os.path.splitext(image_path)[0]
+            tag_file_path_txt = tag_file_path_no_ext + ".txt"
+            tag_file_path_ext_txt = image_path + ".txt"
+
+            loaded_tags = []
+
+            if os.path.exists(tag_file_path_txt):
+                tag_file_to_use = tag_file_path_txt
+            elif os.path.exists(tag_file_path_ext_txt):
+                tag_file_to_use = tag_file_path_ext_txt
+            else:
+                tag_file_to_use = None
+
+            if tag_file_to_use:
+                try:
+                    with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
+                        tag_content = tag_file.readline().strip()
+                        loaded_tags = [tag.strip() for tag in tag_content.split(',')]
+                        # Convert spaces to underscores for consistency
+                        loaded_tags = [FileOperations.convert_spaces_to_underscores(tag) for tag in loaded_tags]
+                except Exception as e:
+                    print(f"Error reading tag file {tag_file_to_use}: {e}")
+                    loaded_tags = []
+
+            # Add to workfile data
+            workfile_data["image_tags"][image_path] = loaded_tags
+            initialized_count += 1
+
+        # Save workfile if we made any changes
+        if initialized_count > 0:
+            try:
+                with open(workfile_path, 'w', encoding='utf-8') as f:
+                    json.dump(workfile_data, f, indent=2)
+                print(f"Initialized {initialized_count} new entries in workfile")
+            except Exception as e:
+                print(f"Error saving workfile: {e}")
+                raise
+
+        return workfile_data, initialized_count
+
     def load_favorites(self):
         """Loads the ordered list of favorite tag names from favorites.json."""
         favorites_file_path = os.path.join(os.getcwd(), "data", "favorites.json")

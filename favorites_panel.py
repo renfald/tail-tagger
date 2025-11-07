@@ -18,6 +18,10 @@ class FavoritesPanel(TagListPanel):
         """Always allow dragging in this panel."""
         return True
 
+    def _get_bulk_operations(self):
+        """Returns list of allowed bulk operations for this panel."""
+        return ['add_front', 'add_end', 'remove']
+
     def _remove_tag_from_data_list(self, tag_data):
         """Remove tag from the favorites list."""
         self.main_window.favorite_tags_ordered.remove(tag_data)

@@ -318,6 +318,8 @@ class ClassifierPanel(QWidget):
         """Handles right-clicks on TagWidgets in the results area."""
         print(f"Right-click detected on tag: {tag_name}")
 
+        from PySide6.QtGui import QCursor
+
         # Find the TagData object for the clicked tag
         tag_data = self.main_window.tag_list_model.tags_by_name.get(tag_name)
 
@@ -338,12 +340,32 @@ class ClassifierPanel(QWidget):
             actions_added = True
             print(f"  Added 'Add to Known Tags' action for '{tag_name}'")
 
-        # --- Show the menu only if actions were added ---
+        # --- Add bulk operations submenu ---
+        # Add separator if previous actions were added
         if actions_added:
-            menu.popup(self.cursor().pos())
-            from PySide6.QtGui import QCursor
-            menu.popup(QCursor.pos())
+            menu.addSeparator()
 
+        bulk_menu = menu.addMenu("Bulk Operations")
+
+        add_front_action = QAction("Add to All Images (Beginning)", self)
+        add_front_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('add_front', tag_name))
+        bulk_menu.addAction(add_front_action)
+
+        add_end_action = QAction("Add to All Images (End)", self)
+        add_end_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('add_end', tag_name))
+        bulk_menu.addAction(add_end_action)
+
+        bulk_menu.addSeparator()
+
+        remove_action = QAction("Remove from All Images", self)
+        remove_action.triggered.connect(lambda: self.main_window.execute_bulk_operation('remove', tag_name))
+        bulk_menu.addAction(remove_action)
+
+        actions_added = True
+
+        # --- Show the menu ---
+        if actions_added:
+            menu.popup(QCursor.pos())
         else:
             print(f"  No context actions applicable for tag '{tag_name}'")
     

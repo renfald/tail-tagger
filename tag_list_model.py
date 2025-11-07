@@ -201,8 +201,17 @@ class TagListModel(QAbstractListModel):
             self.tags_selected_changed.emit()  # Keep existing signal for backward compatibility TODO: is anything broken if this is removed? check search panel
 
     def remove_unknown_tags(self):
-        """Removes any tags where is_known is False from the tag list."""
+        """Removes any tags where is_known is False from the tag list and tags_by_name dict."""
+        # Identify unknown tags to remove
+        unknown_tags = [tag for tag in self.tags if not tag.is_known]
+
+        # Remove from the main tags list
         self.tags = [tag for tag in self.tags if tag.is_known]
+
+        # Also remove unknown tags from the tags_by_name dictionary
+        for tag in unknown_tags:
+            if tag.name in self.tags_by_name:
+                del self.tags_by_name[tag.name]
 
     def rowCount(self, parent=QModelIndex()):
         """Returns the number of rows (tags)."""
