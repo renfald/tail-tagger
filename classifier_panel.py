@@ -133,6 +133,7 @@ class ClassifierPanel(QWidget):
                                  widget.tag_data.remove_observer(widget._on_tag_data_changed)
                          except Exception as e:
                              print(f"Error removing observer during clear: {e}")
+                    self.results_layout.removeWidget(widget)
                     widget.deleteLater()
 
     def _handle_analyze_clicked(self):
