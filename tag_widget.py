@@ -36,6 +36,43 @@ class TagWidget(QFrame):
         # Register as an observer for this tag's data changes
         self.tag_data.add_observer(self._on_tag_data_changed)
 
+        self._is_cleaned_up = False
+
+    def cleanup(self):
+        """Properly disconnect signals and remove observers before widget deletion."""
+        if self._is_cleaned_up:
+            return
+        self._is_cleaned_up = True
+
+        try:
+            self.tag_clicked.disconnect()
+        except RuntimeError:
+            pass
+        except Exception as e:
+            print(f"Unexpected error disconnecting tag_clicked for '{self.tag_name}': {e}")
+
+        try:
+            self.favorite_star_clicked.disconnect()
+        except RuntimeError:
+            pass
+        except Exception as e:
+            print(f"Unexpected error disconnecting favorite_star_clicked for '{self.tag_name}': {e}")
+
+        try:
+            self.tag_right_clicked.disconnect()
+        except RuntimeError:
+            pass
+        except Exception as e:
+            print(f"Unexpected error disconnecting tag_right_clicked for '{self.tag_name}': {e}")
+
+        if hasattr(self, 'tag_data') and self.tag_data:
+            try:
+                self.tag_data.remove_observer(self._on_tag_data_changed)
+            except (RuntimeError, ValueError):
+                pass
+            except Exception as e:
+                print(f"Unexpected error removing observer for '{self.tag_name}': {e}")
+
     def set_is_known_tag(self, is_known_tag):
         """Sets the is_known_tag property."""
         self.is_known_tag = is_known_tag
@@ -278,22 +315,13 @@ class TagWidget(QFrame):
             
     def _on_tag_data_changed(self):
         """Called when this tag's data changes."""
-        # Update local properties from TagData
+        if self._is_cleaned_up:
+            return
+
         self.is_selected = self.tag_data.selected
         self.is_known_tag = self.tag_data.is_known
-        # Update the visual appearance
         self._update_style()
-        # Update the elided text in case visibility constraints have changed
         self._update_elided_text()
-        
-    def __del__(self):
-        """Clean up by removing this widget as an observer."""
-        try:
-            if hasattr(self, 'tag_data') and self.tag_data:
-                self.tag_data.remove_observer(self._on_tag_data_changed)
-        except:
-            # In case of destruction order issues
-            pass
             
     def hideEvent(self, event):
         """Handle widget being hidden."""
@@ -301,11 +329,7 @@ class TagWidget(QFrame):
         
     def closeEvent(self, event):
         """Handle widget being closed."""
-        try:
-            if hasattr(self, 'tag_data') and self.tag_data:
-                self.tag_data.remove_observer(self._on_tag_data_changed)
-        except:
-            pass
+        self.cleanup()
         super().closeEvent(event)
         
     def resizeEvent(self, event):
@@ -315,6 +339,9 @@ class TagWidget(QFrame):
         
     def _update_elided_text(self):
         """Update the label text with elision based on available width."""
+        if self._is_cleaned_up:
+            return
+
         from PySide6.QtGui import QFontMetrics
         
         # Get original text (with spaces instead of underscores)
