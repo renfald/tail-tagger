@@ -145,6 +145,7 @@ class TagSearchPanel(QWidget):
         for i in reversed(range(self.results_area_layout.count())):
             widget = self.results_area_layout.itemAt(i).widget()
             if widget is not None:
+                self.results_area_layout.removeWidget(widget)
                 if hasattr(widget, 'cleanup'):
                     widget.cleanup()
                 widget.deleteLater()

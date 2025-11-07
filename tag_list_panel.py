@@ -73,6 +73,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         for i in reversed(range(self.layout.count())):
             widget = self.layout.itemAt(i).widget()
             if widget is not None:
+                self.layout.removeWidget(widget)
                 if hasattr(widget, 'cleanup'):
                     widget.cleanup()
                 widget.deleteLater()
