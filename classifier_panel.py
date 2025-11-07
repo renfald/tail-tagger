@@ -125,9 +125,9 @@ class ClassifierPanel(QWidget):
             if widget_item is not None:
                 widget = widget_item.widget()
                 if widget is not None:
-                    self.results_layout.removeWidget(widget)
                     if hasattr(widget, 'cleanup'):
                         widget.cleanup()
+                    self.results_layout.removeWidget(widget)
                     widget.deleteLater()
 
     def _handle_analyze_clicked(self):
