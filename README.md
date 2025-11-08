@@ -75,7 +75,7 @@ run.bat
    - Use favorites panel for commonly used tags. Tags can be favorited by clicking the star on the tag
    - Right-click any tag and select Bulk Operations to add or remove the tag across all images in the folder (saves backup in `staging/backups` folder)
 4. **AI-Assisted Tagging** (if models installed):
-   - Click "Analyze Image" for intelligent tag suggestions
+   - Click "Analyze" for intelligent tag suggestions
    - Enable "Auto-Analyze" toggle for automatic analysis on image load
    - Adjust confidence threshold to filter suggestions
 5. **Save Work**: Tags are automatically saved as you work

@@ -1,11 +1,60 @@
-from PySide6.QtWidgets import QFrame, QMenu
-from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget, QApplication
+from PySide6.QtGui import QAction, QIcon
+from PySide6.QtCore import QSize
 from tag_list_panel import TagListPanel
+from file_operations import FileOperations
 
 class SelectedTagsPanel(TagListPanel):
     def __init__(self, main_window, parent=None):
         super().__init__(main_window, panel_title="Selected Tags")
         self.setAcceptDrops(True)  # This panel accepts drops
+
+        # --- Button Section (below title, above tags area) ---
+        # Create a container widget for the button row
+        button_row_widget = QWidget()
+        button_row_layout = QHBoxLayout(button_row_widget)
+        button_row_layout.setContentsMargins(5, 2, 5, 2)
+        button_row_layout.setSpacing(5)
+
+        # Add stretch to push button to the right
+        button_row_layout.addStretch()
+
+        # Copy Tags button (aligned to right)
+        self.copy_tags_button = QPushButton()
+        self.copy_tags_button.setIcon(QIcon(":/icons/copy-Tags.svg"))
+        self.copy_tags_button.setToolTip("Copy Tags to Clipboard")
+        self.copy_tags_button.setFixedSize(28, 30)
+        self.copy_tags_button.setIconSize(QSize(20, 24))
+        button_row_layout.addWidget(self.copy_tags_button)
+
+        # Insert button row into main layout (between title and scroll area)
+        # Index 1 is right after the title_label, pushing scroll_area down
+        # TODO: This feels like an oversight in the base class design. Tag Panels do not natively support adding widgets 
+        # between title and scroll area. Consider refactoring base class to allow more flexible layouts.
+        self.main_layout.insertWidget(1, button_row_widget, 0)  # 0 stretch factor
+
+        # Connect button signal
+        self.copy_tags_button.clicked.connect(self._handle_copy_tags_clicked)
+
+    def _handle_copy_tags_clicked(self):
+        """Copies all selected tags for current image to clipboard."""
+        # Get the selected tags list from main window
+        selected_tags = self.main_window.selected_tags_for_current_image
+
+        # Convert tag names from underscores to spaces
+        spaced_tags = [
+            FileOperations.convert_underscores_to_spaces(tag.name)
+            for tag in selected_tags
+        ]
+
+        # Join with comma-space separator (matches export format)
+        tags_string = ", ".join(spaced_tags)
+
+        # Copy to clipboard (will be empty string if no tags)
+        clipboard = QApplication.clipboard()
+        clipboard.setText(tags_string)
+
+        print(f"Copied {len(spaced_tags)} tags to clipboard")
 
     def get_styling_mode(self):
         return "ignore_select"  # Right panel ignores selection for styling

@@ -1,6 +1,6 @@
 # Resource object code (Python 3)
 # Created by: object code
-# Created by: The Resource Compiler for Qt version 6.9.2
+# Created by: The Resource Compiler for Qt version 6.10.0
 # WARNING! All changes made in this file will be lost!
 
 from PySide6 import QtCore
@@ -2766,6 +2766,106 @@ ray\x22 stroke-widt\
 h=\x2210\x22 stroke-li\
 necap=\x22round\x22/>\x0a\
 </svg>\
+\x00\x00\x06\x12\
+<\
+?xml version=\x221.\
+0\x22 encoding=\x22UTF\
+-8\x22 standalone=\x22\
+no\x22?>\x0a<!DOCTYPE \
+svg PUBLIC \x22-//W\
+3C//DTD SVG 1.1/\
+/EN\x22 \x22http://www\
+.w3.org/Graphics\
+/SVG/1.1/DTD/svg\
+11.dtd\x22>\x0a<svg wi\
+dth=\x22100%\x22 heigh\
+t=\x22100%\x22 viewBox\
+=\x220 0 417 500\x22 v\
+ersion=\x221.1\x22 xml\
+ns=\x22http://www.w\
+3.org/2000/svg\x22 \
+xmlns:xlink=\x22htt\
+p://www.w3.org/1\
+999/xlink\x22 xml:s\
+pace=\x22preserve\x22 \
+xmlns:serif=\x22htt\
+p://www.serif.co\
+m/\x22 style=\x22fill-\
+rule:evenodd;cli\
+p-rule:evenodd;s\
+troke-linecap:ro\
+und;stroke-linej\
+oin:round;stroke\
+-miterlimit:1.5;\
+\x22>\x0a    <g transf\
+orm=\x22matrix(1.14\
+7112,0,0,1.14711\
+2,-82.818438,-36\
+.778048)\x22>\x0a     \
+   <g transform=\
+\x22matrix(1.235629\
+,0,0,1.119891,-5\
+4.388784,4.77560\
+1)\x22>\x0a           \
+ <path d=\x22M339.9\
+82,241.193L339.9\
+82,134.752L246.3\
+43,40.78L152.704\
+,134.752L152.704\
+,397.163L339.982\
+,397.163L339.982\
+,330.488\x22 style=\
+\x22fill:none;strok\
+e:rgb(211,211,21\
+1);stroke-width:\
+30.8px;\x22/>\x0a     \
+   </g>\x0a        \
+<g transform=\x22ma\
+trix(1,0,0,1,6.6\
+99836,-3.971631)\
+\x22>\x0a            <\
+circle cx=\x22243.3\
+\x22 cy=\x22178.617\x22 r\
+=\x2234.326\x22 style=\
+\x22fill:none;strok\
+e:rgb(211,211,21\
+1);stroke-width:\
+18.16px;\x22/>\x0a    \
+    </g>\x0a       \
+ <path d=\x22M407.5\
+9,324.886L261.71\
+6,324.886L313.85\
+5,274.886L261.71\
+6,324.886L313.93\
+,374.886\x22 style=\
+\x22fill:none;strok\
+e:rgb(211,211,21\
+1);stroke-width:\
+26.52px;\x22/>\x0a    \
+    <g transform\
+=\x22matrix(1,0,0,1\
+,-1,0)\x22>\x0a       \
+     <path d=\x22M1\
+84.542,236.914L1\
+84.542,397.331\x22 \
+style=\x22fill:none\
+;stroke:rgb(211,\
+211,211);stroke-\
+width:10.9px;\x22/>\
+\x0a        </g>\x0a  \
+      <g transfo\
+rm=\x22matrix(1,0,0\
+,1,-10,0)\x22>\x0a    \
+        <path d=\
+\x22M226.209,397.33\
+1L226.209,287.60\
+8\x22 style=\x22fill:n\
+one;stroke:rgb(2\
+11,211,211);stro\
+ke-width:10.9px;\
+\x22/>\x0a        </g>\
+\x0a    </g>\x0a</svg>\
+\x0a\
 \x00\x00\x03j\
 <\
 ?xml version=\x221.\
@@ -2839,6 +2939,74 @@ e-width=\x2210\x22 fil\
 l=\x22none\x22 stroke-\
 linecap=\x22round\x22/\
 >\x0a</svg>\x0a\
+\x00\x00\x04\x15\
+<\
+?xml version=\x221.\
+0\x22 encoding=\x22UTF\
+-8\x22 standalone=\x22\
+no\x22?>\x0a<!DOCTYPE \
+svg PUBLIC \x22-//W\
+3C//DTD SVG 1.1/\
+/EN\x22 \x22http://www\
+.w3.org/Graphics\
+/SVG/1.1/DTD/svg\
+11.dtd\x22>\x0a<svg wi\
+dth=\x22100%\x22 heigh\
+t=\x22100%\x22 viewBox\
+=\x220 0 417 500\x22 v\
+ersion=\x221.1\x22 xml\
+ns=\x22http://www.w\
+3.org/2000/svg\x22 \
+xmlns:xlink=\x22htt\
+p://www.w3.org/1\
+999/xlink\x22 xml:s\
+pace=\x22preserve\x22 \
+xmlns:serif=\x22htt\
+p://www.serif.co\
+m/\x22 style=\x22fill-\
+rule:evenodd;cli\
+p-rule:evenodd;s\
+troke-linejoin:r\
+ound;stroke-mite\
+rlimit:2;\x22>\x0a    \
+<g transform=\x22ma\
+trix(0,3.517427,\
+-0.804128,0,495.\
+507379,-739.7160\
+16)\x22>\x0a        <p\
+ath d=\x22M320.522,\
+361.852L320.522,\
+508.75C320.522,5\
+24.547 317.595,5\
+37.352 313.984,5\
+37.352L248.766,5\
+37.352C245.155,5\
+37.352 242.228,5\
+24.547 242.228,5\
+08.75L242.228,36\
+1.852L217.5,361.\
+852C214.425,361.\
+852 211.765,352.\
+48 211.111,339.3\
+36C210.457,326.1\
+93 211.984,312.8\
+31 214.781,307.2\
+38L278.656,179.4\
+88C280.383,176.0\
+34 282.367,176.0\
+34 284.094,179.4\
+88L347.969,307.2\
+38C350.766,312.8\
+31 352.293,326.1\
+93 351.639,339.3\
+36C350.985,352.4\
+8 348.325,361.85\
+2 345.25,361.852\
+L320.522,361.852\
+Z\x22 style=\x22fill:r\
+gb(211,211,211);\
+\x22/>\x0a    </g>\x0a</s\
+vg>\x0a\
 \x00\x00\x05\x85\
 <\
 svg viewBox=\x220 0\
@@ -2988,6 +3156,10 @@ qt_resource_name = b"\
 \x0b\x7f\x83\xc7\
 \x00e\
 \x00q\x00u\x00a\x00l\x00.\x00s\x00v\x00g\
+\x00\x0d\
+\x03-\xde'\
+\x00c\
+\x00o\x00p\x00y\x00-\x00T\x00a\x00g\x00s\x00.\x00s\x00v\x00g\
 \x00\x0b\
 \x0a\xb9\x14G\
 \x00a\
@@ -2996,6 +3168,10 @@ qt_resource_name = b"\
 \x09fT'\
 \x00a\
 \x00p\x00p\x00r\x00o\x00x\x00.\x00s\x00v\x00g\
+\x00\x0c\
+\x0a\x9f\x06\xe7\
+\x00b\
+\x00u\x00l\x00k\x00-\x00A\x00d\x00d\x00.\x00s\x00v\x00g\
 \x00\x09\
 \x06\x98\x88\x07\
 \x00b\
@@ -3009,21 +3185,25 @@ qt_resource_name = b"\
 qt_resource_struct = b"\
 \x00\x00\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x01\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00\x00\x00\x02\x00\x00\x00\x09\x00\x00\x00\x02\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x0b\x00\x00\x00\x02\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00\xf0\x00\x00\x00\x00\x00\x01\x00\x00\xb5\x93\
+\x00\x00\x00\xa2\x00\x00\x00\x00\x00\x01\x00\x00\xab\xbe\
+\x00\x00\x01\x9aa\x07'I\
+\x00\x00\x01.\x00\x00\x00\x00\x00\x01\x00\x00\xbf\xc2\
 \x00\x00\x01\x97\x08\xfa\xe7\xcd\
-\x00\x00\x00\xd8\x00\x00\x00\x00\x00\x01\x00\x00\xb0\x0a\
-\x00\x00\x01\x99&\x1c&Q\
+\x00\x00\x01\x16\x00\x00\x00\x00\x00\x01\x00\x00\xba9\
+\x00\x00\x01\x99&\x80!;\
 \x00\x00\x00d\x00\x00\x00\x00\x00\x01\x00\x00\xa9\xa8\
 \x00\x00\x01\x97\x08\xfa\xe7\xcf\
 \x00\x00\x00F\x00\x00\x00\x00\x00\x01\x00\x00\x05\x81\
 \x00\x00\x01\x97\x08\xfa\xe7\xcd\
 \x00\x00\x00\x10\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
-\x00\x00\x01\x99&\x1bD\xa7\
-\x00\x00\x00\xbe\x00\x00\x00\x00\x00\x01\x00\x00\xaf,\
+\x00\x00\x01\x99&\x80!<\
+\x00\x00\x00\xde\x00\x00\x00\x00\x00\x01\x00\x00\xb5B\
 \x00\x00\x01\x97\x08\xfa\xe7\xcd\
-\x00\x00\x00\xa2\x00\x00\x00\x00\x00\x01\x00\x00\xab\xbe\
+\x00\x00\x00\xf8\x00\x00\x00\x00\x00\x01\x00\x00\xb6 \
+\x00\x00\x01\x9aa\x06\xe6\xbb\
+\x00\x00\x00\xc2\x00\x00\x00\x00\x00\x01\x00\x00\xb1\xd4\
 \x00\x00\x01\x97\x08\xfa\xe7\xcc\
 \x00\x00\x00\x8a\x00\x00\x00\x00\x00\x01\x00\x00\xaa\x83\
 \x00\x00\x01\x97\x08\xfa\xe7\xce\
