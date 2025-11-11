@@ -21,10 +21,10 @@ class SelectedTagsPanel(TagListPanel):
 
         # Copy Tags button (aligned to right)
         self.copy_tags_button = QPushButton()
-        self.copy_tags_button.setIcon(QIcon(":/icons/copy-Tags.svg"))
+        self.copy_tags_button.setIcon(QIcon(":/icons/copy-tags.svg"))
         self.copy_tags_button.setToolTip("Copy Tags to Clipboard")
         self.copy_tags_button.setFixedSize(28, 30)
-        self.copy_tags_button.setIconSize(QSize(20, 24))
+        self.copy_tags_button.setIconSize(QSize(20, 22))
         button_row_layout.addWidget(self.copy_tags_button)
 
         # Insert button row into main layout (between title and scroll area)

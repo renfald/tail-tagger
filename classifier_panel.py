@@ -56,10 +56,10 @@ class ClassifierPanel(QWidget):
 
         # Copy Tags button
         self.copy_tags_button = QPushButton()
-        self.copy_tags_button.setIcon(QIcon(":/icons/copy-Tags.svg"))
+        self.copy_tags_button.setIcon(QIcon(":/icons/copy-tags.svg"))
         self.copy_tags_button.setToolTip("Copy Tags to Clipboard")
         self.copy_tags_button.setFixedSize(28, 30)
-        self.copy_tags_button.setIconSize(QSize(20, 24))
+        self.copy_tags_button.setIconSize(QSize(20, 22))
 
         # Create opacity effect for disabled state
         self.copy_button_opacity_effect = QGraphicsOpacityEffect()
