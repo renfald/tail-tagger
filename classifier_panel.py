@@ -1,12 +1,13 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-                             QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox, QCheckBox)
+                             QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox, QApplication, QGraphicsOpacityEffect)
 from PySide6.QtCore import Qt, Slot, QSize, Signal
 from PySide6.QtGui import QAction, QIcon
 
 # Import TagWidget - it will be needed for placeholder logic
 from tag_widget import TagWidget
 from tag_list_model import TagData
+from file_operations import FileOperations
 
 class ClassifierPanel(QWidget):
     # Custom signals
@@ -35,7 +36,7 @@ class ClassifierPanel(QWidget):
         controls_row1_layout.setContentsMargins(0,0,0,0)
         controls_row1_layout.setSpacing(5)
 
-        self.analyze_button = QPushButton("Analyze Image")
+        self.analyze_button = QPushButton("Analyze")
         controls_row1_layout.addWidget(self.analyze_button)
 
         self.auto_analyze_toggle_button = QPushButton()
@@ -44,7 +45,7 @@ class ClassifierPanel(QWidget):
         self.auto_analyze_toggle_button.setCheckable(True)
         self.auto_analyze_toggle_button.setChecked(False)
         self.auto_analyze_toggle_button.setFixedSize(30, 30) # Maintain square shape
-        self.auto_analyze_toggle_button.setIconSize(QSize(15, 15)) # Adjust icon size within button
+        self.auto_analyze_toggle_button.setIconSize(QSize(17, 17)) # Adjust icon size within button
         # Style to match exact_match_toggle_button with rounded corners
         self.auto_analyze_toggle_button.setStyleSheet("""
             QPushButton:checked {
@@ -52,6 +53,29 @@ class ClassifierPanel(QWidget):
             }
         """)
         controls_row1_layout.addWidget(self.auto_analyze_toggle_button)
+
+        # Copy Tags button
+        self.copy_tags_button = QPushButton()
+        self.copy_tags_button.setIcon(QIcon(":/icons/copy-tags.svg"))
+        self.copy_tags_button.setToolTip("Copy Tags to Clipboard")
+        self.copy_tags_button.setFixedSize(28, 30)
+        self.copy_tags_button.setIconSize(QSize(20, 22))
+
+        # Create opacity effect for disabled state
+        self.copy_button_opacity_effect = QGraphicsOpacityEffect()
+        self.copy_button_opacity_effect.setOpacity(0.3)  # Dim when disabled
+        self.copy_tags_button.setGraphicsEffect(self.copy_button_opacity_effect)
+        self.copy_tags_button.setEnabled(False)  # Disabled initially until results are available
+
+        controls_row1_layout.addWidget(self.copy_tags_button)
+
+        # Bulk Add button
+        self.bulk_add_button = QPushButton()
+        self.bulk_add_button.setIcon(QIcon(":/icons/bulk-Add.svg"))
+        self.bulk_add_button.setToolTip("Add All Suggested Tags to Current Image (Does nothing... for now!)")
+        self.bulk_add_button.setFixedSize(28, 30)
+        self.bulk_add_button.setIconSize(QSize(20, 24))
+        controls_row1_layout.addWidget(self.bulk_add_button)
 
         layout.addLayout(controls_row1_layout)
 
@@ -102,6 +126,7 @@ class ClassifierPanel(QWidget):
         # --- Connect Button Signals ---
         self.analyze_button.clicked.connect(self._handle_analyze_clicked)
         self.auto_analyze_toggle_button.clicked.connect(self._handle_auto_analyze_toggled)
+        self.copy_tags_button.clicked.connect(self._handle_copy_tags_clicked)
 
         # --- Connect ClassifierManager Signals ---
         self.classifier_manager.analysis_started.connect(self._on_analysis_started)
@@ -131,7 +156,7 @@ class ClassifierPanel(QWidget):
                     widget.deleteLater()
 
     def _handle_analyze_clicked(self):
-        """Handles clicks on the 'Analyze Image' button."""
+        """Handles clicks on the 'Analyze' button."""
         print("Analyze Button Clicked - Requesting analysis...")
         current_path = self.main_window.current_image_path
         if current_path and self.classifier_manager:
@@ -161,7 +186,42 @@ class ClassifierPanel(QWidget):
         else:
             print("Classifier Manager not available.")
             self.status_label.setText("Error: Classifier not ready.")
-    
+
+    def _handle_copy_tags_clicked(self):
+        """Copies tags meeting current threshold to clipboard."""
+        # Check if we have results to copy
+        if self.raw_results is None:
+            return
+
+        # Get current threshold
+        current_threshold = self.threshold_spinbox.value()
+
+        # Filter results using same logic as _update_displayed_tags()
+        filtered_results = [
+            (tag_name, score) for tag_name, score in self.raw_results
+            if score >= current_threshold
+        ]
+
+        # Convert tag names from underscores to spaces
+        spaced_tags = [
+            FileOperations.convert_underscores_to_spaces(tag_name)
+            for tag_name, score in filtered_results
+        ]
+
+        # Join with comma-space separator (matches export format)
+        tags_string = ", ".join(spaced_tags)
+
+        # Copy to clipboard
+        clipboard = QApplication.clipboard()
+        clipboard.setText(tags_string)
+
+        print(f"Copied {len(spaced_tags)} tags to clipboard")
+
+    def _set_copy_button_enabled(self, enabled):
+        """Helper method to enable/disable copy button with opacity effect."""
+        self.copy_tags_button.setEnabled(enabled)
+        self.copy_button_opacity_effect.setOpacity(1.0 if enabled else 0.3)
+
     def _update_displayed_tags(self):
         """Filters stored raw results based on current threshold and updates display."""
         if self.raw_results is None:
@@ -170,6 +230,7 @@ class ClassifierPanel(QWidget):
             self._clear_results_widgets() # Ensure display is clear
             # Reset status if called before analysis? Or assume status is handled elsewhere?
             # Let's only clear here. Status is set elsewhere.
+            self._set_copy_button_enabled(False)
             return
 
         current_threshold = self.threshold_spinbox.value()
@@ -213,6 +274,10 @@ class ClassifierPanel(QWidget):
             # else: status is likely "Ready" or "Loading", don't overwrite
         print(f"Displayed {widgets_added} widgets.")
 
+        # --- Update copy button state ---
+        # Enable if there are filtered results, disable otherwise
+        self._set_copy_button_enabled(len(filtered_results) > 0)
+
     def clear_results(self):
         """Clears the results area and resets the status label."""
         print("ClassifierPanel: Clearing results.")
@@ -224,7 +289,9 @@ class ClassifierPanel(QWidget):
             self.analyze_button.setEnabled(True)
         else:
             self.analyze_button.setEnabled(False)
-    
+        # Disable copy button when results are cleared
+        self._set_copy_button_enabled(False)
+
     def _populate_model_selector(self):
         """Gets available models from manager and populates the ComboBox."""
         self.model_selector.clear() # Clear existing items first
