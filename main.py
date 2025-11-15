@@ -1,5 +1,40 @@
 import sys
 import os
+
+def check_dependencies():
+    """Verify critical dependencies can be imported."""
+    missing = []
+
+    # Check for einops (new dependency for JTP-3)
+    try:
+        import einops
+    except ImportError:
+        missing.append("einops (new dependency for JTP-3)")
+
+    # Check for timm with NAFlex support
+    try:
+        import timm
+        # Try to list NAFlex models to verify timm has the feature
+        timm.list_models("naflexvit*")  # Will work if timm >= 1.0.19
+    except ImportError:
+        missing.append("timm")
+    except Exception:
+        missing.append("timm (outdated - needs >= 1.0.19 for JTP-3 support)")
+
+    if missing:
+        print("\n" + "="*60)
+        print("ERROR: Missing or outdated dependencies:")
+        for item in missing:
+            print(f"  - {item}")
+        print("\nPlease update your environment:")
+        print("  Option 1: pip install -r requirements.txt --upgrade")
+        print("  Option 2: Re-run setup.bat (deletes venv and reinstalls)")
+        print("="*60 + "\n")
+        sys.exit(1)
+
+# Check dependencies before importing heavy modules
+check_dependencies()
+
 import time
 import theme
 from file_operations import FileOperations

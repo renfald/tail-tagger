@@ -1,47 +1,25 @@
 # classifier_manager.py
 import os
 import time
-import json
+from typing import Callable, Any
 import torch
-import timm
-import safetensors.torch
 from PIL import Image
 from timm.models import VisionTransformer # Explicit import for type hinting
 from PySide6.QtCore import QObject, Signal, QRunnable, Slot, QThreadPool
 
-# Import the transformation function
-from transformations import get_transform
+# Import inference modules
+from inference import (
+    load_jtp2_model, preprocess_jtp2, run_inference_jtp2,
+    load_jtp3_model, preprocess_jtp3, run_inference_jtp3
+)
 
 # --- Known/Supported Models and Display Names ---
 # Maps internal model_id (folder name) to user-friendly display name
 SUPPORTED_MODELS = {
     "JTP_PILOT": "JTP Pilot v1",
     "JTP_PILOT2": "JTP Pilot v2",
-    # Add future supported models here
+    "JTP-3": "JTP-3 Hydra",
 }
-
-# --- Custom Head for JTP_PILOT2 ---
-class GatedHead(torch.nn.Module):
-    def __init__(self,
-        num_features: int,
-        num_classes: int
-    ):
-        super().__init__()
-        self.num_classes = num_classes
-        self.linear = torch.nn.Linear(num_features, num_classes * 2)
-
-        self.act = torch.nn.Sigmoid()
-        self.gate = torch.nn.Sigmoid()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Assuming x is batch x num_features
-        x = self.linear(x) # Output shape: batch x (num_classes * 2)
-        # Split the output into two parts for activation and gating
-        activation_output = x[:, :self.num_classes]
-        gate_output = x[:, self.num_classes:]
-        # Apply activation and gating
-        x = self.act(activation_output) * self.gate(gate_output)
-        return x
 
 class ClassifierManager(QObject):
     analysis_started = Signal()
@@ -72,7 +50,11 @@ class ClassifierManager(QObject):
         self.model: VisionTransformer | None = None
         self.allowed_tags: list[str] | None = None
         self.device = None
-        self.transform = get_transform() # Transform is currently shared
+
+        # Model family tracking (determines which inference path to use)
+        self.model_family: str | None = None  # "jtp2" or "jtp3"
+        self.preprocess_fn: Callable[[str], Any] | None = None
+        self.inference_fn: Callable | None = None
 
         # Other state
         self.thread_pool = QThreadPool.globalInstance()
@@ -201,32 +183,57 @@ class ClassifierManager(QObject):
             # --- Preprocessing (on main thread) ---
             print("MainThread: Loading and preprocessing image...")
             start_preprocess = time.time()
-            image = Image.open(image_path).convert("RGBA")
-            tensor = self.transform(image)
-            # Add batch dimension and move to device
-            tensor = tensor.unsqueeze(0).to(self.device)
 
-            # Apply dtype optimization if needed
-            if self.device.type == 'cuda' and torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7:
-                try:
-                    model_dtype = next(self.model.parameters()).dtype
-                    if model_dtype == torch.float16:
-                        print("MainThread: Converting input tensor to float16...")
-                        tensor = tensor.to(dtype=torch.float16)
-                except StopIteration:
-                    print("Warning: Could not determine model parameter dtype.")
-            end_preprocess = time.time()
-            print(f"MainThread: Preprocessing took {end_preprocess - start_preprocess:.3f} seconds.")
+            if self.model_family == "jtp2":
+                # JTP-2: Single tensor
+                tensor = self.preprocess_fn(image_path)
+                tensor = tensor.to(self.device)
 
-            # --- Dispatch Worker ---
-            print("MainThread: Dispatching worker to thread pool...")
-            worker = AnalysisWorker(
-                model_id=self.active_model_id,
-                image_tensor=tensor,
-                model=self.model,
-                device=self.device, # Pass device just in case, though maybe not needed
-                allowed_tags=self.allowed_tags
-            )
+                # Apply dtype optimization if needed
+                if self.device.type == 'cuda' and torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7:
+                    try:
+                        model_dtype = next(self.model.parameters()).dtype
+                        if model_dtype == torch.float16:
+                            print("MainThread: Converting input tensor to float16...")
+                            tensor = tensor.to(dtype=torch.float16)
+                    except StopIteration:
+                        print("Warning: Could not determine model parameter dtype.")
+
+                end_preprocess = time.time()
+                print(f"MainThread: Preprocessing took {end_preprocess - start_preprocess:.3f} seconds.")
+
+                # --- Dispatch Worker ---
+                print("MainThread: Dispatching worker to thread pool...")
+                worker = AnalysisWorker(
+                    model_id=self.active_model_id,
+                    image_tensor=tensor,
+                    model=self.model,
+                    device=self.device,
+                    allowed_tags=self.allowed_tags,
+                    inference_fn=self.inference_fn
+                )
+
+            elif self.model_family == "jtp3":
+                # JTP-3: Three tensors (patches, coords, valid)
+                patches, coords, valid = self.preprocess_fn(image_path)
+
+                end_preprocess = time.time()
+                print(f"MainThread: Preprocessing took {end_preprocess - start_preprocess:.3f} seconds.")
+
+                # --- Dispatch Worker ---
+                print("MainThread: Dispatching worker to thread pool...")
+                worker = AnalysisWorkerJTP3(
+                    model_id=self.active_model_id,
+                    patches=patches,
+                    coords=coords,
+                    valid=valid,
+                    model=self.model,
+                    device=self.device,
+                    allowed_tags=self.allowed_tags,
+                    inference_fn=self.inference_fn
+                )
+            else:
+                raise RuntimeError(f"Unknown model family: {self.model_family}")
 
             # Connect worker signals to manager's SLOTS (methods)
             # These slots will then emit the manager's SIGNALS
@@ -269,7 +276,8 @@ class ClassifierManager(QObject):
                     print(f"  Skipping '{potential_id}': Not in SUPPORTED_MODELS list.")
                     continue
 
-                # Check for required files (tags.json and *.safetensors)
+                # Check for required files
+                # JTP-2 models require tags.json, JTP-3 embeds tags in model file
                 tags_file = os.path.join(model_folder_path, "tags.json")
                 has_tags = os.path.isfile(tags_file)
                 has_model_file = False
@@ -278,11 +286,28 @@ class ClassifierManager(QObject):
                         has_model_file = True
                         break # Found one, that's enough
 
-                if has_tags and has_model_file:
-                    print(f"  Found valid supported model: '{potential_id}'")
-                    discovered_ids.append(potential_id)
+                # Validate requirements based on model type
+                if potential_id in ["JTP_PILOT", "JTP_PILOT2"]:
+                    # JTP-2 models require both tags.json and safetensors
+                    if has_tags and has_model_file:
+                        print(f"  Found valid supported model: '{potential_id}'")
+                        discovered_ids.append(potential_id)
+                    else:
+                        print(f"  Skipping '{potential_id}': Missing tags.json or *.safetensors file.")
+                elif potential_id == "JTP-3":
+                    # JTP-3 only requires safetensors (tags embedded in model)
+                    if has_model_file:
+                        print(f"  Found valid supported model: '{potential_id}'")
+                        discovered_ids.append(potential_id)
+                    else:
+                        print(f"  Skipping '{potential_id}': Missing *.safetensors file.")
                 else:
-                    print(f"  Skipping '{potential_id}': Missing tags.json or *.safetensors file.")
+                    # Unknown model type
+                    if has_tags and has_model_file:
+                        print(f"  Found valid supported model: '{potential_id}'")
+                        discovered_ids.append(potential_id)
+                    else:
+                        print(f"  Skipping '{potential_id}': Missing tags.json or *.safetensors file.")
 
         return discovered_ids
     
@@ -356,6 +381,9 @@ class ClassifierManager(QObject):
             self.model = None
             self.allowed_tags = None
             self.device = None # Reset device associated with the model
+            self.model_family = None  # Reset model family
+            self.preprocess_fn = None  # Reset function pointers
+            self.inference_fn = None
 
             if was_cuda and torch.cuda.is_available():
                 print("Clearing CUDA cache...")
@@ -407,7 +435,24 @@ class ClassifierManager(QObject):
         self.device = next(model.parameters()).device
         print(f"ClassifierManager updated with loaded model on {self.device} and {len(allowed_tags)} tags.")
         self.is_loading = False
-        
+
+        # Set model family and function pointers based on active model
+        if self.active_model_id in ["JTP_PILOT", "JTP_PILOT2"]:
+            self.model_family = "jtp2"
+            self.preprocess_fn = preprocess_jtp2
+            self.inference_fn = run_inference_jtp2
+            print("MainThread: Set model family to 'jtp2'")
+        elif self.active_model_id == "JTP-3":
+            self.model_family = "jtp3"
+            self.preprocess_fn = preprocess_jtp3
+            self.inference_fn = run_inference_jtp3
+            print("MainThread: Set model family to 'jtp3'")
+        else:
+            print(f"WARNING: Unknown model family for {self.active_model_id}")
+            self.model_family = None
+            self.preprocess_fn = None
+            self.inference_fn = None
+
         if self.pending_analysis_path:
             print(f"Model loaded. Triggering queued analysis for: {os.path.basename(self.pending_analysis_path)}")
             path_to_analyze = self.pending_analysis_path
@@ -451,8 +496,7 @@ class LoadModelWorker(QRunnable):
     @Slot()
     def run(self):
         """Loads the model and tags in the background."""
-        load_start_time = time.time()
-        print(f"LoadWorker: Starting model and tag loading...")
+        print(f"LoadWorker: Starting model and tag loading for {self.model_id}...")
         model = None
         allowed_tags = None
 
@@ -465,54 +509,31 @@ class LoadModelWorker(QRunnable):
                 self.device = torch.device("cpu")
                 print("LoadWorker: Using CPU.")
 
-            # --- Load Tags ---
-            try:
-                with open(self.tags_path, "r", encoding='utf-8') as f:
-                    tags_data: dict[str, int] = json.load(f)
-                    allowed_tags = list(tags_data.keys())
-                    print(f"LoadWorker: Loaded {len(allowed_tags)} tags.")
-            except FileNotFoundError:
-                raise RuntimeError(f"Tags file not found at {self.tags_path}")
-            except Exception as e:
-                raise RuntimeError(f"Error loading tags.json: {e}")
+            # --- Load Model using appropriate inference module ---
+            if self.model_id in ["JTP_PILOT", "JTP_PILOT2"]:
+                print("LoadWorker: Using JTP-2 inference module...")
+                model, allowed_tags = load_jtp2_model(
+                    model_path=self.model_path,
+                    tags_path=self.tags_path,
+                    device=self.device,
+                    model_id=self.model_id
+                )
+            elif self.model_id == "JTP-3":
+                print("LoadWorker: Using JTP-3 inference module...")
+                model, allowed_tags = load_jtp3_model(
+                    model_path=self.model_path,
+                    device=self.device
+                )
+            else:
+                raise RuntimeError(f"Unsupported model_id: {self.model_id}")
 
-            # --- Load Model ---
-            print("LoadWorker: Creating ViT model structure...")
-            model = timm.create_model(
-                "vit_so400m_patch14_siglip_384.webli",
-                pretrained=False,
-                num_classes=len(allowed_tags),
-            )
-            print(f"LoadWorker: Loading model weights from {self.model_path}...")
+            self.signals.model_loaded.emit(model, allowed_tags)  # Emit success
 
-            # Load to CPU first to avoid potential CUDA init on this thread? Or load direct?
-            # Let's try loading directly to target device based on path device str
-            if self.model_id == "JTP_PILOT2":
-                print("LoadWorker: Replacing model head with GatedHead for JTP_PILOT2.")
-                # Get num_features from the base model's original head (before replacement)
-                num_features = model.head.in_features
-                model.head = GatedHead(num_features, len(allowed_tags))
-
-            state_dict = safetensors.torch.load_file(self.model_path, device=str(self.device))
-            model.load_state_dict(state_dict)
-            model.eval()
-            model.to(self.device) # Ensure model is on the correct device
-            print(f"LoadWorker: Model loaded successfully to {self.device}.")
-
-            # Apply performance optimizations if applicable
-            if self.device.type == 'cuda' and torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7:
-                model.to(dtype=torch.float16)
-                print("LoadWorker: Applied float16 optimization.")
-
-            load_end_time = time.time()
-            print(f"LoadWorker: Model and tags loaded in {load_end_time - load_start_time:.2f} seconds.")
-            self.signals.model_loaded.emit(model, allowed_tags) # Emit success
-
-        except FileNotFoundError:
-             # Handle specific FileNotFoundError before generic Exception
-             error_msg = f"Model file not found at {self.model_path}"
-             print(f"LoadWorker: ERROR - {error_msg}")
-             self.signals.loading_error.emit(error_msg)
+        except FileNotFoundError as e:
+            # Handle specific FileNotFoundError before generic Exception
+            error_msg = f"Model file not found: {e}"
+            print(f"LoadWorker: ERROR - {error_msg}")
+            self.signals.loading_error.emit(error_msg)
         except Exception as e:
             error_msg = f"Error during model loading: {e}"
             print(f"LoadWorker: ERROR - {error_msg}")
@@ -523,47 +544,37 @@ class LoadModelWorker(QRunnable):
 
 # --- Analysis Worker (Runs on Background Thread) ---
 class AnalysisWorker(QRunnable):
-    def __init__(self, model_id, image_tensor, model, device, allowed_tags):
+    def __init__(self, model_id, image_tensor, model, device, allowed_tags, inference_fn):
         super().__init__()
         self.signals = WorkerSignals()
         self.model_id = model_id
-        self.tensor = image_tensor # Preprocessed tensor (already on correct device & dtype)
+        self.tensor = image_tensor  # Preprocessed tensor
         self.model = model
-        self.device = device # Needed? Tensor is already on device. Model too. Maybe not needed here.
+        self.device = device
         self.allowed_tags = allowed_tags
+        self.inference_fn = inference_fn  # Function to run inference
 
-    @Slot() # Decorator indicating this is the entry point for the runnable
+    @Slot()
     def run(self):
         try:
-            # --- Inference (already done in background thread) ---
+            # --- Run Inference using provided function ---
             print("Worker: Running inference...")
-            start_inference = time.time()
-            with torch.no_grad():
-                # Model expects batch dimension, tensor should already have it
-                logits = self.model(self.tensor)
-            end_inference = time.time()
-            print(f"Worker: Inference took {end_inference - start_inference:.3f} seconds.")
+            probabilities = self.inference_fn(
+                model=self.model,
+                tensor=self.tensor,
+                device=self.device,
+                model_id=self.model_id
+            )
 
             # --- Post-processing ---
             print("Worker: Post-processing results...")
-            # 1. Apply Sigmoid (get probabilities 0-1)
-            if self.model_id == "JTP_PILOT2":
-                print("Worker: Using direct output probabilities for JTP_PILOT2.")
-                # Output is already probabilities from GatedHead
-                probabilities = logits[0] # Remove batch dim
-            else:
-                print("Worker: Applying sigmoid to logits.")
-                # Apply Sigmoid for models like JTP_PILOT (standard head)
-                probabilities = torch.nn.functional.sigmoid(logits[0]) # Remove batch dim
-
-            # 2. Thresholding (find indices above threshold)
-            # Move probabilities to CPU for numpy operations if needed, or keep on GPU
-            probabilities_cpu = probabilities.cpu() # Move to CPU for thresholding/indexing
-            INTERNAL_THRESHOLD = 0.01 # Filter out only extremely unlikely tags
+            # 1. Thresholding (find indices above threshold)
+            probabilities_cpu = probabilities.cpu()  # Move to CPU for thresholding/indexing
+            INTERNAL_THRESHOLD = 0.01  # Filter out only extremely unlikely tags
             indices = torch.where(probabilities_cpu > INTERNAL_THRESHOLD)[0]
             values = probabilities_cpu[indices]
 
-            # 3. Map indices to tags and store scores
+            # 2. Map indices to tags and store scores
             results = []
             for i in range(indices.size(0)):
                 tag_index = indices[i].item()
@@ -574,16 +585,75 @@ class AnalysisWorker(QRunnable):
                 else:
                     print(f"Warning: Index {tag_index} out of bounds for allowed_tags.")
 
-
-            # 4. Sort by score (descending)
+            # 3. Sort by score (descending)
             results.sort(key=lambda x: x[1], reverse=True)
 
             print(f"Worker: Found {len(results)} tags above INTERNAL threshold {INTERNAL_THRESHOLD}.")
-            # 5. Emit results
+            # 4. Emit results
             self.signals.finished.emit(results)
 
         except Exception as e:
             print(f"Worker: ERROR during analysis - {e}")
             import traceback
-            traceback.print_exc() # Print detailed traceback
+            traceback.print_exc()  # Print detailed traceback
+            self.signals.error.emit(str(e))
+
+
+# --- Analysis Worker for JTP-3 (Runs on Background Thread) ---
+class AnalysisWorkerJTP3(QRunnable):
+    def __init__(self, model_id, patches, coords, valid, model, device, allowed_tags, inference_fn):
+        super().__init__()
+        self.signals = WorkerSignals()
+        self.model_id = model_id
+        self.patches = patches
+        self.coords = coords
+        self.valid = valid
+        self.model = model
+        self.device = device
+        self.allowed_tags = allowed_tags
+        self.inference_fn = inference_fn
+
+    @Slot()
+    def run(self):
+        try:
+            # --- Run Inference using provided function ---
+            print("Worker: Running JTP-3 inference...")
+            probabilities = self.inference_fn(
+                model=self.model,
+                patches=self.patches,
+                coords=self.coords,
+                valid=self.valid,
+                device=self.device
+            )
+
+            # --- Post-processing ---
+            print("Worker: Post-processing results...")
+            # 1. Thresholding (find indices above threshold)
+            probabilities_cpu = probabilities.cpu()  # Move to CPU for thresholding/indexing
+            INTERNAL_THRESHOLD = 0.01  # Filter out only extremely unlikely tags
+            indices = torch.where(probabilities_cpu > INTERNAL_THRESHOLD)[0]
+            values = probabilities_cpu[indices]
+
+            # 2. Map indices to tags and store scores
+            results = []
+            for i in range(indices.size(0)):
+                tag_index = indices[i].item()
+                if 0 <= tag_index < len(self.allowed_tags):
+                    tag_name = self.allowed_tags[tag_index]
+                    score = values[i].item()
+                    results.append((tag_name, score))
+                else:
+                    print(f"Warning: Index {tag_index} out of bounds for allowed_tags.")
+
+            # 3. Sort by score (descending)
+            results.sort(key=lambda x: x[1], reverse=True)
+
+            print(f"Worker: Found {len(results)} tags above INTERNAL threshold {INTERNAL_THRESHOLD}.")
+            # 4. Emit results
+            self.signals.finished.emit(results)
+
+        except Exception as e:
+            print(f"Worker: ERROR during JTP-3 analysis - {e}")
+            import traceback
+            traceback.print_exc()  # Print detailed traceback
             self.signals.error.emit(str(e))
