@@ -4,7 +4,7 @@ This directory should contain the JTP-3 classifier model file.
 
 ## Required Files
 
-You need to download **one file** from the [RedRocket/JointTaggerProject repository on Hugging Face](https://huggingface.co/RedRocket/JointTaggerProject):
+You need to download **one file** from the [RedRocket/JTP-3 repository on Hugging Face](https://huggingface.co/RedRocket/JTP-3):
 
 1. **jtp-3-hydra.safetensors** - The model weights file (includes embedded tag metadata)
 
@@ -12,7 +12,7 @@ You need to download **one file** from the [RedRocket/JointTaggerProject reposit
 
 ## Download Instructions
 
-1. Visit: https://huggingface.co/RedRocket/JointTaggerProject/tree/main/JTP-3
+1. Visit: https://huggingface.co/RedRocket/JTP-3/tree/main/models
 2. Download the `jtp-3-hydra.safetensors` file (~956 MB)
 3. Place it directly in this directory (`classifiers/JTP-3/`)
 
@@ -40,6 +40,6 @@ Or re-run `setup.bat` to refresh the environment.
 
 ## About JTP-3
 
-JTP-3 uses the Hydra architecture with NAFlex Vision Transformer, which supports variable-resolution image processing. It provides more accurate tagging compared to earlier JTP models, with confidence scores ranging from -1.0 (absent) to 1.0 (present).
+JTP-3 uses the Hydra architecture with NAFlex Vision Transformer, which supports variable-resolution image processing. It provides more accurate tagging compared to earlier JTP models.
 
 Once the file is in place, restart the application and select "JTP-3 Hydra" from the classifier dropdown.
