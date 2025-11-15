@@ -95,6 +95,67 @@ python main.py
 - `TagWidget` instances represent individual tags and handle selection/favorite toggling
 - Panels observe model changes and update their displays accordingly
 
+## Bulk Operations Architecture
+
+### Current Implementation
+
+**Tag Bulk Operations** (`tail_tagger/bulk_operations/`):
+- Right-click context menu operations on tags
+- Three operations: Add to Beginning, Add to End, Remove from All
+- `BulkOperationsManager` handles core logic (direct workfile manipulation)
+- `TagBulkOperationDialog` provides progress feedback and results
+- `BulkOperationWorker` runs operations in background thread
+- Operations are typically sub-second even on 1000+ images
+- Backups created in `staging/backups/` before modifications
+
+### Future Extensibility
+
+**Architecture Layers for Future Bulk Tools:**
+
+1. **Setup/Configuration Layer** (tool-specific dialogs):
+   - `tail_tagger/bulk_operations/tag_operations_dialog.py` - Current right-click tag operations
+   - Future: `tail_tagger/tag_sorter/` - UI for ranking/ordering tags across dataset
+   - Future: `tail_tagger/find_replace_tags/` - Pattern-based tag find/replace with preview
+   - Future: `tail_tagger/bulk_classifier/` - Batch image analysis configuration
+
+2. **Execution Layer** (reusable):
+   - `tail_tagger/bulk_operations/manager.py` - Core operations that manipulate workfiles
+   - `BulkOperationWorker` - Generic threaded execution (in tag_operations_dialog.py)
+   - Common utilities like `ensure_workfile_complete()` in `file_operations.py`
+
+3. **Progress/Results Layer**:
+   - Tool-specific dialogs show their own progress and results
+   - Consider extracting `ProgressDialog` base class when second tool is added
+   - Threading pattern is established and reusable
+
+**Design Principles:**
+- Each bulk tool gets its own file with clear naming
+- Share common operations via `BulkOperationsManager`
+- Use background threads for any disk I/O operations
+- Create backups before modifying data
+- Provide clear progress feedback and result summaries
+
+**Avoid:**
+- Don't make `tag_operations_dialog.py` a catch-all for all bulk operations
+- Don't create a generic dialog that handles every tool (becomes a God Class)
+- Each tool should be self-contained with its own UI and result formatting
+
+### File Structure
+
+```
+tail_tagger/                    # Application package
+├── __init__.py
+└── bulk_operations/            # Bulk operations module
+    ├── __init__.py             # Exports BulkOperationsManager, TagBulkOperationDialog, etc.
+    ├── manager.py              # Core logic for bulk tag operations
+    └── tag_operations_dialog.py # UI for right-click tag operations
+```
+
+Import style:
+```python
+from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationDialog
+```
+
 ## File Format Information
 
 - `config.json`: Application settings (last folder, model ID, threshold)

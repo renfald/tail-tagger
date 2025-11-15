@@ -1,5 +1,40 @@
 import sys
 import os
+
+def check_dependencies():
+    """Verify critical dependencies can be imported."""
+    missing = []
+
+    # Check for einops (new dependency for JTP-3)
+    try:
+        import einops
+    except ImportError:
+        missing.append("einops (new dependency for JTP-3)")
+
+    # Check for timm with NAFlex support
+    try:
+        import timm
+        # Try to list NAFlex models to verify timm has the feature
+        timm.list_models("naflexvit*")  # Will work if timm >= 1.0.19
+    except ImportError:
+        missing.append("timm")
+    except Exception:
+        missing.append("timm (outdated - needs >= 1.0.19 for JTP-3 support)")
+
+    if missing:
+        print("\n" + "="*60)
+        print("ERROR: Missing or outdated dependencies:")
+        for item in missing:
+            print(f"  - {item}")
+        print("\nPlease update your environment:")
+        print("  Option 1: pip install -r requirements.txt --upgrade")
+        print("  Option 2: Re-run setup.bat (deletes venv and reinstalls)")
+        print("="*60 + "\n")
+        sys.exit(1)
+
+# Check dependencies before importing heavy modules
+check_dependencies()
+
 import time
 import theme
 from file_operations import FileOperations
@@ -488,7 +523,52 @@ class MainWindow(QMainWindow):
 
         else:
             print(f"Warning: Favorite star clicked for tag '{clicked_tag_name}', but tag not found in TagListModel.")
-    
+
+    def bulk_add_classifier_tags(self, tag_names):
+        """Adds multiple classifier tags to the current image in a single operation.
+
+        Args:
+            tag_names (list[str]): List of tag names to add, sorted by confidence descending
+        """
+        if not tag_names or not self.current_image_path:
+            return
+
+        added_count = 0
+        skipped_count = 0
+
+        # Process each tag
+        for tag_name in tag_names:
+            # Find the TagData object in the model
+            tag_data = self.tag_list_model.tags_by_name.get(tag_name)
+
+            if not tag_data:
+                print(f"Warning: Tag '{tag_name}' not found in model during bulk add")
+                continue
+
+            # Skip if already selected (keeps original position)
+            if tag_data.selected:
+                skipped_count += 1
+                continue
+
+            # Select the tag in the model
+            self.tag_list_model.set_tag_selected_state(tag_name, True)
+
+            # Add to selected tags list (append to end)
+            if tag_data not in self.selected_tags_for_current_image:
+                self.selected_tags_for_current_image.append(tag_data)
+                added_count += 1
+
+        # Single workfile write operation for all changes
+        if added_count > 0:
+            self.update_workfile_for_current_image()
+
+            # Update UI to reflect changes
+            self.selected_tags_panel.update_display()
+
+            print(f"Bulk add complete: {added_count} tags added, {skipped_count} tags skipped (already selected)")
+        else:
+            print(f"Bulk add: No new tags added ({skipped_count} tags already selected)")
+
     def update_workfile_for_current_image(self):
         """Updates the workfile for the current image. Make sure selected_tags_for_current_image is up to date before calling this."""
         self.file_operations.update_workfile(

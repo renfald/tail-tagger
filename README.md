@@ -18,7 +18,7 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
 
 ### Prerequisites
 
-- Python 3.10 - 3.11 (3.12 compatibility pending)
+- Python 3.10 - 3.12
 - Git
 
 ### Setup
@@ -43,13 +43,14 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
    - Yes: Installs NVIDIA CUDA 12.8 wheels.
 
 3. **[Optional] Download AI Models:**
-   
+
    Tail Tagger works perfectly without AI models for manual tagging only. To enable AI-assisted tagging:
-   
+
    - Visit [RedRocket/JointTaggerProject on Hugging Face](https://huggingface.co/RedRocket/JointTaggerProject)
    - Download model files following instructions in:
      - [`classifiers/JTP_PILOT/DOWNLOAD_INSTRUCTIONS.md`](classifiers/JTP_PILOT/DOWNLOAD_INSTRUCTIONS.md)
      - [`classifiers/JTP_PILOT2/DOWNLOAD_INSTRUCTIONS.md`](classifiers/JTP_PILOT2/DOWNLOAD_INSTRUCTIONS.md)
+     - [`classifiers/JTP-3/DOWNLOAD_INSTRUCTIONS.md`](classifiers/JTP-3/DOWNLOAD_INSTRUCTIONS.md) - Latest and most accurate model
 
 That's it! The setup script automatically creates a virtual environment and installs all dependencies.
 
@@ -89,11 +90,12 @@ run.bat
 
 ### AI Models
 
-Tail Tagger supports the two Joint Tagger Project classifier models trained on furry art:
+Tail Tagger supports the Joint Tagger Project classifier models trained on furry art:
 - **JTP_PILOT**
 - **JTP_PILOT2**
+- **JTP-3 (Hydra)** - Recommended
 
-Use whichever (or both) according to your preferences 
+Use whichever model(s) you prefer. JTP-3 is recommended for best results.
 
 Models are optional - the app provides full manual tagging functionality without them.
 
@@ -102,8 +104,9 @@ Models are optional - the app provides full manual tagging functionality without
 ```
 ├── main.py                   # Main application entry point
 ├── classifiers/              # AI model directory (download separately)
-│   ├── JTP_PILOT/            # First classifier model files
-│   └── JTP_PILOT2/           # Second classifier model files
+│   ├── JTP_PILOT/            # JTP_PILOT model files
+│   ├── JTP_PILOT2/           # JTP_PILOT2 model files
+│   └── JTP-3/                # JTP-3 (Hydra) model files
 ├── data/                     # Application data (auto-generated)
 │   ├── config.json           # User settings
 │   ├── favorites.json        # Favorite tags

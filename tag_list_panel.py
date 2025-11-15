@@ -188,7 +188,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             if container_pos.y() < tag_pos_bottom - 10:  # Adjust this if the line should change at a diff height
                 visual_position = tag_widget.geometry().top()
                 tag_index = self._get_data_index_for_tag(tag_widget.tag_name)
-                print(f"  Drop index determined: {tag_index} (before tag '{tag_widget.tag_name}')")
+                # print(f"  Drop index determined: {tag_index} (before tag '{tag_widget.tag_name}')")
                 insertion_point_found = True
                 break
         
@@ -198,12 +198,12 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
                 _, last_tag_widget = visible_tags[-1]
                 visual_position = last_tag_widget.geometry().bottom()
                 tag_index = len(self._get_tag_data_list())
-                print(f"  Drop index determined: {tag_index} (after last tag)")
+                # print(f"  Drop index determined: {tag_index} (after last tag)")
             else:
                 # Panel is empty or all tags are hidden
                 visual_position = 0
                 tag_index = 0
-                print("  Drop index determined: 0 (panel empty)")
+                #  print("  Drop index determined: 0 (panel empty)")
         
         return visual_position, tag_index
     

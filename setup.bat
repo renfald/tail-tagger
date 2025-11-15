@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM Tail Tagger Setup Script for Windows
 REM This script sets up the virtual environment and installs dependencies
 
@@ -10,7 +11,7 @@ set "PYTHON_CMD=py"
 %PYTHON_CMD% --version >nul 2>&1
 if errorlevel 1 (
     set "PYTHON_CMD=python"
-    %PYTHON_CMD% --version >nul 2>&1
+    !PYTHON_CMD! --version >nul 2>&1
     if errorlevel 1 (
         echo Error: Python is not installed or not in PATH.
         echo Please install Python 3.11 from python.org and try again.
@@ -21,8 +22,8 @@ if errorlevel 1 (
 )
 
 REM Display Python version
-for /f "tokens=*" %%i in ('%PYTHON_CMD% --version') do set PYTHON_VERSION=%%i
-echo Found %PYTHON_VERSION%
+for /f "tokens=*" %%i in ('!PYTHON_CMD! --version') do set PYTHON_VERSION=%%i
+echo Found !PYTHON_VERSION!
 
 REM Check if we're in the right directory
 if not exist "main.py" (
@@ -40,7 +41,7 @@ if exist "venv" (
 
 REM Create virtual environment
 echo Creating virtual environment...
-%PYTHON_CMD% -m venv venv
+!PYTHON_CMD! -m venv venv
 
 if errorlevel 1 (
     echo Error: Failed to create virtual environment
