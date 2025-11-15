@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM Tail Tagger Run Script for Windows
 REM This script activates the virtual environment and runs the application
 
@@ -7,7 +8,7 @@ set "PYTHON_CMD=py"
 %PYTHON_CMD% -V >nul 2>&1
 if errorlevel 1 (
     set "PYTHON_CMD=python"
-    %PYTHON_CMD% -V >nul 2>&1
+    !PYTHON_CMD! -V >nul 2>&1
     if errorlevel 1 (
         echo Error: Python is not installed or not in PATH.
         echo Please install Python 3.11 from python.org and try again.
@@ -46,7 +47,7 @@ if errorlevel 1 (
 
 REM Run the application
 echo Starting Tail Tagger...
-%PYTHON_CMD% main.py
+!PYTHON_CMD! main.py
 
 REM Check if the application exited with an error
 if errorlevel 1 (

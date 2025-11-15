@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 REM Update script for Tail Tagger (Windows)
 REM Pulls latest code from git and updates Python dependencies
 
@@ -26,7 +27,7 @@ if %errorlevel% equ 0 (
 
 REM Display Python version
 echo Found Python:
-%PYTHON_CMD% --version
+!PYTHON_CMD! --version
 echo.
 
 REM Check we're in the correct directory
@@ -129,7 +130,7 @@ echo.
 
 REM Upgrade pip
 echo Upgrading pip...
-%PYTHON_CMD% -m pip install --upgrade pip
+!PYTHON_CMD! -m pip install --upgrade pip
 if errorlevel 1 (
     echo Warning: Failed to upgrade pip, continuing anyway...
 )
@@ -137,7 +138,7 @@ echo.
 
 REM Detect if GPU (CUDA) version is installed
 echo Detecting current PyTorch configuration...
-%PYTHON_CMD% -c "import torch; exit(0 if torch.cuda.is_available() else 1)" >nul 2>&1
+!PYTHON_CMD! -c "import torch; exit(0 if torch.cuda.is_available() else 1)" >nul 2>&1
 if %errorlevel% equ 0 (
     set "REQUIREMENTS_FILE=requirements-cu128.txt"
     echo Detected GPU installation - will update CUDA dependencies
