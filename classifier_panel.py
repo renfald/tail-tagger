@@ -72,9 +72,16 @@ class ClassifierPanel(QWidget):
         # Bulk Add button
         self.bulk_add_button = QPushButton()
         self.bulk_add_button.setIcon(QIcon(":/icons/bulk-Add.svg"))
-        self.bulk_add_button.setToolTip("Add All Suggested Tags to Current Image (Does nothing... for now!)")
+        self.bulk_add_button.setToolTip("Add All Suggested Tags to Current Image")
         self.bulk_add_button.setFixedSize(28, 30)
         self.bulk_add_button.setIconSize(QSize(20, 24))
+
+        # Create opacity effect for disabled state
+        self.bulk_add_button_opacity_effect = QGraphicsOpacityEffect()
+        self.bulk_add_button_opacity_effect.setOpacity(0.3)  # Dim when disabled
+        self.bulk_add_button.setGraphicsEffect(self.bulk_add_button_opacity_effect)
+        self.bulk_add_button.setEnabled(False)  # Disabled initially until results are available
+
         controls_row1_layout.addWidget(self.bulk_add_button)
 
         layout.addLayout(controls_row1_layout)
@@ -127,6 +134,7 @@ class ClassifierPanel(QWidget):
         self.analyze_button.clicked.connect(self._handle_analyze_clicked)
         self.auto_analyze_toggle_button.clicked.connect(self._handle_auto_analyze_toggled)
         self.copy_tags_button.clicked.connect(self._handle_copy_tags_clicked)
+        self.bulk_add_button.clicked.connect(self._handle_bulk_add_clicked)
 
         # --- Connect ClassifierManager Signals ---
         self.classifier_manager.analysis_started.connect(self._on_analysis_started)
@@ -217,10 +225,38 @@ class ClassifierPanel(QWidget):
 
         print(f"Copied {len(spaced_tags)} tags to clipboard")
 
+    def _handle_bulk_add_clicked(self):
+        """Adds all filtered classifier tags to the current image."""
+        # Check if we have results to add
+        if self.raw_results is None:
+            return
+
+        # Get current threshold
+        current_threshold = self.threshold_spinbox.value()
+
+        # Filter results using same logic as _update_displayed_tags()
+        filtered_results = [
+            (tag_name, score) for tag_name, score in self.raw_results
+            if score >= current_threshold
+        ]
+
+        # Extract just the tag names (already sorted by confidence descending)
+        tag_names = [tag_name for tag_name, score in filtered_results]
+
+        # Call MainWindow method to perform the bulk add
+        if tag_names:
+            self.main_window.bulk_add_classifier_tags(tag_names)
+            print(f"Bulk add requested for {len(tag_names)} tags")
+
     def _set_copy_button_enabled(self, enabled):
         """Helper method to enable/disable copy button with opacity effect."""
         self.copy_tags_button.setEnabled(enabled)
         self.copy_button_opacity_effect.setOpacity(1.0 if enabled else 0.3)
+
+    def _set_bulk_add_button_enabled(self, enabled):
+        """Helper method to enable/disable bulk add button with opacity effect."""
+        self.bulk_add_button.setEnabled(enabled)
+        self.bulk_add_button_opacity_effect.setOpacity(1.0 if enabled else 0.3)
 
     def _update_displayed_tags(self):
         """Filters stored raw results based on current threshold and updates display."""
@@ -231,6 +267,7 @@ class ClassifierPanel(QWidget):
             # Reset status if called before analysis? Or assume status is handled elsewhere?
             # Let's only clear here. Status is set elsewhere.
             self._set_copy_button_enabled(False)
+            self._set_bulk_add_button_enabled(False)
             return
 
         current_threshold = self.threshold_spinbox.value()
@@ -274,9 +311,11 @@ class ClassifierPanel(QWidget):
             # else: status is likely "Ready" or "Loading", don't overwrite
         print(f"Displayed {widgets_added} widgets.")
 
-        # --- Update copy button state ---
+        # --- Update button states ---
         # Enable if there are filtered results, disable otherwise
-        self._set_copy_button_enabled(len(filtered_results) > 0)
+        has_filtered_results = len(filtered_results) > 0
+        self._set_copy_button_enabled(has_filtered_results)
+        self._set_bulk_add_button_enabled(has_filtered_results)
 
     def clear_results(self):
         """Clears the results area and resets the status label."""
@@ -289,8 +328,9 @@ class ClassifierPanel(QWidget):
             self.analyze_button.setEnabled(True)
         else:
             self.analyze_button.setEnabled(False)
-        # Disable copy button when results are cleared
+        # Disable action buttons when results are cleared
         self._set_copy_button_enabled(False)
+        self._set_bulk_add_button_enabled(False)
 
     def _populate_model_selector(self):
         """Gets available models from manager and populates the ComboBox."""
