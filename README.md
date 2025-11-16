@@ -38,9 +38,10 @@ This application is HEAVILY inspired by the amazing **[sd-tagging-helper](https:
    ./setup.sh
    ```
 
-   During setup, you'll be asked first if you want GPU acceleration (NVIDIA only).
-   - No: Installs pytorch for CPU.
-   - Yes: Installs NVIDIA CUDA 12.8 wheels.
+   During setup, you'll be prompted to choose GPU acceleration:
+   - **CPU only**: Works on all systems (slowest)
+   - **NVIDIA GPU**: Requires NVIDIA GPU with CUDA drivers
+   - **AMD GPU** (Linux only): Requires AMD GPU with ROCm drivers
 
 3. **[Optional] Download AI Models:**
 
@@ -163,11 +164,13 @@ If you encounter problems during setup:
    rm -rf venv
    ```
 
-### GPU/CUDA Support
+### GPU Support
 
 - Tail Tagger automatically detects and uses GPU acceleration if available
 - Falls back to CPU if no GPU is detected
-- For GPU support, ensure compatible CUDA drivers are installed
+- **NVIDIA GPUs**: Ensure compatible CUDA drivers are installed
+- **AMD GPUs** (Linux only): Ensure ROCm drivers are installed
+- Windows and macOS only support NVIDIA GPU acceleration
 
 ### Model Loading Issues
 
