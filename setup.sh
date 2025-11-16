@@ -63,12 +63,31 @@ pip install --upgrade pip
 
 # Prompt for GPU acceleration before installing dependencies
 echo ""
-read -p "Enable GPU acceleration (NVIDIA only)? Requires a recent NVIDIA driver. [y/N]: " USE_GPU
-if [[ "$USE_GPU" =~ ^[Yy]$ ]]; then
-    REQ_FILE="requirements-cu128.txt"
-else
-    REQ_FILE="requirements.txt"
-fi
+echo "Select GPU acceleration option:"
+echo "  1. CPU only (slowest, most compatible)"
+echo "  2. NVIDIA GPU (CUDA - requires NVIDIA GPU and recent drivers)"
+echo "  3. AMD GPU (ROCm - requires AMD GPU and ROCm drivers)"
+echo ""
+read -p "Enter your choice [1/2/3]: " GPU_CHOICE
+
+case "$GPU_CHOICE" in
+    1)
+        REQ_FILE="requirements.txt"
+        echo "✓ Selected: CPU only"
+        ;;
+    2)
+        REQ_FILE="requirements-cu128.txt"
+        echo "✓ Selected: NVIDIA GPU (CUDA)"
+        ;;
+    3)
+        REQ_FILE="requirements-rocm.txt"
+        echo "✓ Selected: AMD GPU (ROCm)"
+        ;;
+    *)
+        echo "⚠️  Invalid choice, defaulting to CPU only"
+        REQ_FILE="requirements.txt"
+        ;;
+esac
 
 # Install requirements
 echo "📦 Installing dependencies from $REQ_FILE ..."

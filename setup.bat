@@ -66,10 +66,20 @@ python -m pip install --upgrade pip
 
 REM Prompt for GPU acceleration before installing dependencies
 echo.
-set /p USE_GPU="Enable GPU acceleration (NVIDIA only)? Requires a recent NVIDIA driver. [Y/N]: "
-if /I "%USE_GPU%"=="Y" (
+echo Select GPU acceleration option:
+echo   1. CPU only (slowest, most compatible)
+echo   2. NVIDIA GPU (CUDA - requires NVIDIA GPU and recent drivers)
+echo.
+set /p GPU_CHOICE="Enter your choice [1/2]: "
+
+if "%GPU_CHOICE%"=="1" (
+    set "REQ_FILE=requirements.txt"
+    echo Selected: CPU only
+) else if "%GPU_CHOICE%"=="2" (
     set "REQ_FILE=requirements-cu128.txt"
+    echo Selected: NVIDIA GPU (CUDA)
 ) else (
+    echo Invalid choice, defaulting to CPU only
     set "REQ_FILE=requirements.txt"
 )
 

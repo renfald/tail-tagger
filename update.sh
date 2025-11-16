@@ -123,12 +123,19 @@ if [ $? -ne 0 ]; then
 fi
 echo ""
 
-# Detect if GPU (CUDA) version is installed
+# Detect current PyTorch configuration (CPU/CUDA/ROCm)
 echo "🔍 Detecting current PyTorch configuration..."
-$PYTHON_CMD -c "import torch; exit(0 if torch.cuda.is_available() else 1)" > /dev/null 2>&1
+
+# Check for ROCm (AMD GPU)
+$PYTHON_CMD -c "import torch; exit(0 if hasattr(torch.version, 'hip') and torch.version.hip is not None else 1)" > /dev/null 2>&1
 if [ $? -eq 0 ]; then
+    REQUIREMENTS_FILE="requirements-rocm.txt"
+    echo "✓ Detected AMD GPU installation - will update ROCm dependencies"
+# Check for CUDA (NVIDIA GPU)
+elif $PYTHON_CMD -c "import torch; exit(0 if torch.cuda.is_available() else 1)" > /dev/null 2>&1; then
     REQUIREMENTS_FILE="requirements-cu128.txt"
-    echo "✓ Detected GPU installation - will update CUDA dependencies"
+    echo "✓ Detected NVIDIA GPU installation - will update CUDA dependencies"
+# Default to CPU
 else
     REQUIREMENTS_FILE="requirements.txt"
     echo "✓ Detected CPU installation - will update CPU dependencies"
