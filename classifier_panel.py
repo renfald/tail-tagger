@@ -1,6 +1,6 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-                             QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox, QApplication, QGraphicsOpacityEffect)
+                             QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox, QApplication, QGraphicsOpacityEffect, QLineEdit)
 from PySide6.QtCore import Qt, Slot, QSize, Signal
 from PySide6.QtGui import QAction, QIcon
 
@@ -108,6 +108,26 @@ class ClassifierPanel(QWidget):
 
         layout.addLayout(controls_row2_layout)
 
+        # --- Collapsible Filter Section ---
+        self.filter_toggle_button = QPushButton("▶ Filter")
+        self.filter_toggle_button.setFlat(True)
+        self.filter_toggle_button.setCheckable(True)
+        self.filter_toggle_button.setChecked(False)
+        self.filter_toggle_button.setStyleSheet("text-align: left; padding-left: 2px;")
+        layout.addWidget(self.filter_toggle_button)
+
+        self.filter_content_widget = QWidget()
+        filter_content_layout = QVBoxLayout(self.filter_content_widget)
+        filter_content_layout.setContentsMargins(0, 0, 0, 0)
+        filter_content_layout.setSpacing(2)
+
+        self.filter_input = QLineEdit()
+        self.filter_input.setPlaceholderText("e.g. shirt, pants, -shoes")
+        filter_content_layout.addWidget(self.filter_input)
+
+        self.filter_content_widget.setVisible(False)
+        layout.addWidget(self.filter_content_widget)
+
         # --- Status Label ---
         self.status_label = QLabel("Ready")
         self.status_label.setAlignment(Qt.AlignCenter)
@@ -143,6 +163,8 @@ class ClassifierPanel(QWidget):
 
         self.threshold_spinbox.valueChanged.connect(self._update_displayed_tags)
         self.threshold_spinbox.valueChanged.connect(self._save_threshold_setting)
+        self.filter_toggle_button.toggled.connect(self._handle_filter_toggle)
+        self.filter_input.textChanged.connect(self._update_displayed_tags)
 
         self.model_selector.textActivated.connect(self._handle_model_selection_changed)
 
@@ -150,6 +172,26 @@ class ClassifierPanel(QWidget):
         self._populate_model_selector()
 
         print("ClassifierPanel UI Setup Complete and signals connected.")
+
+    @Slot(bool)
+    def _handle_filter_toggle(self, checked: bool):
+        self.filter_content_widget.setVisible(checked)
+        self.filter_toggle_button.setText("▼ Filter" if checked else "▶ Filter")
+
+    def _parse_filter_terms(self, text: str) -> tuple[list[str], list[str]]:
+        include_terms = []
+        exclude_terms = []
+        for token in text.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            if token.startswith("-"):
+                term = token[1:]
+                if term:
+                    exclude_terms.append(term.lower())
+            else:
+                include_terms.append(token.lower())
+        return include_terms, exclude_terms
 
     def _clear_results_widgets(self):
         """Helper to clear existing widgets from the results layout."""
@@ -281,6 +323,23 @@ class ClassifierPanel(QWidget):
             if score >= current_threshold
         ]
 
+        # --- Apply tag name filter (display only) ---
+        filter_text = self.filter_input.text() if hasattr(self, 'filter_input') else ""
+        include_terms, exclude_terms = self._parse_filter_terms(filter_text)
+        filter_is_active = bool(include_terms or exclude_terms)
+
+        threshold_count = len(filtered_results)  # save count before second pass for status label
+
+        if filter_is_active:
+            def matches_filter(tag_name: str) -> bool:
+                display = FileOperations.convert_underscores_to_spaces(tag_name).lower()
+                if include_terms and not any(t in display for t in include_terms):
+                    return False
+                if any(t in display for t in exclude_terms):
+                    return False
+                return True
+            filtered_results = [(n, s) for n, s in filtered_results if matches_filter(n)]
+
         # --- Populate results area with filtered results ---
         tag_model = self.main_window.tag_list_model
         widgets_added = 0
@@ -304,18 +363,22 @@ class ClassifierPanel(QWidget):
 
         # --- Update status label ---
         if widgets_added > 0:
-            self.status_label.setText(f"Displaying {widgets_added} suggestions")
+            if filter_is_active:
+                self.status_label.setText(f"Displaying {widgets_added} of {threshold_count} suggestions (filtered)")
+            else:
+                self.status_label.setText(f"Displaying {widgets_added} suggestions")
         else:
-            if self.raw_results: # Check if analysis actually ran
+            if filter_is_active:
+                self.status_label.setText("No tags match filter")
+            elif self.raw_results: # Check if analysis actually ran
                 self.status_label.setText(f"No suggestions above threshold {current_threshold:.2f}")
             # else: status is likely "Ready" or "Loading", don't overwrite
         print(f"Displayed {widgets_added} widgets.")
 
         # --- Update button states ---
-        # Enable if there are filtered results, disable otherwise
-        has_filtered_results = len(filtered_results) > 0
-        self._set_copy_button_enabled(has_filtered_results)
-        self._set_bulk_add_button_enabled(has_filtered_results)
+        # Base on threshold-only count so buttons stay enabled when filter hides all results
+        self._set_copy_button_enabled(threshold_count > 0)
+        self._set_bulk_add_button_enabled(threshold_count > 0)
 
     def clear_results(self):
         """Clears the results area and resets the status label."""
