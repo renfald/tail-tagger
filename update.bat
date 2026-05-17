@@ -58,12 +58,12 @@ if not exist "venv\" (
     exit /b 1
 )
 
-REM Check for uv (faster package manager)
+REM Check for uv
 set "USE_UV=false"
 uv --version >nul 2>&1
 if not errorlevel 1 (
     set "USE_UV=true"
-    echo Found uv - using for faster installs
+    echo Found uv - using for setup
 )
 
 REM Check for uncommitted changes

@@ -50,11 +50,11 @@ if [ ! -d "venv" ]; then
     exit 1
 fi
 
-# Check for uv (faster package manager)
+# Check for uv
 USE_UV=false
 if command -v uv &> /dev/null; then
     USE_UV=true
-    echo "✓ Found uv - using for faster installs"
+    echo "✓ Found uv - using for setup"
 fi
 
 # Check for uncommitted changes
