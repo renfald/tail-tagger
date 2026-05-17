@@ -106,16 +106,30 @@ class ClassifierPanel(QWidget):
 
         controls_row2_layout.addWidget(self.threshold_spinbox)
 
-        layout.addLayout(controls_row2_layout)
-
-        # --- Collapsible Filter Section ---
-        self.filter_toggle_button = QPushButton("▶ Filter")
-        self.filter_toggle_button.setFlat(True)
+        self.filter_toggle_button = QPushButton(">")
         self.filter_toggle_button.setCheckable(True)
         self.filter_toggle_button.setChecked(False)
-        self.filter_toggle_button.setStyleSheet("text-align: left; padding-left: 2px;")
-        layout.addWidget(self.filter_toggle_button)
+        self.filter_toggle_button.setToolTip("Toggle tag filter")
+        self.filter_toggle_button.setFixedSize(16, 24)
+        self.filter_toggle_button.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                color: white;
+                font-size: 10px;
+                padding: 0px;
+                margin: 0px;
+            }
+            QPushButton:hover {
+                background-color: #3A3A3A;
+                border-radius: 3px;
+            }
+        """)
+        controls_row2_layout.addWidget(self.filter_toggle_button)
 
+        layout.addLayout(controls_row2_layout)
+
+        # --- Collapsible Filter Section (below model row) ---
         self.filter_content_widget = QWidget()
         filter_content_layout = QVBoxLayout(self.filter_content_widget)
         filter_content_layout.setContentsMargins(0, 0, 0, 0)
@@ -123,6 +137,7 @@ class ClassifierPanel(QWidget):
 
         self.filter_input = QLineEdit()
         self.filter_input.setPlaceholderText("e.g. shirt, pants, -shoes")
+        self.filter_input.setStyleSheet("background-color: #2B2B2B; color: white;")
         filter_content_layout.addWidget(self.filter_input)
 
         self.filter_content_widget.setVisible(False)
@@ -176,7 +191,7 @@ class ClassifierPanel(QWidget):
     @Slot(bool)
     def _handle_filter_toggle(self, checked: bool):
         self.filter_content_widget.setVisible(checked)
-        self.filter_toggle_button.setText("▼ Filter" if checked else "▶ Filter")
+        self.filter_toggle_button.setText("▼" if checked else ">")
 
     def _parse_filter_terms(self, text: str) -> tuple[list[str], list[str]]:
         include_terms = []
