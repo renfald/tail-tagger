@@ -11,7 +11,7 @@ if errorlevel 1 (
     !PYTHON_CMD! -V >nul 2>&1
     if errorlevel 1 (
         echo Error: Python is not installed or not in PATH.
-        echo Please install Python 3.11 from python.org and try again.
+        echo Please install Python 3.10-3.12 from python.org and try again.
         echo The 'py' launcher is recommended.
         pause
         exit /b 1
@@ -56,7 +56,7 @@ if errorlevel 1 (
     echo If you're having issues:
     echo 1. Try running setup.bat again
     echo 2. Check that all model files are properly downloaded ^(if using AI features^)
-    echo 3. Make sure your Python version is 3.11 or lower
+    echo 3. Make sure your Python version is 3.10-3.12
     echo.
     pause
 )

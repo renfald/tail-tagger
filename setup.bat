@@ -14,7 +14,7 @@ if errorlevel 1 (
     !PYTHON_CMD! --version >nul 2>&1
     if errorlevel 1 (
         echo Error: Python is not installed or not in PATH.
-        echo Please install Python 3.11 from python.org and try again.
+        echo Please install Python 3.10-3.12 from python.org and try again.
         echo The 'py' launcher is recommended.
         pause
         exit /b 1
