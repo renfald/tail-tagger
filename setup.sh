@@ -30,6 +30,13 @@ if [ ! -f "main.py" ]; then
     exit 1
 fi
 
+# Check for uv (faster package manager)
+USE_UV=false
+if command -v uv &> /dev/null; then
+    USE_UV=true
+    echo "✓ Found uv - using for faster installs"
+fi
+
 # Check for existing venv and confirm before deleting
 if [ -d "venv" ]; then
     echo ""
@@ -45,13 +52,19 @@ fi
 
 # Create virtual environment
 echo "🔧 Creating virtual environment..."
-$PYTHON_CMD -m venv venv
+if [ "$USE_UV" = true ]; then
+    uv venv venv
+else
+    $PYTHON_CMD -m venv venv
+fi
 
 if [ $? -ne 0 ]; then
     echo "❌ Error: Failed to create virtual environment"
-    echo "Make sure you have python3-venv installed:"
-    echo "  Ubuntu/Debian: sudo apt install python3-venv"
-    echo "  macOS: Should be included with Python"
+    if [ "$USE_UV" = false ]; then
+        echo "Make sure you have python3-venv installed:"
+        echo "  Ubuntu/Debian: sudo apt install python3-venv"
+        echo "  macOS: Should be included with Python"
+    fi
     exit 1
 fi
 
@@ -64,9 +77,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Upgrade pip
-echo "⬆️  Upgrading pip..."
-pip install --upgrade pip
+# Upgrade pip (skip when using uv)
+if [ "$USE_UV" = false ]; then
+    echo "⬆️  Upgrading pip..."
+    pip install --upgrade pip
+fi
 
 # Prompt for GPU acceleration before installing dependencies
 echo ""
@@ -99,15 +114,19 @@ esac
 # Install requirements
 echo "📦 Installing dependencies from $REQ_FILE ..."
 if [ -f "$REQ_FILE" ]; then
+    if [ "$USE_UV" = true ]; then
+        uv pip install -r "$REQ_FILE"
+    else
         pip install -r "$REQ_FILE"
-        if [ $? -ne 0 ]; then
-                echo "❌ Error: Failed to install dependencies from $REQ_FILE"
-                echo "Check the error messages above and try again"
-                exit 1
-        fi
-else
-        echo "❌ Error: $REQ_FILE not found"
+    fi
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Failed to install dependencies from $REQ_FILE"
+        echo "Check the error messages above and try again"
         exit 1
+    fi
+else
+    echo "❌ Error: $REQ_FILE not found"
+    exit 1
 fi
 
 # Test the installation
