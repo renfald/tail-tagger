@@ -18,6 +18,7 @@ class ClassifierPanel(QWidget):
         self.main_window = main_window
         self.classifier_manager = classifier_manager
         self.raw_results: list[tuple[str, float]] | None = None
+        self.displayed_results: list[tuple[str, float]] = []
 
         print("ClassifierPanel Initialized") # Basic check
 
@@ -254,23 +255,12 @@ class ClassifierPanel(QWidget):
 
     def _handle_copy_tags_clicked(self):
         """Copies tags meeting current threshold to clipboard."""
-        # Check if we have results to copy
         if self.raw_results is None:
             return
 
-        # Get current threshold
-        current_threshold = self.threshold_spinbox.value()
-
-        # Filter results using same logic as _update_displayed_tags()
-        filtered_results = [
-            (tag_name, score) for tag_name, score in self.raw_results
-            if score >= current_threshold
-        ]
-
-        # Convert tag names from underscores to spaces
         spaced_tags = [
             FileOperations.convert_underscores_to_spaces(tag_name)
-            for tag_name, score in filtered_results
+            for tag_name, score in self.displayed_results
         ]
 
         # Join with comma-space separator (matches export format)
@@ -283,24 +273,12 @@ class ClassifierPanel(QWidget):
         print(f"Copied {len(spaced_tags)} tags to clipboard")
 
     def _handle_bulk_add_clicked(self):
-        """Adds all filtered classifier tags to the current image."""
-        # Check if we have results to add
+        """Adds all displayed classifier tags to the current image."""
         if self.raw_results is None:
             return
 
-        # Get current threshold
-        current_threshold = self.threshold_spinbox.value()
+        tag_names = [tag_name for tag_name, score in self.displayed_results]
 
-        # Filter results using same logic as _update_displayed_tags()
-        filtered_results = [
-            (tag_name, score) for tag_name, score in self.raw_results
-            if score >= current_threshold
-        ]
-
-        # Extract just the tag names (already sorted by confidence descending)
-        tag_names = [tag_name for tag_name, score in filtered_results]
-
-        # Call MainWindow method to perform the bulk add
         if tag_names:
             self.main_window.bulk_add_classifier_tags(tag_names)
             print(f"Bulk add requested for {len(tag_names)} tags")
@@ -323,6 +301,7 @@ class ClassifierPanel(QWidget):
             self._clear_results_widgets() # Ensure display is clear
             # Reset status if called before analysis? Or assume status is handled elsewhere?
             # Let's only clear here. Status is set elsewhere.
+            self.displayed_results = []
             self._set_copy_button_enabled(False)
             self._set_bulk_add_button_enabled(False)
             return
@@ -354,6 +333,8 @@ class ClassifierPanel(QWidget):
                     return False
                 return True
             filtered_results = [(n, s) for n, s in filtered_results if matches_filter(n)]
+
+        self.displayed_results = list(filtered_results)
 
         # --- Populate results area with filtered results ---
         tag_model = self.main_window.tag_list_model
