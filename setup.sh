@@ -150,4 +150,6 @@ echo "2. Run the application with: ./run.sh"
 echo ""
 echo "The application works perfectly without AI models for manual tagging."
 
+read -p "Press Enter to exit..."
+
 exit 0
