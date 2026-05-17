@@ -30,11 +30,11 @@ if [ ! -f "main.py" ]; then
     exit 1
 fi
 
-# Check for uv (faster package manager)
+# Check for uv
 USE_UV=false
 if command -v uv &> /dev/null; then
     USE_UV=true
-    echo "✓ Found uv - using for faster installs"
+    echo "✓ Found uv - using for setup"
 fi
 
 # Check for existing venv and confirm before deleting
@@ -53,7 +53,8 @@ fi
 # Create virtual environment
 echo "🔧 Creating virtual environment..."
 if [ "$USE_UV" = true ]; then
-    uv venv venv
+    PYTHON_PATH=$($PYTHON_CMD -c "import sys; print(sys.executable)")
+    uv venv venv --python "$PYTHON_PATH"
 else
     $PYTHON_CMD -m venv venv
 fi

@@ -33,12 +33,12 @@ if not exist "main.py" (
     exit /b 1
 )
 
-REM Check for uv (faster package manager)
+REM Check for uv
 set "USE_UV=false"
 uv --version >nul 2>&1
 if not errorlevel 1 (
     set "USE_UV=true"
-    echo Found uv - using for faster installs
+    echo Found uv - using for setup
 )
 
 REM Check for existing venv and confirm before deleting
@@ -59,7 +59,8 @@ if exist "venv" (
 REM Create virtual environment
 echo Creating virtual environment...
 if "!USE_UV!"=="true" (
-    uv venv venv
+    for /f "tokens=*" %%i in ('!PYTHON_CMD! -c "import sys; print(sys.executable)"') do set PYTHON_PATH=%%i
+    uv venv venv --python "!PYTHON_PATH!"
 ) else (
     !PYTHON_CMD! -m venv venv
 )
