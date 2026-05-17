@@ -50,6 +50,13 @@ if [ ! -d "venv" ]; then
     exit 1
 fi
 
+# Check for uv
+USE_UV=false
+if command -v uv &> /dev/null; then
+    USE_UV=true
+    echo "✓ Found uv - using for setup"
+fi
+
 # Check for uncommitted changes
 echo "🔍 Checking for uncommitted changes..."
 git status --porcelain > /dev/null 2>&1
@@ -115,13 +122,15 @@ if [ $? -ne 0 ]; then
 fi
 echo ""
 
-# Upgrade pip
-echo "📦 Upgrading pip..."
-$PYTHON_CMD -m pip install --upgrade pip
-if [ $? -ne 0 ]; then
-    echo "⚠️  Warning: Failed to upgrade pip, continuing anyway..."
+# Upgrade pip (skip when using uv)
+if [ "$USE_UV" = false ]; then
+    echo "📦 Upgrading pip..."
+    $PYTHON_CMD -m pip install --upgrade pip
+    if [ $? -ne 0 ]; then
+        echo "⚠️  Warning: Failed to upgrade pip, continuing anyway..."
+    fi
+    echo ""
 fi
-echo ""
 
 # Detect current PyTorch configuration (CPU/CUDA/ROCm)
 echo "🔍 Detecting current PyTorch configuration..."
@@ -144,7 +153,11 @@ echo ""
 
 # Install/update requirements
 echo "📦 Updating Python dependencies from $REQUIREMENTS_FILE..."
-pip install -r $REQUIREMENTS_FILE
+if [ "$USE_UV" = true ]; then
+    uv pip install -r $REQUIREMENTS_FILE
+else
+    pip install -r $REQUIREMENTS_FILE
+fi
 if [ $? -ne 0 ]; then
     echo ""
     echo "❌ Error: Failed to install requirements"

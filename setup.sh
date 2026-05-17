@@ -15,7 +15,7 @@ elif command -v python &> /dev/null; then
     PYTHON_CMD="python"
 else
     echo "❌ Error: Python 3 is not installed or not in PATH"
-    echo "Please install Python 3.11 and try again"
+    echo "Please install Python 3.10-3.12 and try again"
     exit 1
 fi
 
@@ -28,6 +28,13 @@ if [ ! -f "main.py" ]; then
     echo "❌ Error: main.py not found"
     echo "Please run this script from the Tail Tagger directory"
     exit 1
+fi
+
+# Check for uv
+USE_UV=false
+if command -v uv &> /dev/null; then
+    USE_UV=true
+    echo "✓ Found uv - using for setup"
 fi
 
 # Check for existing venv and confirm before deleting
@@ -45,13 +52,20 @@ fi
 
 # Create virtual environment
 echo "🔧 Creating virtual environment..."
-$PYTHON_CMD -m venv venv
+if [ "$USE_UV" = true ]; then
+    PYTHON_PATH=$($PYTHON_CMD -c "import sys; print(sys.executable)")
+    uv venv venv --python "$PYTHON_PATH"
+else
+    $PYTHON_CMD -m venv venv
+fi
 
 if [ $? -ne 0 ]; then
     echo "❌ Error: Failed to create virtual environment"
-    echo "Make sure you have python3-venv installed:"
-    echo "  Ubuntu/Debian: sudo apt install python3-venv"
-    echo "  macOS: Should be included with Python"
+    if [ "$USE_UV" = false ]; then
+        echo "Make sure you have python3-venv installed:"
+        echo "  Ubuntu/Debian: sudo apt install python3-venv"
+        echo "  macOS: Should be included with Python"
+    fi
     exit 1
 fi
 
@@ -64,9 +78,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Upgrade pip
-echo "⬆️  Upgrading pip..."
-pip install --upgrade pip
+# Upgrade pip (skip when using uv)
+if [ "$USE_UV" = false ]; then
+    echo "⬆️  Upgrading pip..."
+    pip install --upgrade pip
+fi
 
 # Prompt for GPU acceleration before installing dependencies
 echo ""
@@ -99,15 +115,19 @@ esac
 # Install requirements
 echo "📦 Installing dependencies from $REQ_FILE ..."
 if [ -f "$REQ_FILE" ]; then
+    if [ "$USE_UV" = true ]; then
+        uv pip install -r "$REQ_FILE"
+    else
         pip install -r "$REQ_FILE"
-        if [ $? -ne 0 ]; then
-                echo "❌ Error: Failed to install dependencies from $REQ_FILE"
-                echo "Check the error messages above and try again"
-                exit 1
-        fi
-else
-        echo "❌ Error: $REQ_FILE not found"
+    fi
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Failed to install dependencies from $REQ_FILE"
+        echo "Check the error messages above and try again"
         exit 1
+    fi
+else
+    echo "❌ Error: $REQ_FILE not found"
+    exit 1
 fi
 
 # Test the installation
@@ -130,5 +150,7 @@ echo "1. [Optional] Download AI models following instructions in classifiers/*/D
 echo "2. Run the application with: ./run.sh"
 echo ""
 echo "The application works perfectly without AI models for manual tagging."
+
+read -p "Press Enter to exit..."
 
 exit 0

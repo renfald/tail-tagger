@@ -14,7 +14,7 @@ if errorlevel 1 (
     !PYTHON_CMD! --version >nul 2>&1
     if errorlevel 1 (
         echo Error: Python is not installed or not in PATH.
-        echo Please install Python 3.11 from python.org and try again.
+        echo Please install Python 3.10-3.12 from python.org and try again.
         echo The 'py' launcher is recommended.
         pause
         exit /b 1
@@ -31,6 +31,14 @@ if not exist "main.py" (
     echo Please run this script from the Tail Tagger directory
     pause
     exit /b 1
+)
+
+REM Check for uv
+set "USE_UV=false"
+uv --version >nul 2>&1
+if not errorlevel 1 (
+    set "USE_UV=true"
+    echo Found uv - using for setup
 )
 
 REM Check for existing venv and confirm before deleting
@@ -50,7 +58,12 @@ if exist "venv" (
 
 REM Create virtual environment
 echo Creating virtual environment...
-!PYTHON_CMD! -m venv venv
+if "!USE_UV!"=="true" (
+    for /f "tokens=*" %%i in ('!PYTHON_CMD! -c "import sys; print(sys.executable)"') do set PYTHON_PATH=%%i
+    uv venv venv --python "!PYTHON_PATH!"
+) else (
+    !PYTHON_CMD! -m venv venv
+)
 
 if errorlevel 1 (
     echo Error: Failed to create virtual environment
@@ -69,9 +82,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Upgrade pip
-echo Upgrading pip...
-python -m pip install --upgrade pip
+REM Upgrade pip (skip when using uv)
+if not "!USE_UV!"=="true" (
+    echo Upgrading pip...
+    python -m pip install --upgrade pip
+)
 
 REM Prompt for GPU acceleration before installing dependencies
 echo.
@@ -98,7 +113,11 @@ if "%GPU_CHOICE%"=="1" (
 REM Install requirements based on choice
 echo Installing dependencies from %REQ_FILE% ...
 if exist "%REQ_FILE%" (
-    pip install -r "%REQ_FILE%"
+    if "!USE_UV!"=="true" (
+        uv pip install -r "%REQ_FILE%"
+    ) else (
+        pip install -r "%REQ_FILE%"
+    )
     if errorlevel 1 (
         echo Error: Failed to install dependencies from %REQ_FILE%
         echo Check the error messages above and try again

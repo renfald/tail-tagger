@@ -58,6 +58,14 @@ if not exist "venv\" (
     exit /b 1
 )
 
+REM Check for uv
+set "USE_UV=false"
+uv --version >nul 2>&1
+if not errorlevel 1 (
+    set "USE_UV=true"
+    echo Found uv - using for setup
+)
+
 REM Check for uncommitted changes
 echo Checking for uncommitted changes...
 git status --porcelain > nul 2>&1
@@ -128,13 +136,15 @@ if errorlevel 1 (
 )
 echo.
 
-REM Upgrade pip
-echo Upgrading pip...
-!PYTHON_CMD! -m pip install --upgrade pip
-if errorlevel 1 (
-    echo Warning: Failed to upgrade pip, continuing anyway...
+REM Upgrade pip (skip when using uv)
+if not "!USE_UV!"=="true" (
+    echo Upgrading pip...
+    !PYTHON_CMD! -m pip install --upgrade pip
+    if errorlevel 1 (
+        echo Warning: Failed to upgrade pip, continuing anyway...
+    )
+    echo.
 )
-echo.
 
 REM Detect if GPU (CUDA) version is installed
 echo Detecting current PyTorch configuration...
@@ -150,7 +160,11 @@ echo.
 
 REM Install/update requirements
 echo Updating Python dependencies from %REQUIREMENTS_FILE%...
-pip install -r %REQUIREMENTS_FILE%
+if "!USE_UV!"=="true" (
+    uv pip install -r %REQUIREMENTS_FILE%
+) else (
+    pip install -r %REQUIREMENTS_FILE%
+)
 if errorlevel 1 (
     echo.
     echo Error: Failed to install requirements
