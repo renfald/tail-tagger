@@ -11,10 +11,11 @@ from .jtp2_inference import (
     run_inference_jtp2,
 )
 
-from .jtp3_inference import (
-    load_jtp3_model,
-    preprocess_jtp3,
-    run_inference_jtp3,
+from .hydra_inference import (
+    load_hydra_model,
+    preprocess_hydra,
+    run_inference_hydra,
+    HydraMetadataMissingError,
 )
 
 __all__ = [
@@ -22,8 +23,9 @@ __all__ = [
     "load_jtp2_model",
     "preprocess_jtp2",
     "run_inference_jtp2",
-    # JTP-3
-    "load_jtp3_model",
-    "preprocess_jtp3",
-    "run_inference_jtp3",
+    # Hydra (JTP-3 Hydra + Hydra 3.5, via vendored package)
+    "load_hydra_model",
+    "preprocess_hydra",
+    "run_inference_hydra",
+    "HydraMetadataMissingError",
 ]

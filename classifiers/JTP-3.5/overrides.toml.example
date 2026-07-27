@@ -1,0 +1,42 @@
+# Tag Overrides for JTP-3 Classifier
+#
+# This file configures how classifier inference results are processed before display.
+# To use this file, copy/rename it to "overrides.toml" (remove the .example extension).
+#
+# Format notes:
+# - Tag names use underscores: "female_anthro" not "female anthro"
+# - Tag names are case-sensitive
+# - String values must be quoted: "dog" not dog
+# - Keys with special chars need quotes: "digital_media_(artwork)"
+
+# ============================================================================
+# TAG TRANSLATIONS
+# ============================================================================
+# Map original tag names to replacement tag names (one-to-one mapping)
+# Format: original_tag = "replacement_tag"
+#
+# Common use case: E621 renames one tag to another, but classifier was
+# trained after this change and outputs a different tag than what most 
+# furry image generation models were expecting. Allows for auto 'fix' 
+
+[translations]
+vulva = "pussy"
+
+# Uncomment additional translations as needed:
+# foo = "bar"
+# felid = "garfield"
+# "digital_media_(artwork)" = "example"
+
+# ============================================================================
+# TAG BLACKLIST
+# ============================================================================
+# Tags to completely remove from inference results.
+# Useful for removing rating tags or unwanted meta tags.
+
+[blacklist]
+tags = [
+    # Uncomment to remove rating tags from all results:
+    # "explicit",
+    # "questionable",
+    # "safe",
+]
