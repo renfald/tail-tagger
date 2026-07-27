@@ -10,8 +10,10 @@ from PySide6.QtCore import QObject, Signal, QRunnable, Slot, QThreadPool
 # Import inference modules
 from inference import (
     load_jtp2_model, preprocess_jtp2, run_inference_jtp2,
-    load_jtp3_model, preprocess_jtp3, run_inference_jtp3
+    load_hydra_model, preprocess_hydra, run_inference_hydra,
+    HydraMetadataMissingError,
 )
+from tail_tagger.hydra.classification import simple_slider
 
 # --- Known/Supported Models and Display Names ---
 # Maps internal model_id (folder name) to user-friendly display name
@@ -19,12 +21,28 @@ SUPPORTED_MODELS = {
     "JTP_PILOT": "JTP Pilot v1",
     "JTP_PILOT2": "JTP Pilot v2",
     "JTP-3": "JTP-3 Hydra",
+    "JTP-3.5": "Hydra 3.5",
 }
+
+# Maps internal model_id to its inference family. "jtp2" = the legacy
+# timm/torchvision PILOT models (flat threshold, PIL preprocessing). "hydra" = the
+# vendored Hydra package path (JTP-3 rr_hydra and Hydra 3.5 rr_hydra2), which
+# supports per-tag calibration and implications and preprocesses with pyvips.
+MODEL_FAMILY = {
+    "JTP_PILOT": "jtp2",
+    "JTP_PILOT2": "jtp2",
+    "JTP-3": "hydra",
+    "JTP-3.5": "hydra",
+}
+
+# Default implication mode for Hydra models (matches the vendor GUI default).
+DEFAULT_IMPLICATION_MODE = "inherit"
 
 class ClassifierManager(QObject):
     analysis_started = Signal()
     analysis_finished = Signal(list) # Will emit list of (tag, score) tuples
     error_occurred = Signal(str)
+    calibrating = Signal(bool) # Hydra: True while a (slow) calibration builds, False when done
 
 
     def __init__(self, config_manager, use_gpu=True, parent=None):
@@ -52,9 +70,21 @@ class ClassifierManager(QObject):
         self.device = None
 
         # Model family tracking (determines which inference path to use)
-        self.model_family: str | None = None  # "jtp2" or "jtp3"
+        self.model_family: str | None = None  # "jtp2" or "hydra"
         self.preprocess_fn: Callable[[str], Any] | None = None
         self.inference_fn: Callable | None = None
+
+        # --- Hydra postprocessing state ---
+        # Raw per-tag probabilities from the last Hydra inference, cached so the
+        # confidence slider / implication mode can be re-applied without re-running
+        # the model. calibration_cache holds the (expensive) per-tag threshold sets
+        # keyed by (model_id, confidence) so revisited slider values are instant.
+        self.raw_output: torch.Tensor | None = None
+        self.raw_output_model_id: str | None = None
+        self.calibration_cache: dict[tuple[str, float], Any] = {}
+        self._calibrating_keys: set[tuple[str, float]] = set()
+        self.current_confidence: float = 0.5
+        self.current_implication_mode: str = DEFAULT_IMPLICATION_MODE
 
         # Other state
         self.thread_pool = QThreadPool.globalInstance()
@@ -180,11 +210,11 @@ class ClassifierManager(QObject):
             return
 
         try:
-            # --- Preprocessing (on main thread) ---
-            print("MainThread: Loading and preprocessing image...")
-            start_preprocess = time.time()
-
             if self.model_family == "jtp2":
+                # --- Preprocessing (on main thread) ---
+                print("MainThread: Loading and preprocessing image...")
+                start_preprocess = time.time()
+
                 # JTP-2: Single tensor
                 tensor = self.preprocess_fn(image_path)
                 tensor = tensor.to(self.device)
@@ -212,41 +242,35 @@ class ClassifierManager(QObject):
                     allowed_tags=self.allowed_tags,
                     inference_fn=self.inference_fn
                 )
+                worker.signals.finished.connect(self._handle_worker_result)
+                worker.signals.error.connect(self._handle_worker_error)
 
-            elif self.model_family == "jtp3":
-                # JTP-3: Three tensors (patches, coords, valid)
-                patches, coords, valid = self.preprocess_fn(image_path)
+                self.analysis_started.emit()
+                print("MainThread: Emitted analysis_started signal.")
+                self.thread_pool.start(worker)
+                print("MainThread: Worker started.")
 
-                end_preprocess = time.time()
-                print(f"MainThread: Preprocessing took {end_preprocess - start_preprocess:.3f} seconds.")
-
-                # --- Dispatch Worker ---
-                print("MainThread: Dispatching worker to thread pool...")
-                worker = AnalysisWorkerJTP3(
+            elif self.model_family == "hydra":
+                # Hydra: preprocessing (pyvips decode) runs inside the worker to keep
+                # the UI thread free. The worker returns raw per-tag probabilities;
+                # calibration/implication/thresholding happen in _run_postprocess().
+                print("MainThread: Dispatching Hydra inference worker to thread pool...")
+                worker = HydraInferenceWorker(
                     model_id=self.active_model_id,
-                    patches=patches,
-                    coords=coords,
-                    valid=valid,
                     model=self.model,
+                    image_path=image_path,
                     device=self.device,
-                    allowed_tags=self.allowed_tags,
-                    inference_fn=self.inference_fn
                 )
+                worker.signals.inference_ready.connect(self._handle_hydra_inference_ready)
+                worker.signals.error.connect(self._handle_worker_error)
+
+                self.analysis_started.emit()
+                print("MainThread: Emitted analysis_started signal.")
+                self.thread_pool.start(worker)
+                print("MainThread: Worker started.")
+
             else:
                 raise RuntimeError(f"Unknown model family: {self.model_family}")
-
-            # Connect worker signals to manager's SLOTS (methods)
-            # These slots will then emit the manager's SIGNALS
-            worker.signals.finished.connect(self._handle_worker_result)
-            worker.signals.error.connect(self._handle_worker_error)
-
-            # Emit the analysis_started signal *before* starting the thread
-            self.analysis_started.emit()
-            print("MainThread: Emitted analysis_started signal.")
-
-            # Start the worker
-            self.thread_pool.start(worker)
-            print("MainThread: Worker started.")
 
         except FileNotFoundError:
             error_msg = f"Image file not found at {image_path}"
@@ -277,7 +301,9 @@ class ClassifierManager(QObject):
                     continue
 
                 # Check for required files
-                # JTP-2 models require tags.json, JTP-3 embeds tags in model file
+                # JTP-2 models require tags.json; Hydra models embed their labels
+                # (JTP-3.5) or read them from co-located CSVs (JTP-3), so they only
+                # need the .safetensors here.
                 tags_file = os.path.join(model_folder_path, "tags.json")
                 has_tags = os.path.isfile(tags_file)
                 has_model_file = False
@@ -286,23 +312,17 @@ class ClassifierManager(QObject):
                         has_model_file = True
                         break # Found one, that's enough
 
-                # Validate requirements based on model type
-                if potential_id in ["JTP_PILOT", "JTP_PILOT2"]:
-                    # JTP-2 models require both tags.json and safetensors
-                    if has_tags and has_model_file:
-                        print(f"  Found valid supported model: '{potential_id}'")
-                        discovered_ids.append(potential_id)
-                    else:
-                        print(f"  Skipping '{potential_id}': Missing tags.json or *.safetensors file.")
-                elif potential_id == "JTP-3":
-                    # JTP-3 only requires safetensors (tags embedded in model)
+                # Validate requirements based on model family
+                family = MODEL_FAMILY.get(potential_id)
+                if family == "hydra":
+                    # Hydra models only require a safetensors file
                     if has_model_file:
                         print(f"  Found valid supported model: '{potential_id}'")
                         discovered_ids.append(potential_id)
                     else:
                         print(f"  Skipping '{potential_id}': Missing *.safetensors file.")
                 else:
-                    # Unknown model type
+                    # JTP-2 (and unknown) models require both tags.json and safetensors
                     if has_tags and has_model_file:
                         print(f"  Found valid supported model: '{potential_id}'")
                         discovered_ids.append(potential_id)
@@ -322,6 +342,42 @@ class ClassifierManager(QObject):
     def get_display_name(self, model_id: str) -> str:
         """Gets the user-friendly display name for a given model ID."""
         return SUPPORTED_MODELS.get(model_id, model_id) # Return ID if no display name found
+
+    def get_active_capabilities(self) -> dict[str, bool]:
+        """
+        Reports what postprocessing the active model supports, so the UI can
+        configure itself per model. Keyed off the active model id (available even
+        before the model finishes loading) rather than the loaded model, so the
+        panel can reconfigure the moment the selection changes.
+
+        Returns a dict with:
+            supports_calibration: per-tag calibrated thresholds + confidence slider
+            supports_implications: implication-mode dropdown (add/remove implied)
+        """
+        family = MODEL_FAMILY.get(self.active_model_id)
+        is_hydra = family == "hydra"
+        return {
+            "supports_calibration": is_hydra,
+            "supports_implications": is_hydra,
+        }
+
+    def set_confidence(self, value: float) -> None:
+        """Set the Hydra confidence (0..1); drives the calibration F-score beta."""
+        self.current_confidence = float(value)
+
+    def set_implication_mode(self, mode: str) -> None:
+        """Set the Hydra implication mode ('off' / 'inherit' / 'remove' / ...)."""
+        self.current_implication_mode = mode
+
+    def recompute_results(self) -> None:
+        """
+        Re-apply calibration + implications to the cached raw output (Hydra only),
+        WITHOUT re-running the model. Used when the confidence slider or implication
+        mode changes. No-op for JTP-2 (the panel filters those locally).
+        """
+        if self.model_family != "hydra" or self.raw_output is None:
+            return
+        self._run_postprocess()
 
     def _set_paths_for_active_model(self, model_id: str):
         """Helper to set the internal paths based on the active model ID."""
@@ -385,6 +441,12 @@ class ClassifierManager(QObject):
             self.preprocess_fn = None  # Reset function pointers
             self.inference_fn = None
 
+            # Drop Hydra postprocessing state tied to the previous model
+            self.raw_output = None
+            self.raw_output_model_id = None
+            self.calibration_cache.clear()
+            self._calibrating_keys.clear()
+
             if was_cuda and torch.cuda.is_available():
                 print("Clearing CUDA cache...")
                 torch.cuda.empty_cache() # Release GPU memory
@@ -417,13 +479,89 @@ class ClassifierManager(QObject):
     # --- Slots to receive results from worker ---
     @Slot(list)
     def _handle_worker_result(self, results):
+        """JTP-2 result path: raw (tag, score) list -> overrides -> emit."""
         print("MainThread: Received analysis_finished signal from worker.")
+        self._emit_results(results)
 
-        # Apply tag overrides (blacklist/translation) before emitting
+    def _emit_results(self, results):
+        """Apply tag overrides (blacklist/translation/dedup) then emit results."""
         from tail_tagger.classifier_overrides import TagOverrideManager
         results = TagOverrideManager.apply_overrides(results, self.active_model_id)
-
         self.analysis_finished.emit(results) # Relay the signal
+
+    # --- Hydra postprocessing (calibration + implications on cached raw output) ---
+    @Slot(object, str)
+    def _handle_hydra_inference_ready(self, probabilities, model_id):
+        """Cache the raw probability vector from a Hydra inference and postprocess it."""
+        if model_id != self.active_model_id:
+            print(f"MainThread: Ignoring stale Hydra inference for '{model_id}'.")
+            return
+        self.raw_output = probabilities
+        self.raw_output_model_id = model_id
+        self._run_postprocess()
+
+    def _run_postprocess(self):
+        """
+        Turn the cached raw output into a final tag list using the current
+        confidence + implication mode. Calibration is the expensive step (~1s), so
+        it runs in a background worker and is cached per (model_id, confidence);
+        classification is cheap and done inline. Revisited confidence values and
+        implication-mode changes therefore resolve instantly.
+        """
+        if self.raw_output is None or self.model_family != "hydra":
+            return
+
+        model_id = self.active_model_id
+        value = self.current_confidence
+        key = (model_id, value)
+
+        calibration = self.calibration_cache.get(key)
+        if calibration is not None:
+            self._classify_and_emit(calibration)
+            return
+
+        # Calibration not cached: build it off the UI thread (show "Calibrating...").
+        if key in self._calibrating_keys:
+            return # already building; _handle_calibration_ready will re-run postprocess
+        self._calibrating_keys.add(key)
+        self.calibrating.emit(True)
+        worker = CalibrationWorker(model=self.model, model_id=model_id, confidence=value)
+        worker.signals.calibration_ready.connect(self._handle_calibration_ready)
+        worker.signals.error.connect(self._handle_calibration_error)
+        self.thread_pool.start(worker)
+
+    @Slot(object, str, float)
+    def _handle_calibration_ready(self, calibration, model_id, confidence):
+        """Cache a freshly built calibration and (re-)run postprocess for the current state."""
+        self._calibrating_keys.discard((model_id, confidence))
+        if model_id != self.active_model_id:
+            print(f"MainThread: Ignoring stale calibration for '{model_id}'.")
+            if not self._calibrating_keys:
+                self.calibrating.emit(False)
+            return
+        self.calibration_cache[(model_id, confidence)] = calibration
+        if not self._calibrating_keys:
+            self.calibrating.emit(False)
+        # Re-run for the CURRENT confidence (the slider may have moved again).
+        self._run_postprocess()
+
+    @Slot(str)
+    def _handle_calibration_error(self, error_message):
+        print(f"MainThread: Calibration error: {error_message}")
+        self._calibrating_keys.clear()
+        self.calibrating.emit(False)
+        self.error_occurred.emit(f"Calibration failed: {error_message}")
+
+    def _classify_and_emit(self, calibration):
+        """Apply calibrated thresholds + implications to the cached raw output, then emit."""
+        if self.raw_output is None:
+            return
+        results_dict = calibration.classify_output(
+            self.raw_output,
+            implications=self.current_implication_mode,
+            sort=True,
+        )
+        self._emit_results(list(results_dict.items()))
 
     @Slot(str)
     def _handle_worker_error(self, error_message):
@@ -442,16 +580,22 @@ class ClassifierManager(QObject):
         self.is_loading = False
 
         # Set model family and function pointers based on active model
-        if self.active_model_id in ["JTP_PILOT", "JTP_PILOT2"]:
+        family = MODEL_FAMILY.get(self.active_model_id)
+        if family == "jtp2":
             self.model_family = "jtp2"
             self.preprocess_fn = preprocess_jtp2
             self.inference_fn = run_inference_jtp2
             print("MainThread: Set model family to 'jtp2'")
-        elif self.active_model_id == "JTP-3":
-            self.model_family = "jtp3"
-            self.preprocess_fn = preprocess_jtp3
-            self.inference_fn = run_inference_jtp3
-            print("MainThread: Set model family to 'jtp3'")
+        elif family == "hydra":
+            self.model_family = "hydra"
+            # Hydra preprocessing/inference are driven directly via the model in the
+            # worker; no free-function pointers needed. Fresh model -> drop any
+            # cached raw output/calibrations from a previous model.
+            self.preprocess_fn = None
+            self.inference_fn = None
+            self.raw_output = None
+            self.raw_output_model_id = None
+            print("MainThread: Set model family to 'hydra'")
         else:
             print(f"WARNING: Unknown model family for {self.active_model_id}")
             self.model_family = None
@@ -474,7 +618,7 @@ class ClassifierManager(QObject):
         self.allowed_tags = None
         self.is_loading = False
         self.pending_analysis_path = None
-        self.error_occurred.emit(f"Model loading failed: {error_message}") # Emit manager's error signal
+        self.error_occurred.emit(f"Model failed to load: {error_message}")
 
 
 
@@ -484,6 +628,8 @@ class WorkerSignals(QObject):
     error = Signal(str)
     model_loaded = Signal(object, list) # Emit model object and tag list
     loading_error = Signal(str)
+    inference_ready = Signal(object, str) # Hydra: raw probabilities tensor + model_id
+    calibration_ready = Signal(object, str, float) # Hydra: Calibration + model_id + confidence
 
 # --- Load Model Worker (Runs on Background Thread) ---
 class LoadModelWorker(QRunnable):
@@ -523,17 +669,28 @@ class LoadModelWorker(QRunnable):
                     device=self.device,
                     model_id=self.model_id
                 )
-            elif self.model_id == "JTP-3":
-                print("LoadWorker: Using JTP-3 inference module...")
-                model, allowed_tags = load_jtp3_model(
+            elif MODEL_FAMILY.get(self.model_id) == "hydra":
+                print("LoadWorker: Using Hydra inference module...")
+                # Pass the model's own folder as the legacy metadata dir. It is
+                # required by JTP-3 (rr_hydra, reads <name>-tags.csv/-val.csv there)
+                # and harmlessly ignored by Hydra 3.5 (rr_hydra2, self-contained).
+                model, allowed_tags = load_hydra_model(
                     model_path=self.model_path,
-                    device=self.device
+                    device=self.device,
+                    legacy_metadata_dir=os.path.dirname(self.model_path),
                 )
             else:
                 raise RuntimeError(f"Unsupported model_id: {self.model_id}")
 
             self.signals.model_loaded.emit(model, allowed_tags)  # Emit success
 
+        except HydraMetadataMissingError as e:
+            # Legacy Hydra model (JTP-3) missing its -tags.csv / -val.csv metadata.
+            # The exception already carries a clean, actionable message — surface it
+            # as-is without the generic "Model file not found:" prefix.
+            error_msg = str(e)
+            print(f"LoadWorker: ERROR - {error_msg}")
+            self.signals.loading_error.emit(error_msg)
         except FileNotFoundError as e:
             # Handle specific FileNotFoundError before generic Exception
             error_msg = f"Model file not found: {e}"
@@ -604,61 +761,65 @@ class AnalysisWorker(QRunnable):
             self.signals.error.emit(str(e))
 
 
-# --- Analysis Worker for JTP-3 (Runs on Background Thread) ---
-class AnalysisWorkerJTP3(QRunnable):
-    def __init__(self, model_id, patches, coords, valid, model, device, allowed_tags, inference_fn):
+# --- Hydra Inference Worker (Runs on Background Thread) ---
+class HydraInferenceWorker(QRunnable):
+    """
+    Preprocess (pyvips) + forward pass for a Hydra model, off the UI thread.
+
+    Emits the raw per-tag probability vector; calibration/implication/thresholding
+    is applied by the manager on the main thread (cheap) and cached.
+    """
+    def __init__(self, model_id, model, image_path, device):
         super().__init__()
         self.signals = WorkerSignals()
         self.model_id = model_id
-        self.patches = patches
-        self.coords = coords
-        self.valid = valid
         self.model = model
+        self.image_path = image_path
         self.device = device
-        self.allowed_tags = allowed_tags
-        self.inference_fn = inference_fn
 
     @Slot()
     def run(self):
         try:
-            # --- Run Inference using provided function ---
-            print("Worker: Running JTP-3 inference...")
-            probabilities = self.inference_fn(
-                model=self.model,
-                patches=self.patches,
-                coords=self.coords,
-                valid=self.valid,
-                device=self.device
-            )
-
-            # --- Post-processing ---
-            print("Worker: Post-processing results...")
-            # 1. Thresholding (find indices above threshold)
-            probabilities_cpu = probabilities.cpu()  # Move to CPU for thresholding/indexing
-            INTERNAL_THRESHOLD = 0.01  # Filter out only extremely unlikely tags
-            indices = torch.where(probabilities_cpu > INTERNAL_THRESHOLD)[0]
-            values = probabilities_cpu[indices]
-
-            # 2. Map indices to tags and store scores
-            results = []
-            for i in range(indices.size(0)):
-                tag_index = indices[i].item()
-                if 0 <= tag_index < len(self.allowed_tags):
-                    tag_name = self.allowed_tags[tag_index]
-                    score = values[i].item()
-                    results.append((tag_name, score))
-                else:
-                    print(f"Warning: Index {tag_index} out of bounds for allowed_tags.")
-
-            # 3. Sort by score (descending)
-            results.sort(key=lambda x: x[1], reverse=True)
-
-            print(f"Worker: Found {len(results)} tags above INTERNAL threshold {INTERNAL_THRESHOLD}.")
-            # 4. Emit results
-            self.signals.finished.emit(results)
-
+            print("Worker: Preprocessing + running Hydra inference...")
+            patches, sizes = preprocess_hydra(self.model, self.image_path, self.device)
+            probabilities = run_inference_hydra(self.model, patches, sizes)
+            self.signals.inference_ready.emit(probabilities, self.model_id)
+        except FileNotFoundError:
+            self.signals.error.emit(f"Image file not found at {self.image_path}")
         except Exception as e:
-            print(f"Worker: ERROR during JTP-3 analysis - {e}")
+            print(f"Worker: ERROR during Hydra inference - {e}")
             import traceback
-            traceback.print_exc()  # Print detailed traceback
+            traceback.print_exc()
+            self.signals.error.emit(str(e))
+
+
+# --- Hydra Calibration Worker (Runs on Background Thread) ---
+class CalibrationWorker(QRunnable):
+    """
+    Builds a per-tag :class:`Calibration` for a Hydra model at a given confidence.
+
+    This is the ~1s step (per-tag threshold selection over embedded validation
+    data), so it runs off the UI thread. Results are cached by the manager keyed
+    on (model_id, confidence).
+    """
+    def __init__(self, model, model_id, confidence):
+        super().__init__()
+        self.signals = WorkerSignals()
+        self.model = model
+        self.model_id = model_id
+        self.confidence = confidence
+
+    @Slot()
+    def run(self):
+        try:
+            print(f"Worker: Calibrating '{self.model_id}' at confidence {self.confidence:.3f}...")
+            start = time.time()
+            metric = simple_slider(self.confidence)
+            calibration = self.model.calibrate(metric)
+            print(f"Worker: Calibration built in {time.time() - start:.2f}s.")
+            self.signals.calibration_ready.emit(calibration, self.model_id, self.confidence)
+        except Exception as e:
+            print(f"Worker: ERROR during calibration - {e}")
+            import traceback
+            traceback.print_exc()
             self.signals.error.emit(str(e))

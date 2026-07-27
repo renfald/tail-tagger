@@ -25,6 +25,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
+There is no automated test suite. Validate changes by running the app
+(`run.bat` / `./run.sh`) and exercising the affected panels.
+
 ## Project Architecture
 
 ### Core Components
@@ -41,10 +44,10 @@ python main.py
    - Implements search functionality
    - Tracks tag usage statistics
 
-3. **Classifier System** (`classifier_manager.py`, `classifier_panel.py`)
-   - Handles image analysis using machine learning models
-   - Supports multiple classifier models
-   - Processes model output with confidence thresholds
+3. **Classifier System** (`classifier_manager.py`, `classifier_panel.py`, `inference/`, `tail_tagger/hydra/`)
+   - Handles image analysis using ML models across two families, JTP-2 and Hydra (see Classifier System below)
+   - Loads and runs each model through per-family adapters in `inference/`
+   - Applies calibration + tag implications (Hydra) and `overrides.toml` post-processing
    - Runs analysis in background threads
 
 4. **Panel System**
@@ -81,12 +84,31 @@ python main.py
 
 ### Classifier System
 
-- Machine learning models are located in the `classifiers/` directory
-- Each model has:
-  - A weights file (`.safetensors`) 
-  - A tags mapping file (`tags.json`)
-- Analysis is performed asynchronously using QThreadPool
-- Confidence threshold is user-adjustable
+Models live in `classifiers/<model_id>/` and are grouped into **families** by
+`MODEL_FAMILY` in `classifier_manager.py`, which decides how each is loaded and
+post-processed:
+
+- **`jtp2`** — legacy JTP Pilot v1/v2. timm/torchvision with PIL preprocessing and a
+  flat, user-adjustable confidence threshold. Requires `<id>.safetensors` + `tags.json`.
+- **`hydra`** — JTP-3 and Hydra 3.5. Runs on the vendored Hydra package with pyvips
+  preprocessing and per-tag **calibration** + e621 tag **implications** instead of a flat
+  cutoff. JTP-3 (`rr_hydra`) also needs external `<id>-tags.csv` / `<id>-val.csv` in its
+  folder; Hydra 3.5 (`rr_hydra2`) is self-contained (labels + calibration data embedded in
+  the safetensors).
+
+Architecture layers:
+
+- `inference/` — thin per-family adapters (`jtp2_inference.py`, `hydra_inference.py`,
+  shared helpers in `base.py`) exposing load / preprocess / run-inference functions.
+- `tail_tagger/hydra/` — **vendored** copy of RedRocket's Hydra package. It carries three
+  local patches; read `tail_tagger/hydra/VENDOR_PATCHES.md` before updating it.
+- `tail_tagger/classifier_overrides/` — `TagOverrideManager` applies each model's
+  `overrides.toml` (blacklist / tag translation / dedup) as the final post-processing step.
+
+`ClassifierManager` orchestrates loading, inference, calibration, and overrides; all model
+work runs off the UI thread via `QThreadPool`/`QRunnable`, with results returned through Qt
+signals. Large model weights and the JTP-3 CSVs are gitignored and downloaded separately —
+see each model folder's `DOWNLOAD_INSTRUCTIONS.md`.
 
 ### UI Component Relationships
 
@@ -101,9 +123,10 @@ python main.py
 
 **Tag Bulk Operations** (`tail_tagger/bulk_operations/`):
 - Right-click context menu operations on tags
-- Three operations: Add to Beginning, Add to End, Remove from All
+- Four operations: Add to Beginning, Add to End, Remove from All, Replace in All (in-place)
 - `BulkOperationsManager` handles core logic (direct workfile manipulation)
 - `TagBulkOperationDialog` provides progress feedback and results
+- `ReplaceTagDialog` collects the replacement tag name before the operation runs
 - `BulkOperationWorker` runs operations in background thread
 - Operations are typically sub-second even on 1000+ images
 - Backups created in `staging/backups/` before modifications
@@ -148,17 +171,18 @@ tail_tagger/                    # Application package
 └── bulk_operations/            # Bulk operations module
     ├── __init__.py             # Exports BulkOperationsManager, TagBulkOperationDialog, etc.
     ├── manager.py              # Core logic for bulk tag operations
-    └── tag_operations_dialog.py # UI for right-click tag operations
+    ├── tag_operations_dialog.py # Progress/result UI for right-click tag operations
+    └── replace_tag_dialog.py   # Input dialog for the Replace in All Images operation
 ```
 
 Import style:
 ```python
-from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationDialog
+from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationDialog, ReplaceTagDialog
 ```
 
 ## File Format Information
 
-- `config.json`: Application settings (last folder, model ID, threshold)
+- `config.json`: Application settings (last folder, active model, confidence/threshold, implication mode)
 - `favorites.json`: List of favorite tag names
 - `usage_data.json`: Counter of tag usage frequency
 - Tag files: Comma-separated tag lists stored as .txt files

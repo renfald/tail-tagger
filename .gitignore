@@ -24,6 +24,10 @@ data/usage_data.json
 classifiers/**/*.safetensors
 classifiers/**/tags.json
 
+# JTP-3 legacy calibration metadata (download separately; -val.csv is ~42 MB)
+classifiers/**/*-tags.csv
+classifiers/**/*-val.csv
+
 # User-specific classifier overrides (example files are tracked)
 classifiers/*/overrides.toml
 

@@ -1,7 +1,7 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                              QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox, QApplication, QGraphicsOpacityEffect, QLineEdit)
-from PySide6.QtCore import Qt, Slot, QSize, Signal
+from PySide6.QtCore import Qt, Slot, QSize, Signal, QTimer
 from PySide6.QtGui import QAction, QIcon
 
 # Import TagWidget - it will be needed for placeholder logic
@@ -130,6 +130,38 @@ class ClassifierPanel(QWidget):
 
         layout.addLayout(controls_row2_layout)
 
+        # --- Controls Row 3: Implication mode (Hydra models only) ---
+        # Curated subset of Hydra's implication modes. Hidden for JTP-2 models,
+        # which have no tag-implication graph.
+        self.implication_row = QWidget()
+        implication_layout = QHBoxLayout(self.implication_row)
+        implication_layout.setContentsMargins(0, 0, 0, 0)
+        implication_layout.setSpacing(5)
+
+        self.implication_label = QLabel("Implied tags:")
+        implication_layout.addWidget(self.implication_label)
+
+        self.implication_selector = QComboBox()
+        self.implication_selector.setToolTip(
+            "How to handle e621 tag implications:\n"
+            "  Add implied  – add parent tags implied by detected tags (default)\n"
+            "  Remove redundant – keep only the most specific tags\n"
+            "  Off – threshold each tag independently"
+        )
+        self.implication_selector.addItem("Add implied", userData="inherit")
+        self.implication_selector.addItem("Remove redundant", userData="remove")
+        self.implication_selector.addItem("Off", userData="off")
+        implication_layout.addWidget(self.implication_selector, 1)
+
+        # Restore saved implication mode (global, not per-model)
+        saved_mode = self.main_window.config_manager.get_config_value("classifier_implication_mode")
+        if saved_mode:
+            mode_index = self.implication_selector.findData(saved_mode)
+            if mode_index != -1:
+                self.implication_selector.setCurrentIndex(mode_index)
+
+        layout.addWidget(self.implication_row)
+
         # --- Collapsible Filter Section (below model row) ---
         self.filter_content_widget = QWidget()
         filter_content_layout = QVBoxLayout(self.filter_content_widget)
@@ -172,13 +204,24 @@ class ClassifierPanel(QWidget):
         self.copy_tags_button.clicked.connect(self._handle_copy_tags_clicked)
         self.bulk_add_button.clicked.connect(self._handle_bulk_add_clicked)
 
+        # --- Debounce timer for Hydra confidence changes ---
+        # Rebuilding a calibration costs ~1s, so coalesce rapid slider changes and
+        # only recompute after the value settles. Instant for JTP-2 (which doesn't
+        # use this path) and for cached calibrations.
+        self._confidence_debounce = QTimer(self)
+        self._confidence_debounce.setSingleShot(True)
+        self._confidence_debounce.setInterval(250)
+        self._confidence_debounce.timeout.connect(self.classifier_manager.recompute_results)
+
         # --- Connect ClassifierManager Signals ---
         self.classifier_manager.analysis_started.connect(self._on_analysis_started)
         self.classifier_manager.analysis_finished.connect(self._on_analysis_finished)
         self.classifier_manager.error_occurred.connect(self._on_analysis_error)
+        self.classifier_manager.calibrating.connect(self._on_calibrating)
 
-        self.threshold_spinbox.valueChanged.connect(self._update_displayed_tags)
+        self.threshold_spinbox.valueChanged.connect(self._handle_confidence_changed)
         self.threshold_spinbox.valueChanged.connect(self._save_threshold_setting)
+        self.implication_selector.currentIndexChanged.connect(self._handle_implication_changed)
         self.filter_toggle_button.toggled.connect(self._handle_filter_toggle)
         self.filter_input.textChanged.connect(self._update_displayed_tags)
 
@@ -186,6 +229,9 @@ class ClassifierPanel(QWidget):
 
         # Populate model selector after all UI elements are created
         self._populate_model_selector()
+
+        # Configure controls for whichever model is initially active
+        self._configure_for_active_model()
 
         print("ClassifierPanel UI Setup Complete and signals connected.")
 
@@ -306,16 +352,22 @@ class ClassifierPanel(QWidget):
             self._set_bulk_add_button_enabled(False)
             return
 
-        current_threshold = self.threshold_spinbox.value()
-        print(f"Updating display based on threshold: {current_threshold:.2f}")
-
         self._clear_results_widgets() # Clear previous widgets
 
-        # --- Filter results based on current threshold ---
-        filtered_results = [
-            (tag_name, score) for tag_name, score in self.raw_results
-            if score >= current_threshold
-        ]
+        # --- Base result set ---
+        # For Hydra models the manager already applied per-tag calibrated thresholds,
+        # so self.raw_results IS the final set (the confidence slider drives that
+        # calibration upstream). For JTP-2 the slider is a flat cutoff applied here.
+        supports_calibration = self.classifier_manager.get_active_capabilities()["supports_calibration"]
+        if supports_calibration:
+            filtered_results = list(self.raw_results)
+        else:
+            current_threshold = self.threshold_spinbox.value()
+            print(f"Updating display based on threshold: {current_threshold:.2f}")
+            filtered_results = [
+                (tag_name, score) for tag_name, score in self.raw_results
+                if score >= current_threshold
+            ]
 
         # --- Apply tag name filter (display only) ---
         filter_text = self.filter_input.text() if hasattr(self, 'filter_input') else ""
@@ -367,7 +419,10 @@ class ClassifierPanel(QWidget):
             if filter_is_active:
                 self.status_label.setText("No tags match filter")
             elif self.raw_results: # Check if analysis actually ran
-                self.status_label.setText(f"No suggestions above threshold {current_threshold:.2f}")
+                if supports_calibration:
+                    self.status_label.setText("No suggestions at this confidence")
+                else:
+                    self.status_label.setText(f"No suggestions above threshold {self.threshold_spinbox.value():.2f}")
             # else: status is likely "Ready" or "Loading", don't overwrite
         print(f"Displayed {widgets_added} widgets.")
 
@@ -541,6 +596,63 @@ class ClassifierPanel(QWidget):
         # print(f"Saving new threshold: {value:.2f}") # Debug
         self.main_window.config_manager.set_config_value("classifier_threshold", value)
 
+    def _configure_for_active_model(self):
+        """
+        Reconfigure the panel for whichever model is active. Runs on init and on
+        every model change so the UI reflects the active model's capabilities:
+        Hydra models get the confidence-slider semantics + implications dropdown;
+        JTP-2 models get the legacy flat-threshold slider and no implications.
+        """
+        caps = self.classifier_manager.get_active_capabilities()
+        supports_calibration = caps["supports_calibration"]
+        supports_implications = caps["supports_implications"]
+
+        # Implications dropdown: Hydra only
+        self.implication_row.setVisible(supports_implications)
+
+        # Slider semantics / help text
+        if supports_calibration:
+            self.threshold_spinbox.setToolTip(
+                "Confidence: 0.0 (most speculative) to 1.0 (most confident). "
+                "Drives per-tag calibrated thresholds."
+            )
+        else:
+            self.threshold_spinbox.setToolTip(
+                "Minimum confidence score for a tag to be displayed."
+            )
+
+        # Push current control values into the manager so a subsequent analysis
+        # (or recompute) uses them.
+        if supports_calibration:
+            self.classifier_manager.set_confidence(self.threshold_spinbox.value())
+            self.classifier_manager.set_implication_mode(self.implication_selector.currentData())
+
+    @Slot(float)
+    def _handle_confidence_changed(self, value):
+        """Slider changed: drive Hydra calibration (debounced) or JTP-2 flat filter."""
+        if self.classifier_manager.get_active_capabilities()["supports_calibration"]:
+            self.classifier_manager.set_confidence(value)
+            if self.classifier_manager.raw_output is not None:
+                self._confidence_debounce.start()  # coalesce, then recompute_results
+        else:
+            self._update_displayed_tags()
+
+    @Slot(int)
+    def _handle_implication_changed(self, _index):
+        """Implication mode changed (Hydra): re-classify instantly, no re-inference."""
+        mode = self.implication_selector.currentData()
+        self.main_window.config_manager.set_config_value("classifier_implication_mode", mode)
+        if self.classifier_manager.get_active_capabilities()["supports_implications"]:
+            self.classifier_manager.set_implication_mode(mode)
+            if self.classifier_manager.raw_output is not None:
+                self.classifier_manager.recompute_results()
+
+    @Slot(bool)
+    def _on_calibrating(self, is_calibrating):
+        """Show a transient status while a (slow) calibration builds."""
+        if is_calibrating:
+            self.status_label.setText("Calibrating...")
+
     @Slot(str) # Receives the display text of the selected item
     def _handle_model_selection_changed(self, display_name):
         """Handles a change in the selected model from the ComboBox."""
@@ -559,6 +671,9 @@ class ClassifierPanel(QWidget):
 
         # --- Call the ClassifierManager method to perform the switch ---
         self.classifier_manager.set_active_model(selected_model_id)
+
+        # --- Reconfigure controls for the newly selected model's capabilities ---
+        self._configure_for_active_model()
 
         # --- Update UI State for the new model ---
         # Clear previous analysis results (they are for the old model)
