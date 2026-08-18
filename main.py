@@ -43,7 +43,8 @@ from keyboard_manager import KeyboardManager
 from classifier_manager import ClassifierManager
 from tag_list_model import TagListModel, TagData
 from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationDialog, ReplaceTagDialog
-
+from resizeable_scroll_area import ResizableScrollArea
+from grid_panel import GridPanel
 from left_panel_container import LeftPanelContainer
 from center_panel import CenterPanel
 from selected_tags_panel import SelectedTagsPanel
@@ -51,7 +52,7 @@ from selected_tags_panel import SelectedTagsPanel
 # Start application timer
 app_start_time = time.time()
 import resources.resources_rc as resources_rc  
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel, QSizePolicy, 
+from PySide6.QtWidgets import (QApplication, QMainWindow, QScrollArea, QWidget, QHBoxLayout, QFrame, QLabel, QSizePolicy, 
                                QVBoxLayout, QPushButton, QSpacerItem, QFileDialog, QSplitter, QMessageBox)
 from PySide6.QtCore import Qt, QTimer, Slot, QUrl
 from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QDesktopServices
@@ -171,14 +172,14 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(0)
 
         # --- Main Horizontal Splitter (Left, Center, Right) ---
-        main_splitter = QSplitter(Qt.Horizontal)
-        main_splitter.setChildrenCollapsible(False)
-        main_layout.addWidget(main_splitter) # Add splitter to main layout
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.setChildrenCollapsible(False)
+        main_layout.addWidget(self.main_splitter) # Add splitter to main layout
 
 
         # --- Left Panel ---
         self.left_panel_container = LeftPanelContainer(main_window=self, classifier_manager=self.classifier_manager)
-        main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
+        self.main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
 
         # Connect auto-analyze signal from classifier panel
         self.left_panel_container.classifier_panel.auto_analyze_toggled.connect(self._handle_auto_analyze_toggled)
@@ -188,17 +189,26 @@ class MainWindow(QMainWindow):
         self.center_panel = CenterPanel()
         self.center_panel.setFrameShape(QFrame.StyledPanel)
         self.center_panel.setMinimumSize(100, 100)
-        main_splitter.addWidget(self.center_panel)  # Add to splitter
+        self.main_splitter.addWidget(self.center_panel)  # Add to splitter
 
+        # --- Grid Panel ---
+        self.grid_panel_layout = GridPanel(main_window=self)
+        self.grid_panel = ResizableScrollArea()
+        self.grid_panel.setWidgetResizable(True)
+        self.grid_panel.setWidget(self.grid_panel_layout)
+        self.grid_panel_layout.scroll_area = self.grid_panel
+        self.grid_panel.resized.connect(
+            self.grid_panel_layout.update_grid
+        )
         # --- Right Panel (Selected Tags) ---
-        main_splitter.addWidget(self.selected_tags_panel)  # Add panel directly to splitter
+        self.main_splitter.addWidget(self.selected_tags_panel)  # Add panel directly to splitter
 
         # Set initial sizes for the splitter. Essentially left and right will be fixed width between this and the set stretch factors
-        main_splitter.setSizes([150, 200, 150])
+        self.main_splitter.setSizes([150, 200, 150])
         # Set stretch factors. 0 = fixed size, 1 = stretchable
-        main_splitter.setStretchFactor(0, 0) # Left Panel
-        main_splitter.setStretchFactor(1, 1) # Center Panel
-        main_splitter.setStretchFactor(2, 0) # Right Panel
+        self.main_splitter.setStretchFactor(0, 0) # Left Panel
+        self.main_splitter.setStretchFactor(1, 1) # Center Panel
+        self.main_splitter.setStretchFactor(2, 0) # Right Panel
 
 
         # --- Bottom Panel (Image Info and Buttons) ---
@@ -294,6 +304,7 @@ class MainWindow(QMainWindow):
             print(f"Found {len(self.image_paths)} images in folder: {folder_path}")
             self.current_image_index = 0
             self._load_and_display_image(self.image_paths[0])
+            self.grid_panel_layout.set_image_paths(self.image_paths)
             self._update_index_label()
             self.prev_button.setEnabled(True)
             self.next_button.setEnabled(True)
@@ -350,6 +361,14 @@ class MainWindow(QMainWindow):
         print(f"Total tags in model: {total_tags}")
         print(f"Selected tags: {selected_tags}")
         print(f"Unknown tags: {unknown_tags}")
+
+    def _cycle_image_layout(self):
+        """Cycles through the image display layouts in the center panel."""
+        if self.main_splitter.widget(1) == self.center_panel:
+            self.grid_panel.setSizePolicy(self.center_panel.sizePolicy())
+            self.main_splitter.replaceWidget(1, self.grid_panel)
+        else:
+            self.main_splitter.replaceWidget(1, self.center_panel)  
 
     def _update_index_label(self):
         """Updates the image index label."""
