@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget, QApplication
 from PySide6.QtGui import QAction, QIcon
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QSize, Qt
 from tag_list_panel import TagListPanel
 from file_operations import FileOperations
 
@@ -31,16 +31,26 @@ class SelectedTagsPanel(TagListPanel):
         # Index 1 is right after the title_label, pushing scroll_area down
         # TODO: This feels like an oversight in the base class design. Tag Panels do not natively support adding widgets 
         # between title and scroll area. Consider refactoring base class to allow more flexible layouts.
-        self.main_layout.insertWidget(1, button_row_widget, 0)  # 0 stretch factor
+        self.main_layout.insertWidget(1, button_row_widget, 0, Qt.AlignLeft)  # 0 stretch factor
 
         # Connect button signal
         self.copy_tags_button.clicked.connect(self._handle_copy_tags_clicked)
+        
+        # Image Layout button. Positioning it here is lwk a bandaid fix cause idk where else to put it, I'm not a UX designer
+        self.change_layout_button = QPushButton()
+        self.change_layout_button.setIcon(QIcon("./resources/icons/grid_view.svg"))
+
+        self.change_layout_button.setToolTip("Change Image Display Layout")
+        self.change_layout_button.setFixedSize(28, 30)
+        self.change_layout_button.setIconSize(QSize(22, 22))
+        button_row_layout.addWidget(self.change_layout_button)    
+        self.change_layout_button.clicked.connect(self._handle_change_layout_clicked)
 
     def _handle_copy_tags_clicked(self):
         """Copies all selected tags for current image to clipboard."""
         # Get the selected tags list from main window
         selected_tags = self.main_window.selected_tags_for_current_image
-
+        
         # Convert tag names from underscores to spaces
         spaced_tags = [
             FileOperations.convert_underscores_to_spaces(tag.name)
@@ -55,6 +65,13 @@ class SelectedTagsPanel(TagListPanel):
         clipboard.setText(tags_string)
 
         print(f"Copied {len(spaced_tags)} tags to clipboard")
+
+    def _handle_change_layout_clicked(self):
+        """Handles the Change Image Display Layout button click."""
+        if self.main_window:
+            self.main_window._cycle_image_layout()
+        else:
+            print("Warning: SelectedTagsPanel does not have access to MainWindow instance.")
 
     def get_styling_mode(self):
         return "ignore_select"  # Right panel ignores selection for styling
