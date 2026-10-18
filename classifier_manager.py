@@ -14,6 +14,7 @@ from inference import (
     HydraMetadataMissingError,
 )
 from tail_tagger.hydra.classification import simple_slider
+from file_operations import FileOperations
 
 # --- Known/Supported Models and Display Names ---
 # Maps internal model_id (folder name) to user-friendly display name
@@ -179,6 +180,12 @@ class ClassifierManager(QObject):
         """
         
         print(f"\n--- Requesting Asynchronous Analysis for: {os.path.basename(image_path)} ---")
+
+        # The classifier models only accept still images
+        if FileOperations.is_video_file(image_path):
+            print("Analysis skipped: video files are not supported.")
+            self.error_occurred.emit("Video files can't be analyzed")
+            return
 
         # --- Check if model is ready or start loading ---
         model_ready = self._ensure_loaded()

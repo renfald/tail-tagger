@@ -6,6 +6,8 @@ class FileOperations:
     """Handles file system operations for the image tagger."""
 
     staging_folder_path = None  # Class variable for staging folder
+    IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+    VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.mkv', '.avi']
 
     def __init__(self):
         pass
@@ -91,7 +93,7 @@ class FileOperations:
         """Gathers tag data for all images in the specified folder."""
         all_tags = {}
         workfile_path = self.get_workfile_path(folder_path)
-        image_paths = self.get_sorted_image_files(folder_path)
+        image_paths = self.get_sorted_media_files(folder_path)
 
         try:
             with open(workfile_path, 'r', encoding='utf-8') as f:
@@ -271,7 +273,7 @@ class FileOperations:
             print(f"Creating new workfile structure for {folder_path}")
 
         # Get all image files in folder
-        image_paths = self.get_sorted_image_files(folder_path)
+        image_paths = self.get_sorted_media_files(folder_path)
 
         if not image_paths:
             print(f"No images found in folder: {folder_path}")
@@ -348,6 +350,13 @@ class FileOperations:
         self._save_json_file(favorites_file_path, {"favorites": tag_names})
 
     @staticmethod
+    def is_video_file(path):
+        """Returns True if the given path has a recognized video extension."""
+        if not path:
+            return False
+        return os.path.splitext(path)[1].lower() in FileOperations.VIDEO_EXTENSIONS
+
+    @staticmethod
     def convert_underscores_to_spaces(tag_name):
         """Converts underscores in a tag name to spaces for display."""
         return tag_name.replace('_', ' ')
@@ -418,16 +427,16 @@ class FileOperations:
         usage_data_path = os.path.join(os.getcwd(), "data", "usage_data.json")
         return self._save_json_file(usage_data_path, {})
 
-    def get_sorted_image_files(self, folder_path):
-        """Gets a naturally sorted list of image file paths from a directory."""
+    def get_sorted_media_files(self, folder_path):
+        """Gets a naturally sorted list of image and video file paths from a directory."""
         import re
 
         def natural_sort_key(s):
             return [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', s)]
 
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        media_extensions = FileOperations.IMAGE_EXTENSIONS + FileOperations.VIDEO_EXTENSIONS
         try:
-            filenames = [f for f in os.listdir(folder_path) if any(f.lower().endswith(ext) for ext in image_extensions)]
+            filenames = [f for f in os.listdir(folder_path) if any(f.lower().endswith(ext) for ext in media_extensions)]
             filenames.sort(key=natural_sort_key)
             return [os.path.join(folder_path, f) for f in filenames]
         except FileNotFoundError:

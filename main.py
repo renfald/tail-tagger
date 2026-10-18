@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
         self.auto_analyze_timer = QTimer(self)
         self.auto_analyze_timer.setSingleShot(True) # Important: only fire once per start
         self.auto_analyze_timer.timeout.connect(self._trigger_auto_analysis_from_timer)
-        self.AUTO_ANALYZE_DELAY_MS = 1500 # 1.5 seconds (configurable if needed later)
+        self.AUTO_ANALYZE_DELAY_MS = 100 # 1.5 seconds (configurable if needed later)
         self.auto_analyze_enabled = False
 
         # --- Global Keyboard Shortcuts ---
@@ -288,7 +288,7 @@ class MainWindow(QMainWindow):
         # Update folder path label with elided text
         self._update_folder_path_label(folder_path)
         
-        self.image_paths = self.file_operations.get_sorted_image_files(folder_path)
+        self.image_paths = self.file_operations.get_sorted_media_files(folder_path)
 
         if self.image_paths:
             print(f"Found {len(self.image_paths)} images in folder: {folder_path}")
@@ -309,7 +309,7 @@ class MainWindow(QMainWindow):
     def _load_and_display_image(self, image_path):
         """Loads and displays an image, loads associated tags."""
 
-        self.center_panel.set_image_path(image_path)
+        self.center_panel.set_media_path(image_path)
         filename = os.path.basename(image_path)
         self.filename_label.setText(filename)
         # current_image_path used for workfile updates
