@@ -32,7 +32,7 @@ class FavoritesPanel(TagListPanel):
 
     def _handle_post_drop_update(self, tag_name, original_index, new_index):
         """Save favorites after tag order changes."""
-        self.main_window.file_operations.save_favorites(self.main_window.favorite_tags_ordered)
+        self.main_window.move_favorite(tag_name)
         print(f"  favorites.json updated with new tag order.")
 
     

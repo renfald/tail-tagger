@@ -123,21 +123,15 @@ class TagWidget(QFrame):
         if event.button() == Qt.LeftButton:
             self.start_drag_pos = event.pos()  # Record starting position
             self.start_drag_global_pos = event.globalPos() # Needed for calculating global distance
-            print(f"Mouse press event. tag: {self.tag_name}, pos: {self.start_drag_pos}, global: {self.start_drag_global_pos}") # Debug
 
     def mouseMoveEvent(self, event):
         """Handles mouse move events to initiate drag operation."""
-        print(f"mouseMoveEvent called for tag: {self.tag_name}") # Debug
-
         if event.buttons() != Qt.LeftButton: # Check if left button is still pressed
-            print(f"mouseMoveEvent: Ignoring because left button is not pressed.") #Debug
             return # Ignore if not left button drag
 
         dx = event.globalPos().x() - self.start_drag_global_pos.x() # Calculate horizontal movement
         dy = event.globalPos().y() - self.start_drag_global_pos.y() # Calculate vertical movement
         distance = sqrt(dx * dx + dy * dy) # Calculate total distance using hypotenuse
-
-        print(f"mouseMoveEvent: tag={self.tag_name}, distance={distance:.2f}") # Debug
 
         # Get the parent panel to check if the tag is draggable
         parent_panel = self.parent()
@@ -148,7 +142,6 @@ class TagWidget(QFrame):
         is_draggable = False
         if parent_panel and hasattr(parent_panel, 'is_tag_draggable'):
             is_draggable = parent_panel.is_tag_draggable(self.tag_name)
-            print(f"Tag '{self.tag_name}' draggable: {is_draggable}")
         
         if distance > 8: # Drag threshold (pixels) - Always initiate a drag to allow "escape" from misclicks
             print(f"Initiating drag for tag: {self.tag_name}") # Debug
@@ -321,6 +314,7 @@ class TagWidget(QFrame):
         self.is_selected = self.tag_data.selected
         self.is_known_tag = self.tag_data.is_known
         self._update_style()
+        self.set_favorite_state()
         self._update_elided_text()
             
     def hideEvent(self, event):

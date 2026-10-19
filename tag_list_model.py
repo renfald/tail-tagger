@@ -157,24 +157,27 @@ class TagListModel(QAbstractListModel):
         
         # Update tags_by_name dictionary
         self.tags_by_name[tag_data.name] = tag_data
-        
+
         # Only add known tags to the search index
         if tag_data.is_known:
-            # Add to search index
-            tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower())
-            
-            # Index the full tag name
-            if tag_name_spaces not in self.search_index:
-                self.search_index[tag_name_spaces] = []
+            self.index_tag(tag_data)
+
+    def index_tag(self, tag_data):
+        """Adds a tag to the search index under its full name and each word."""
+        tag_name_spaces = FileOperations.convert_underscores_to_spaces(tag_data.name.lower())
+
+        # Index the full tag name
+        if tag_name_spaces not in self.search_index:
+            self.search_index[tag_name_spaces] = []
+        if tag_data not in self.search_index[tag_name_spaces]:
             self.search_index[tag_name_spaces].append(tag_data)
-            
-            # Index each word separately
-            words = tag_name_spaces.split()
-            for word in words:
-                if word not in self.search_index:
-                    self.search_index[word] = []
-                if tag_data not in self.search_index[word]:
-                    self.search_index[word].append(tag_data)
+
+        # Index each word separately
+        for word in tag_name_spaces.split():
+            if word not in self.search_index:
+                self.search_index[word] = []
+            if tag_data not in self.search_index[word]:
+                self.search_index[word].append(tag_data)
 
     def remove_tag(self, tag_data_to_remove):
         """Removes a specific TagData object from the tag list."""

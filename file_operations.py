@@ -343,11 +343,10 @@ class FileOperations:
         )
         return data.get("favorites", [])
         
-    def save_favorites(self, favorite_tags):
+    def save_favorites(self, tag_names):
         """Saves the ordered list of favorite tag names to favorites.json."""
         favorites_file_path = os.path.join(os.getcwd(), "data", "favorites.json")
-        tag_names = [tag.name for tag in favorite_tags] # Extract names!
-        self._save_json_file(favorites_file_path, {"favorites": tag_names})
+        self._save_json_file(favorites_file_path, {"favorites": list(tag_names)})
 
     @staticmethod
     def is_video_file(path):

@@ -99,7 +99,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
     def dragEnterEvent(self, event):
         """Handles drag enter events for the panel."""
         # Check if dragging is allowed in this panel for the tag being dragged
-        if event.mimeData().hasText() and self._is_any_tag_draggable():
+        if self._accepts_drag(event):
             event.acceptProposedAction()
             print("Drag Enter Event: Drag accepted for text data.")
             
@@ -116,7 +116,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
 
     def dragMoveEvent(self, event):
         """Handles drag move events for the panel, updating drop indicator."""
-        if event.mimeData().hasText() and self._is_any_tag_draggable():
+        if self._accepts_drag(event):
             event.acceptProposedAction()
             drop_pos = event.pos()
             # Convert position to be relative to the tags container
@@ -143,12 +143,12 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             self.drop_indicator_line.hide() # Hide the indicator when drag leaves
         self.dragged_tag_name = None  # Reset dragged tag name
         
-    def _is_any_tag_draggable(self):
-        """Helper method to check if this panel supports dragging any tags."""
-        for tag_data in self._get_tag_data_list():
-            if self.is_tag_draggable(tag_data.name):
-                return True
-        return False
+    def _accepts_drag(self, event):
+        """Accepts only drags of a draggable tag that started in this panel."""
+        source = event.source()
+        return (isinstance(source, TagWidget)
+                and self.isAncestorOf(source)
+                and self.is_tag_draggable(source.tag_name))
         
     def _ensure_drop_indicator_exists(self):
         """Helper method to initialize the drop indicator line if it doesn't exist yet."""
@@ -219,7 +219,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
 
     def dropEvent(self, event):
         """Handles drop events for the panel, implementing tag reordering."""
-        if event.mimeData().hasText() and self._is_any_tag_draggable() and self.is_tag_draggable(event.mimeData().text()):
+        if self._accepts_drag(event):
             tag_name = event.mimeData().text()
             print(f"Drop Event: Tag '{tag_name}' dropped!")
 

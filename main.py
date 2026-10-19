@@ -84,7 +84,8 @@ class MainWindow(QMainWindow):
         They are populated with references to TagData objects from the model.
         This means any changes to the TagData objects in the model will be reflected in these lists automatically and vice versa."""
         self.selected_tags_for_current_image = []  # List of tags for the current image.
-        self.favorite_tags_ordered = []  # List of favorite tags in order.
+        self.favorite_tags_ordered = []  # Favorite tags known in the current tag source, in order.
+        self.favorite_tag_names = []  # All favorite tag names across every tag source, in order. This is what gets saved.
         
         # --- File Operations ---
         self.file_operations = FileOperations()
@@ -426,21 +427,38 @@ class MainWindow(QMainWindow):
         """Loads favorite tags from favorites.json and populates favorite_tags_ordered list."""
         print("Loading favorites...")
         
-        # Clear existing favorites
+        self.favorite_tag_names = self.file_operations.load_favorites()
+
+        # Only favorites that exist in the current tag source are shown
         self.favorite_tags_ordered = []
-        
-        # Load favorite tag names from file
-        favorite_tag_names = self.file_operations.load_favorites()
-        
-        # Find matching TagData objects in the current model and mark as favorites
-        for tag_name in favorite_tag_names:
-            for tag in self.tag_list_model.get_all_tags():
-                if tag.name == tag_name:
-                    tag.favorite = True
-                    self.favorite_tags_ordered.append(tag)
-                    break # Move to next fav tag name
-                    
-        print(f"Loaded {len(self.favorite_tags_ordered)} favorite tags")
+        for tag_name in self.favorite_tag_names:
+            tag = self.tag_list_model.tags_by_name.get(tag_name)
+            if tag and tag not in self.favorite_tags_ordered:
+                tag.favorite = True
+                self.favorite_tags_ordered.append(tag)
+
+        print(f"Loaded {len(self.favorite_tags_ordered)} of {len(self.favorite_tag_names)} favorite tags for this tag source")
+
+    def move_favorite(self, tag_name):
+        """Applies a reorder of the visible favorites to the full favorites list and saves it.
+
+        Call after favorite_tags_ordered has been reordered. The moved tag is placed in front of
+        the next visible favorite (or after the previous one when moved to the end), so favorites
+        hidden by the current tag source keep their positions.
+        """
+        visible_names = [tag.name for tag in self.favorite_tags_ordered]
+        if tag_name not in visible_names or len(visible_names) < 2:
+            return
+
+        new_index = visible_names.index(tag_name)
+        self.favorite_tag_names.remove(tag_name)
+        if new_index + 1 < len(visible_names):
+            insert_at = self.favorite_tag_names.index(visible_names[new_index + 1])
+        else:
+            insert_at = self.favorite_tag_names.index(visible_names[new_index - 1]) + 1
+        self.favorite_tag_names.insert(insert_at, tag_name)
+
+        self.file_operations.save_favorites(self.favorite_tag_names)
 
     def _handle_tag_clicked(self, clicked_tag_name):
         """Handles tag click events, updates model, workfile, and selected tags list."""
@@ -502,15 +520,19 @@ class MainWindow(QMainWindow):
                 # Tag is now a favorite, add it to the list (append to end)
                 if clicked_tag_data not in self.favorite_tags_ordered: # Prevent duplicates
                     self.favorite_tags_ordered.append(clicked_tag_data)
+                if clicked_tag_name not in self.favorite_tag_names:
+                    self.favorite_tag_names.append(clicked_tag_name)
                 print(f"Tag '{clicked_tag_name}' added to favorites.") # Debug
             else:
                 # Tag is no longer a favorite, remove it from the list
                 if clicked_tag_data in self.favorite_tags_ordered:
                     self.favorite_tags_ordered.remove(clicked_tag_data)
+                while clicked_tag_name in self.favorite_tag_names:
+                    self.favorite_tag_names.remove(clicked_tag_name)
                 print(f"Tag '{clicked_tag_name}' removed from favorites.") # Debug
 
             # 4. Save updated favorites to favorites.json
-            self.file_operations.save_favorites(self.favorite_tags_ordered)
+            self.file_operations.save_favorites(self.favorite_tag_names)
             print("favorites.json updated.") # Debug
 
             # 5. Notify observers of state change
@@ -697,6 +719,7 @@ class MainWindow(QMainWindow):
             existing_unknown_tag_data.is_known = True
             existing_unknown_tag_data.category = "9"
             existing_unknown_tag_data.post_count = 0
+            self.tag_list_model.index_tag(existing_unknown_tag_data)
             # Notify observers about the change
             existing_unknown_tag_data.notify_observers()
             self.tag_list_model.tag_state_changed.emit(underscored_tag_name)
@@ -801,8 +824,8 @@ class MainWindow(QMainWindow):
         self.current_tag_source = source_type
         
         # Reload tags from new source
-        csv_path = os.path.join(os.getcwd(), "data", f"{source_type}-tags-list.csv")
-        self.tag_list_model.switch_tag_source(csv_path)
+        self.csv_path = os.path.join(os.getcwd(), "data", f"{source_type}-tags-list.csv")
+        self.tag_list_model.switch_tag_source(self.csv_path)
         
         # Reload favorites with new tag model. We only load favorites that exist in the currently loaded model
         self._load_favorites()
