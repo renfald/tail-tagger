@@ -1,5 +1,5 @@
 # frequently_used_panel.py
-from tag_list_panel import TagListPanel
+from tail_tagger.ui.panels.tag_list_panel import TagListPanel
 from PySide6.QtWidgets import QMenu
 from PySide6.QtGui import QAction
 

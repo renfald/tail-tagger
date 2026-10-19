@@ -2,8 +2,8 @@ from PySide6.QtWidgets import QLabel, QFrame, QSizePolicy, QHBoxLayout
 from PySide6.QtCore import Qt, QSize, Signal, QMimeData, QPoint
 from PySide6.QtGui import QDrag, QFont, QPixmap, QContextMenuEvent
 from math import sqrt
-from file_operations import FileOperations
-from theme import TAG_CATEGORY_COLORS
+from tail_tagger.file_operations import FileOperations
+from tail_tagger.ui.theme import TAG_CATEGORY_COLORS
 class TagWidget(QFrame):
     """Widget to display a tag."""
 

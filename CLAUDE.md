@@ -30,6 +30,34 @@ There is no automated test suite. Validate changes by running the app
 
 ## Project Architecture
 
+### File Layout
+
+```
+main.py                         # Entry point and MainWindow
+tail_tagger/                    # Application package (APP_ROOT in __init__.py = repo root)
+├── tag_list_model.py           # TagData + TagListModel
+├── file_operations.py          # Workfiles, .txt tags, favorites, usage data, export
+├── config_manager.py           # config.json
+├── ui/
+│   ├── theme.py                # Dark palette + tag category colors
+│   ├── keyboard_manager.py
+│   ├── panels/                 # Main window regions: left container, tag list panels, center, classifier
+│   └── widgets/                # TagWidget
+├── classifier/
+│   ├── classifier_manager.py   # ClassifierManager + background workers
+│   ├── inference/              # Per-family load/preprocess/inference adapters
+│   └── overrides/              # TagOverrideManager (overrides.toml)
+├── bulk_operations/            # Right-click bulk tag operations
+└── hydra/                      # Vendored Hydra package
+resources/                      # Icons + compiled resources_rc.py
+data/                           # Tag CSVs and user JSON files
+classifiers/<model_id>/         # Model weights and overrides
+```
+
+Most data paths (`data/`, `staging/`, `output/`, override files) are resolved from the
+working directory, so the app must be run from the repo root (the run scripts do this).
+Model discovery uses `APP_ROOT`.
+
 ### Core Components
 
 1. **MainWindow** (`main.py`)
@@ -38,19 +66,19 @@ There is no automated test suite. Validate changes by running the app
    - Coordinates tag management across panels
    - Handles file operations for saving/loading tags
 
-2. **Tag Model** (`tag_list_model.py`)
+2. **Tag Model** (`tail_tagger/tag_list_model.py`)
    - Stores all tags in `TagData` objects
    - Manages tag selection state
    - Implements search functionality
    - Tracks tag usage statistics
 
-3. **Classifier System** (`classifier_manager.py`, `classifier_panel.py`, `inference/`, `tail_tagger/hydra/`)
+3. **Classifier System** (`tail_tagger/classifier/`, `tail_tagger/ui/panels/classifier_panel.py`, `tail_tagger/hydra/`)
    - Handles image analysis using ML models across two families, JTP-2 and Hydra (see Classifier System below)
-   - Loads and runs each model through per-family adapters in `inference/`
+   - Loads and runs each model through per-family adapters in `tail_tagger/classifier/inference/`
    - Applies calibration + tag implications (Hydra) and `overrides.toml` post-processing
    - Runs analysis in background threads
 
-4. **Panel System**
+4. **Panel System** (all in `tail_tagger/ui/panels/`)
    - Left panel container (`left_panel_container.py`) manages multiple panels:
      - Tag search panel (`tag_search_panel.py`)
      - Frequently used panel (`frequently_used_panel.py`)
@@ -60,8 +88,8 @@ There is no automated test suite. Validate changes by running the app
    - Right panel for selected tags (`selected_tags_panel.py`)
 
 5. **Configuration and Persistence**
-   - `config_manager.py` - Manages application configuration
-   - `file_operations.py` - Handles file I/O operations
+   - `tail_tagger/config_manager.py` - Manages application configuration
+   - `tail_tagger/file_operations.py` - Handles file I/O operations
    - Data stored in JSON files under `data/`
 
 ### Data Flow
@@ -85,7 +113,7 @@ There is no automated test suite. Validate changes by running the app
 ### Classifier System
 
 Models live in `classifiers/<model_id>/` and are grouped into **families** by
-`MODEL_FAMILY` in `classifier_manager.py`, which decides how each is loaded and
+`MODEL_FAMILY` in `tail_tagger/classifier/classifier_manager.py`, which decides how each is loaded and
 post-processed:
 
 - **`jtp2`** — legacy JTP Pilot v1/v2. timm/torchvision with PIL preprocessing and a
@@ -98,11 +126,11 @@ post-processed:
 
 Architecture layers:
 
-- `inference/` — thin per-family adapters (`jtp2_inference.py`, `hydra_inference.py`,
+- `tail_tagger/classifier/inference/` — thin per-family adapters (`jtp2_inference.py`, `hydra_inference.py`,
   shared helpers in `base.py`) exposing load / preprocess / run-inference functions.
 - `tail_tagger/hydra/` — **vendored** copy of RedRocket's Hydra package. It carries three
   local patches; read `tail_tagger/hydra/VENDOR_PATCHES.md` before updating it.
-- `tail_tagger/classifier_overrides/` — `TagOverrideManager` applies each model's
+- `tail_tagger/classifier/overrides/` — `TagOverrideManager` applies each model's
   `overrides.toml` (blacklist / tag translation / dedup) as the final post-processing step.
 
 `ClassifierManager` orchestrates loading, inference, calibration, and overrides; all model
@@ -144,7 +172,7 @@ see each model folder's `DOWNLOAD_INSTRUCTIONS.md`.
 2. **Execution Layer** (reusable):
    - `tail_tagger/bulk_operations/manager.py` - Core operations that manipulate workfiles
    - `BulkOperationWorker` - Generic threaded execution (in tag_operations_dialog.py)
-   - Common utilities like `ensure_workfile_complete()` in `file_operations.py`
+   - Common utilities like `ensure_workfile_complete()` in `tail_tagger/file_operations.py`
 
 3. **Progress/Results Layer**:
    - Tool-specific dialogs show their own progress and results
@@ -183,7 +211,7 @@ from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationD
 ## File Format Information
 
 - `config.json`: Application settings (last folder, active model, confidence/threshold, implication mode)
-- `favorites.json`: List of favorite tag names
+- `favorites.json`: Ordered favorite tag names across all tag sources (the panel shows only those known in the current source)
 - `usage_data.json`: Counter of tag usage frequency
 - Tag files: Comma-separated tag lists stored as .txt files
 - Workfiles: JSON files mapping image paths to their tags

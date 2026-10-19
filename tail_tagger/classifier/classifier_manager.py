@@ -8,13 +8,14 @@ from timm.models import VisionTransformer # Explicit import for type hinting
 from PySide6.QtCore import QObject, Signal, QRunnable, Slot, QThreadPool
 
 # Import inference modules
-from inference import (
+from tail_tagger.classifier.inference import (
     load_jtp2_model, preprocess_jtp2, run_inference_jtp2,
     load_hydra_model, preprocess_hydra, run_inference_hydra,
     HydraMetadataMissingError,
 )
 from tail_tagger.hydra.classification import simple_slider
-from file_operations import FileOperations
+from tail_tagger import APP_ROOT
+from tail_tagger.file_operations import FileOperations
 
 # --- Known/Supported Models and Display Names ---
 # Maps internal model_id (folder name) to user-friendly display name
@@ -59,7 +60,7 @@ class ClassifierManager(QObject):
         self.config_manager = config_manager
         # Basic setup
         self.use_gpu_preference = use_gpu
-        self.base_path = os.path.dirname(__file__)
+        self.base_path = APP_ROOT
         self.classifiers_dir = os.path.join(self.base_path, "classifiers")
 
         # State for the ACTIVE model
@@ -492,7 +493,7 @@ class ClassifierManager(QObject):
 
     def _emit_results(self, results):
         """Apply tag overrides (blacklist/translation/dedup) then emit results."""
-        from tail_tagger.classifier_overrides import TagOverrideManager
+        from tail_tagger.classifier.overrides import TagOverrideManager
         results = TagOverrideManager.apply_overrides(results, self.active_model_id)
         self.analysis_finished.emit(results) # Relay the signal
 
