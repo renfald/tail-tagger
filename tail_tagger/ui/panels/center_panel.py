@@ -3,7 +3,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
-from file_operations import FileOperations
+from tail_tagger.file_operations import FileOperations
 
 DEFAULT_MESSAGE = "No image loaded. Select a folder from the file menu"
 

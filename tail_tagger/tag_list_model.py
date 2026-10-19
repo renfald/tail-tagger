@@ -1,6 +1,6 @@
 from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Signal
 from operator import attrgetter
-from file_operations import FileOperations
+from tail_tagger.file_operations import FileOperations
 from heapq import nlargest
 
 class TagData:

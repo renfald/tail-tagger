@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QFrame, QMenu
 from PySide6.QtGui import QAction
-from tag_list_panel import TagListPanel
+from tail_tagger.ui.panels.tag_list_panel import TagListPanel
 
 class FavoritesPanel(TagListPanel):
     def __init__(self, main_window, parent=None):

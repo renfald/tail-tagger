@@ -2,10 +2,10 @@
 from PySide6.QtWidgets import QWidget, QSplitter, QVBoxLayout, QFrame, QTabWidget
 from PySide6.QtCore import Qt
 
-from tag_search_panel import TagSearchPanel
-from frequently_used_panel import FrequentlyUsedPanel
-from favorites_panel import FavoritesPanel
-from classifier_panel import ClassifierPanel
+from tail_tagger.ui.panels.tag_search_panel import TagSearchPanel
+from tail_tagger.ui.panels.frequently_used_panel import FrequentlyUsedPanel
+from tail_tagger.ui.panels.favorites_panel import FavoritesPanel
+from tail_tagger.ui.panels.classifier_panel import ClassifierPanel
 
 class LeftPanelContainer(QWidget):
     def __init__(self, main_window, classifier_manager, parent=None):

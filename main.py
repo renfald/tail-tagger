@@ -36,17 +36,17 @@ def check_dependencies():
 check_dependencies()
 
 import time
-import theme
-from file_operations import FileOperations
-from config_manager import ConfigManager
-from keyboard_manager import KeyboardManager
-from classifier_manager import ClassifierManager
-from tag_list_model import TagListModel, TagData
+from tail_tagger.ui import theme
+from tail_tagger.file_operations import FileOperations
+from tail_tagger.config_manager import ConfigManager
+from tail_tagger.ui.keyboard_manager import KeyboardManager
+from tail_tagger.classifier.classifier_manager import ClassifierManager
+from tail_tagger.tag_list_model import TagListModel, TagData
 from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationDialog, ReplaceTagDialog
 
-from left_panel_container import LeftPanelContainer
-from center_panel import CenterPanel
-from selected_tags_panel import SelectedTagsPanel
+from tail_tagger.ui.panels.left_panel_container import LeftPanelContainer
+from tail_tagger.ui.panels.center_panel import CenterPanel
+from tail_tagger.ui.panels.selected_tags_panel import SelectedTagsPanel
 
 # Start application timer
 app_start_time = time.time()

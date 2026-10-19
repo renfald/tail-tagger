@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy, QScrollArea
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QKeyEvent
-from tag_widget import TagWidget
+from tail_tagger.ui.widgets.tag_widget import TagWidget
 
 class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget), type(ABC)), {})):  # Explicit metaclass
     """Abstract base class for tag list panels."""
@@ -80,7 +80,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
 
     def _create_tag_widget(self, tag_data):
         """Helper method: Creates and configures a TagWidget."""
-        from tag_widget import TagWidget # Import here to avoid circular dependency
+        from tail_tagger.ui.widgets.tag_widget import TagWidget # Import here to avoid circular dependency
         tag_widget = TagWidget(tag_data=tag_data, is_selected=None, is_known_tag=None) # Pass tag_data as first arg, remove positional is_selected and is_known_tag
         tag_widget.set_styling_mode(self.get_styling_mode()) # Set styling mode from subclass
         tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect tag selection logic

@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QLab
 from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import QKeyEvent, QIcon
 
-from tag_widget import TagWidget
+from tail_tagger.ui.widgets.tag_widget import TagWidget
 
 class TagSearchPanel(QWidget):
     def __init__(self, main_window, parent=None):

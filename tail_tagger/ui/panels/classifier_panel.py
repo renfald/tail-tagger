@@ -5,9 +5,9 @@ from PySide6.QtCore import Qt, Slot, QSize, Signal, QTimer
 from PySide6.QtGui import QAction, QIcon
 
 # Import TagWidget - it will be needed for placeholder logic
-from tag_widget import TagWidget
-from tag_list_model import TagData
-from file_operations import FileOperations
+from tail_tagger.ui.widgets.tag_widget import TagWidget
+from tail_tagger.tag_list_model import TagData
+from tail_tagger.file_operations import FileOperations
 
 class ClassifierPanel(QWidget):
     # Custom signals

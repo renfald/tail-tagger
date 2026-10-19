@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget, QApplication
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtCore import QSize
-from tag_list_panel import TagListPanel
-from file_operations import FileOperations
+from tail_tagger.ui.panels.tag_list_panel import TagListPanel
+from tail_tagger.file_operations import FileOperations
 
 class SelectedTagsPanel(TagListPanel):
     def __init__(self, main_window, parent=None):
