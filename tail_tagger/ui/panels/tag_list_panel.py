@@ -83,8 +83,8 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         from tail_tagger.ui.widgets.tag_widget import TagWidget # Import here to avoid circular dependency
         tag_widget = TagWidget(tag_data=tag_data, is_selected=None, is_known_tag=None) # Pass tag_data as first arg, remove positional is_selected and is_known_tag
         tag_widget.set_styling_mode(self.get_styling_mode()) # Set styling mode from subclass
-        tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked) # Connect tag selection logic
-        tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked) # Connect favorite logic
+        tag_widget.tag_clicked.connect(self.main_window.toggle_tag) # Connect tag selection logic
+        tag_widget.favorite_star_clicked.connect(self.main_window.toggle_favorite) # Connect favorite logic
         tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked) # Connect right-click handling
         return tag_widget
 
@@ -233,31 +233,18 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             # Get visual position and data index
             _, drop_index = self._get_visual_insertion_position(container_pos)
             
-            # Find and handle the dragged tag
-            dragged_tag_data = None
-            dragged_tag_orig_index = -1
-            
-            tag_data_list = self._get_tag_data_list()
-            for i, tag_data in enumerate(tag_data_list):
-                if tag_data.name == tag_name:
-                    dragged_tag_data = tag_data
-                    dragged_tag_orig_index = i
-                    break
-            
-            if dragged_tag_data:
-                # Account for the tag's original position when inserting
-                self._remove_tag_from_data_list(dragged_tag_data)
-                
-                # Adjust drop index if needed
-                if drop_index > dragged_tag_orig_index:
-                    drop_index -= 1  # Adjust for the removal of the tag
-                
-                # Insert at the target position
-                self._insert_tag_into_data_list(dragged_tag_data, drop_index)
-                print(f"  Tag '{tag_name}' reordered from {dragged_tag_orig_index} to {drop_index}")
+            # Find the dragged tag's current position
+            names = [tag_data.name for tag_data in self._get_tag_data_list()]
 
-                # Update appropriate data (file, workfile, etc.)
-                self._handle_post_drop_update(tag_name, dragged_tag_orig_index, drop_index)
+            if tag_name in names:
+                dragged_tag_orig_index = names.index(tag_name)
+
+                # drop_index counts the dragged tag itself, so shift it back when moving down
+                if drop_index > dragged_tag_orig_index:
+                    drop_index -= 1
+
+                self._move_tag(tag_name, drop_index)
+                print(f"  Tag '{tag_name}' reordered from {dragged_tag_orig_index} to {drop_index}")
             else:
                 print(f"Warning: Dragged tag '{tag_name}' not found in tag list!")
 
@@ -271,21 +258,10 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             print("Drop Event: Drop ignored - panel doesn't support dragging or tag not draggable.")
 
     @abstractmethod
-    def _remove_tag_from_data_list(self, tag_data):
-        """Abstract method: Remove a tag from the data list. Must be implemented by subclasses."""
+    def _move_tag(self, tag_name, new_index):
+        """Abstract method: Move a dropped tag to new_index (its final position in this panel's list)."""
         pass
 
-    @abstractmethod
-    def _insert_tag_into_data_list(self, tag_data, index):
-        """Abstract method: Insert a tag into the data list at specified index. Must be implemented by subclasses."""
-        pass
-
-    @abstractmethod
-    def _handle_post_drop_update(self, tag_name, original_index, new_index):
-        """Abstract method: Handle updates after a tag is dropped. Must be implemented by subclasses."""
-        pass
-
-    
 
     @abstractmethod
     def is_tag_draggable(self, tag_name):

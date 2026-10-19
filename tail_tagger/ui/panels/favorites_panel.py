@@ -12,7 +12,7 @@ class FavoritesPanel(TagListPanel):
 
     def _get_tag_data_list(self):
         """Returns the list of TagData objects for this panel (Favorites)."""
-        return self.main_window.favorite_tags_ordered
+        return self.main_window.visible_favorite_tags()
 
     def is_tag_draggable(self, tag_name):
         """Always allow dragging in this panel."""
@@ -22,18 +22,9 @@ class FavoritesPanel(TagListPanel):
         """Returns list of allowed bulk operations for this panel."""
         return ['add_front', 'add_end', 'remove', 'replace']
 
-    def _remove_tag_from_data_list(self, tag_data):
-        """Remove tag from the favorites list."""
-        self.main_window.favorite_tags_ordered.remove(tag_data)
-
-    def _insert_tag_into_data_list(self, tag_data, index):
-        """Insert tag into the favorites list at specified index."""
-        self.main_window.favorite_tags_ordered.insert(index, tag_data)
-
-    def _handle_post_drop_update(self, tag_name, original_index, new_index):
-        """Save favorites after tag order changes."""
-        self.main_window.move_favorite(tag_name)
-        print(f"  favorites.json updated with new tag order.")
+    def _move_tag(self, tag_name, new_index):
+        """Reorder favorites and save."""
+        self.main_window.move_favorite(tag_name, new_index)
 
     
         

@@ -326,7 +326,7 @@ class ClassifierPanel(QWidget):
         tag_names = [tag_name for tag_name, score in self.displayed_results]
 
         if tag_names:
-            self.main_window.bulk_add_classifier_tags(tag_names)
+            self.main_window.add_tags(tag_names)
             print(f"Bulk add requested for {len(tag_names)} tags")
 
     def _set_copy_button_enabled(self, enabled):
@@ -401,8 +401,8 @@ class ClassifierPanel(QWidget):
                 tag_widget = TagWidget(tag_data=tag_data)
                 tag_widget.setToolTip(f"Confidence: {score:.2%}")
                 tag_widget.set_styling_mode("dim_on_select")
-                tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
-                tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
+                tag_widget.tag_clicked.connect(self.main_window.toggle_tag)
+                tag_widget.favorite_star_clicked.connect(self.main_window.toggle_favorite)
                 tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
                 self.results_layout.addWidget(tag_widget)
                 widgets_added += 1

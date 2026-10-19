@@ -166,8 +166,8 @@ class TagSearchPanel(QWidget):
             for tag_data in tag_data_list:
                 tag_widget = TagWidget(tag_data=tag_data)
                 tag_widget.set_styling_mode("dim_on_select")
-                tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
-                tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
+                tag_widget.tag_clicked.connect(self.main_window.toggle_tag)
+                tag_widget.favorite_star_clicked.connect(self.main_window.toggle_favorite)
                 tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
                 self.results_area_layout.addWidget(tag_widget)
                 self.search_results_tag_widgets.append(tag_widget)
@@ -243,7 +243,7 @@ class TagSearchPanel(QWidget):
             elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter: # Handle Enter key press
                 if 0 <= self.highlighted_tag_index < len(self.search_results_tag_widgets):
                     highlighted_tag_widget = self.search_results_tag_widgets[self.highlighted_tag_index]
-                    self.main_window._handle_tag_clicked(highlighted_tag_widget.tag_name) # Select the highlighted tag
+                    self.main_window.toggle_tag(highlighted_tag_widget.tag_name) # Select the highlighted tag
                     self.search_input.clear() # Clear search input after selection - for next phase
                     self._execute_search() # Refresh results to be empty - for next phase
                 event.accept() # Accept the event

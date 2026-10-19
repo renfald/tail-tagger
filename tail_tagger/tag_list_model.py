@@ -194,15 +194,6 @@ class TagListModel(QAbstractListModel):
         """Clears all tags."""
         self.tags = []
     
-    def set_tag_selected_state(self, tag_name, is_tag_selected):
-        """Set the current selection state for a given tag."""
-        tag = next((tag for tag in self.tags if tag.name == tag_name), None)
-        if tag:
-            tag.selected = is_tag_selected
-            tag.notify_observers()  # Notify observers of this specific tag
-            self.tag_state_changed.emit(tag_name)  # Emit signal with tag name
-            self.tags_selected_changed.emit()  # Keep existing signal for backward compatibility TODO: is anything broken if this is removed? check search panel
-
     def remove_unknown_tags(self):
         """Removes any tags where is_known is False from the tag list and tags_by_name dict."""
         # Identify unknown tags to remove
@@ -224,12 +215,6 @@ class TagListModel(QAbstractListModel):
         """Returns data for a specific item and role."""
         return None # Modified
     
-    def clear_selected_tags(self):
-        """Resets the 'selected' status of all tags to False."""
-        for tag in self.tags:
-            tag.selected = False
-        self.tags_selected_changed.emit() # Notify any listeners
-
     def get_known_tags(self):
         """Returns a list of all known tags."""
         return [tag for tag in self.tags if tag.is_known]
