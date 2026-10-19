@@ -321,6 +321,7 @@ class TagWidget(QFrame):
         self.is_selected = self.tag_data.selected
         self.is_known_tag = self.tag_data.is_known
         self._update_style()
+        self.set_favorite_state()
         self._update_elided_text()
             
     def hideEvent(self, event):
