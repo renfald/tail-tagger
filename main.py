@@ -54,11 +54,8 @@ app_start_time = time.time()
 import resources.resources_rc as resources_rc  
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel, QSizePolicy, 
                                QVBoxLayout, QPushButton, QSpacerItem, QFileDialog, QSplitter, QMessageBox)
-from PySide6.QtCore import Qt, QTimer, Slot, QUrl
+from PySide6.QtCore import Qt, Signal, QUrl
 from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QDesktopServices
-
-# TODO: its probably better for tag widget shading to not need every panel to rebuild their tag list and instead just 
-# check their current state. better yet a single tag should be able to know if it needs an update
 
 # Import compiled resources for icons
 # Update resources.qrc and run this command to recompile:
@@ -66,6 +63,13 @@ from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QDesktopServices
 
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
+
+    # Panels listen to these and refresh themselves, so actions don't need to know which panels exist
+    image_changed = Signal(object)  # The new current path, or None when the folder turns out to have no images
+    selection_changed = Signal()    # The current image's ordered tag list changed
+    favorites_changed = Signal()    # Favorites were starred, unstarred, reordered, or reloaded
+    usage_changed = Signal()        # Usage counts changed, so Frequently Used may reorder
+    tags_changed = Signal()         # The tag catalog changed: a tag was added or promoted, or the tag source switched
 
     def __init__(self):
         """Initializes the main application window."""
@@ -100,13 +104,6 @@ class MainWindow(QMainWindow):
         self.keyboard_manager = KeyboardManager(self)
         self.classifier_manager = ClassifierManager(config_manager=self.config_manager, use_gpu=True)
         self.bulk_operations_manager = BulkOperationsManager(self.file_operations)
-
-        # --- Auto-Analyze Timer ---
-        self.auto_analyze_timer = QTimer(self)
-        self.auto_analyze_timer.setSingleShot(True) # Important: only fire once per start
-        self.auto_analyze_timer.timeout.connect(self._trigger_auto_analysis_from_timer)
-        self.AUTO_ANALYZE_DELAY_MS = 100 # 1.5 seconds (configurable if needed later)
-        self.auto_analyze_enabled = False
 
         # --- Global Keyboard Shortcuts ---
         self.prev_shortcut = QShortcut(QKeySequence(Qt.Key_Left), self)
@@ -180,10 +177,6 @@ class MainWindow(QMainWindow):
         self.left_panel_container = LeftPanelContainer(main_window=self, classifier_manager=self.classifier_manager)
         main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
 
-        # Connect auto-analyze signal from classifier panel
-        self.left_panel_container.classifier_panel.auto_analyze_toggled.connect(self._handle_auto_analyze_toggled)
-
-
         # --- Center Panel (Image Display) ---
         self.center_panel = CenterPanel()
         self.center_panel.setFrameShape(QFrame.StyledPanel)
@@ -232,7 +225,9 @@ class MainWindow(QMainWindow):
         right_bottom_layout.setContentsMargins(0, 0, 0, 0)
         right_bottom_layout.addStretch()
         
+        # Prev/Next start disabled; _on_image_changed enables them once a folder has images
         self.prev_button = QPushButton("< Prev")
+        self.prev_button.setEnabled(False)
         self.prev_button.clicked.connect(self._prev_image)
         right_bottom_layout.addWidget(self.prev_button)
 
@@ -243,12 +238,18 @@ class MainWindow(QMainWindow):
         right_bottom_layout.addWidget(self.index_label)
 
         self.next_button = QPushButton("Next >")
+        self.next_button.setEnabled(False)
         self.next_button.clicked.connect(self._next_image)
         right_bottom_layout.addWidget(self.next_button)
-        
+
         bottom_layout.addWidget(right_bottom_container, 1)  # stretch factor 1 (equal to left)
 
         main_layout.addWidget(bottom_panel) # Add bottom panel to main layout
+
+        # The center panel and bottom bar don't know about MainWindow, so they're connected here
+        # (other panels connect themselves)
+        self.image_changed.connect(self.center_panel.show_media)
+        self.image_changed.connect(self._on_image_changed)
 
     def _open_folder_dialog(self):
         """Opens a folder selection dialog and loads images."""
@@ -289,8 +290,6 @@ class MainWindow(QMainWindow):
             print(f"Found {len(media_paths)} images in folder: {folder_path}")
             self.image_paths = media_paths
             self.go_to_image(0)
-            self.prev_button.setEnabled(True)
-            self.next_button.setEnabled(True)
         else:
             print(f"No images found in folder: {folder_path}")
             self._show_no_images("No images found in this folder.")
@@ -301,21 +300,18 @@ class MainWindow(QMainWindow):
         self.image_paths = []
         self.current_image_index = 0
 
+        # Only announce a change when an image was actually showing, so startup with
+        # no folder leaves the classifier's status text alone
+        if had_image:
+            self.tag_list_model.remove_unknown_tags()
+            self._apply_selection([])
+            self.image_changed.emit(None)
+
+        # Set the message after the emit, since image_changed(None) clears the center panel
         if message:
             self.center_panel.setText(message)
         else:
             self.center_panel.clear()
-        self.filename_label.setText("No Image")
-        self.index_label.setText("0 of 0")
-        self.prev_button.setEnabled(False)
-        self.next_button.setEnabled(False)
-
-        if had_image:
-            self.auto_analyze_timer.stop()
-            self.left_panel_container.classifier_panel.clear_results()
-            self.tag_list_model.remove_unknown_tags()
-            self._apply_selection([])
-            self._update_tag_panels()
 
     @property
     def current_image_path(self):
@@ -330,25 +326,12 @@ class MainWindow(QMainWindow):
             return
 
         self.current_image_index = index
-        image_path = self.current_image_path
-        self.center_panel.set_media_path(image_path)
-        self.filename_label.setText(os.path.basename(image_path))
-        self._update_index_label()
-
-        self.left_panel_container.classifier_panel.clear_results()
-
-        if self.auto_analyze_enabled:
-            print("Auto-analyze is enabled. Resetting/starting timer.")
-            self.auto_analyze_timer.stop() # Stop any pending timer
-            self.auto_analyze_timer.start(self.AUTO_ANALYZE_DELAY_MS) # Start new delay
-        else:
-            self.auto_analyze_timer.stop()
-
         self.tag_list_model.remove_unknown_tags() # Unknown tags belong to the previous image
         self._reload_current_image_tags()
+        self.image_changed.emit(self.current_image_path)
 
     def _reload_current_image_tags(self):
-        """Reads the current image's tags (workfile, else .txt), selects them, and refreshes panels.
+        """Reads the current image's tags (workfile, else .txt) and selects them.
 
         Unknown tags already in the model are kept, so classifier suggestions stay valid.
         """
@@ -357,18 +340,16 @@ class MainWindow(QMainWindow):
 
         self.update_workfile_for_current_image() # Writes .txt tags into the workfile on first visit
 
-        self._update_tag_panels()
-
-        # we load the search panel differently than the others (update_display()) because I'm a bad developer
-        self.left_panel_container.tag_search_panel._on_tags_changed()
-
-    def _update_index_label(self):
-        """Updates the image index label."""
-        if self.image_paths:
-            index_text = f"{self.current_image_index + 1} of {len(self.image_paths)}"
+    def _on_image_changed(self, image_path):
+        """Updates the bottom bar's filename, index label, and Prev/Next buttons."""
+        if image_path:
+            self.filename_label.setText(os.path.basename(image_path))
+            self.index_label.setText(f"{self.current_image_index + 1} of {len(self.image_paths)}")
         else:
-            index_text = "0 of 0"
-        self.index_label.setText(index_text)
+            self.filename_label.setText("No Image")
+            self.index_label.setText("0 of 0")
+        self.prev_button.setEnabled(bool(self.image_paths))
+        self.next_button.setEnabled(bool(self.image_paths))
 
     def _update_folder_path_label(self, folder_path):
         """Updates the folder path label with elided text."""
@@ -405,18 +386,6 @@ class MainWindow(QMainWindow):
     def _export_tags(self):
         self.file_operations.export_tags(self, self.last_folder_path)
 
-    # LEGACY: This method is kept for backward compatibility and for full refreshes
-    # Modern approach uses observer pattern and targeted panel updates
-    def _update_tag_panels(self):
-        """Updates all tag panels. 
-        
-        Note: This method is only needed for major changes that require full panel refreshes,
-        such as loading a new image or when the entire model changes. For individual tag state
-        changes (selected/unselected, favorite), the observer pattern handles updates automatically.
-        """
-        self.left_panel_container.update_all_displays()
-        self.selected_tags_panel.update_display()
-
     def _load_favorites(self):
         """Loads favorite names from favorites.json and marks the visible ones as favorites."""
         self.favorite_tag_names = self.file_operations.load_favorites()
@@ -426,6 +395,7 @@ class MainWindow(QMainWindow):
             tag.favorite = True
 
         print(f"Loaded {len(visible)} of {len(self.favorite_tag_names)} favorite tags for this tag source")
+        self.favorites_changed.emit()
 
     def _is_visible_favorite(self, tag_name):
         """A favorite is shown when it is a known tag in the current tag source."""
@@ -445,6 +415,7 @@ class MainWindow(QMainWindow):
         self.favorite_tag_names = move_favorite_name(
             self.favorite_tag_names, self._is_visible_favorite, tag_name, new_index)
         self.file_operations.save_favorites(self.favorite_tag_names)
+        self.favorites_changed.emit()
 
     def toggle_tag(self, tag_name):
         """Adds a tag to the end of the current image's tags, or removes it if present."""
@@ -459,11 +430,11 @@ class MainWindow(QMainWindow):
         self._apply_selection(self._tags_for_names(toggle_name(old_names, tag_name)))
         self.update_workfile_for_current_image()
 
+        # Usage only counts when a tag is selected, not deselected, so Frequently Used stays put on removal
         if selecting:
             self.tag_list_model.increment_tag_usage(tag_name)
             self.file_operations.save_usage_data(self.tag_list_model.tag_usage_counts)
-            self.left_panel_container.frequently_used_panel.update_display()
-        self.selected_tags_panel.update_display()
+            self.usage_changed.emit()
 
     def move_selected_tag(self, tag_name, new_index):
         """Moves one of the current image's tags to new_index and saves the workfile."""
@@ -476,10 +447,10 @@ class MainWindow(QMainWindow):
         """Clears a tag's usage count so it leaves the Frequently Used panel."""
         self.tag_list_model.remove_tag_usage(tag_name)
         self.file_operations.save_usage_data(self.tag_list_model.tag_usage_counts)
-        self.left_panel_container.frequently_used_panel.update_display()
+        self.usage_changed.emit()
 
     def toggle_favorite(self, tag_name):
-        """Stars or unstars a tag, saves favorites, and refreshes the Favorites panel."""
+        """Stars or unstars a tag, saves favorites, and emits favorites_changed."""
         tag = self.tag_list_model.tags_by_name.get(tag_name)
         if tag is None or not tag.is_known:
             print(f"Warning: Favorite toggled for '{tag_name}', but it is not a known tag.")
@@ -493,8 +464,8 @@ class MainWindow(QMainWindow):
         tag.favorite = tag_name in self.favorite_tag_names
 
         self.file_operations.save_favorites(self.favorite_tag_names)
-        tag.notify_observers()
-        self.left_panel_container.favorites_panel.update_display()
+        tag.notify_observers() # Updates the star on every widget showing this tag
+        self.favorites_changed.emit()
 
     def add_tags(self, tag_names):
         """Appends tags not already on the current image, in the given order. Does not count usage."""
@@ -508,6 +479,7 @@ class MainWindow(QMainWindow):
             else:
                 print(f"Warning: Tag '{tag_name}' not found in model during bulk add")
 
+        # Tags already on the image keep their position; only new ones go on the end
         old_names = self._selected_names()
         new_names = append_names(old_names, known_names)
         if new_names == old_names:
@@ -515,8 +487,7 @@ class MainWindow(QMainWindow):
             return
 
         self._apply_selection(self._tags_for_names(new_names))
-        self.update_workfile_for_current_image()
-        self.selected_tags_panel.update_display()
+        self.update_workfile_for_current_image() # One workfile write for all the additions
         print(f"Bulk add complete: {len(new_names) - len(old_names)} tags added")
 
     def update_workfile_for_current_image(self):
@@ -606,7 +577,7 @@ class MainWindow(QMainWindow):
 
     def add_new_tag_to_model(self, tag_name):
         """
-        Adds a new tag to the application, handling CSV updates, model updates, and panel refreshes.
+        Adds a new tag to the application, handling CSV updates and model updates, then emits tags_changed.
         Centralized method for tag addition, promoting unknown tags if necessary.
         """
         underscored_tag_name = self.file_operations.convert_spaces_to_underscores(tag_name)
@@ -640,9 +611,8 @@ class MainWindow(QMainWindow):
             existing_unknown_tag_data.post_count = 0
             existing_unknown_tag_data.favorite = underscored_tag_name in self.favorite_tag_names
             self.tag_list_model.index_tag(existing_unknown_tag_data)
-            # Notify observers about the change
+            # Restyles the tag wherever it's already shown
             existing_unknown_tag_data.notify_observers()
-            self.tag_list_model.tag_state_changed.emit(underscored_tag_name)
             print(f"Unknown tag '{underscored_tag_name}' promoted to known tag (in-place update).")
 
         else:
@@ -658,45 +628,8 @@ class MainWindow(QMainWindow):
             self.tag_list_model.add_tag(new_tag_data)
             print(f"New tag '{underscored_tag_name}' added to TagListModel.")
 
-        # --- Update UI (All relevant panels) ---
-        # Still need to update search panel for new searches to include the tag
-        self.tag_list_model.tags_selected_changed.emit() 
-        # Updates are needed for SelectedTagsPanel if we just promoted a tag that's in the current image
-        self.selected_tags_panel.update_display()
-
-    @Slot(bool)
-    def _handle_auto_analyze_toggled(self, enabled):
-        """Handles the auto_analyze_toggled signal from ClassifierPanel."""
-        print(f"Main window received auto-analyze toggle: {enabled}")
-        self.auto_analyze_enabled = enabled
-
-        # If auto-analyze was just enabled and we have a current image,
-        # start the timer to trigger analysis after a delay
-        if enabled and self.current_image_path:
-            print("Auto-analyze is enabled. Starting timer for current image.")
-            self.auto_analyze_timer.stop() # Ensure any previous timer is stopped
-            self.auto_analyze_timer.start(self.AUTO_ANALYZE_DELAY_MS)
-        elif not enabled:
-            # If auto-analyze was disabled, make sure the timer is stopped
-            self.auto_analyze_timer.stop()
-            print("Auto-analyze is disabled. Timer stopped.")
-
-    @Slot()
-    def _trigger_auto_analysis_from_timer(self):
-        """Called when the auto-analyze timer fires."""
-        print("Auto-analyze timer fired.")
-        if self.current_image_path and hasattr(self, 'left_panel_container') and \
-        hasattr(self.left_panel_container, 'classifier_panel'):
-            # Check if auto-analyze is STILL enabled (user might have disabled it during delay)
-            if self.auto_analyze_enabled:
-                print("  Auto-analyze is enabled. Triggering analysis.")
-                # Call the panel's existing analyze button click handler
-                # This ensures UI updates (button disable, status) are consistent
-                self.left_panel_container.classifier_panel._handle_analyze_clicked()
-            else:
-                print("  Auto-analyze was disabled during delay. Analysis cancelled.")
-        else:
-            print("  Auto-analyze: No current image or panel not ready. Analysis skipped.")
+        # Search re-runs so the tag shows up in results, and the other panels pick up the change
+        self.tags_changed.emit()
 
     # TODO: I really don't like this. This method does seemingly arbitrary things to the model and UI
     # fundamentally its solving the problem of determining what the current state of unknown tags is
@@ -719,7 +652,8 @@ class MainWindow(QMainWindow):
         Flags change only on tags entering or leaving the list, and only those tags notify
         their widgets.
         """
-        old_tags = set(self.selected_tags_for_current_image)
+        old_list = self.selected_tags_for_current_image
+        old_tags = set(old_list)
         new_tags = set(tags)
         self.selected_tags_for_current_image = list(tags)
 
@@ -729,6 +663,10 @@ class MainWindow(QMainWindow):
         for tag in new_tags - old_tags:
             tag.selected = True
             tag.notify_observers()
+
+        # Skip the signal when nothing changed, so reloading the same tags rebuilds nothing
+        if self.selected_tags_for_current_image != old_list:
+            self.selection_changed.emit()
 
     def _selected_names(self):
         return [tag.name for tag in self.selected_tags_for_current_image]
@@ -753,11 +691,8 @@ class MainWindow(QMainWindow):
             self._apply_selection(self._tags_for_names(self._selected_names()))
             self.update_workfile_for_current_image()
 
-        # Rebind classifier suggestions to the new tag objects (no-op without results)
-        self.left_panel_container.classifier_panel._update_displayed_tags()
-        
-        # Full UI refresh
-        self._update_tag_panels()
+        # Every TagData object was replaced, so panels rebuild their widgets against the new ones
+        self.tags_changed.emit()
 
 app = QApplication(sys.argv)
 theme.setup_dark_mode(app)

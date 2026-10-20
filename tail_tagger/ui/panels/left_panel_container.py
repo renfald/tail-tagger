@@ -49,11 +49,3 @@ class LeftPanelContainer(QWidget):
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 0)
         self.splitter.setStretchFactor(2, 1)
-
-        # No need for initial update_display() here - handled by MainWindow's _update_tag_panels
-
-    def update_all_displays(self):
-        """Updates all internal panels."""
-        self.frequently_used_panel.update_display()
-        self.favorites_panel.update_display()
-        # Future panels will be updated here as well

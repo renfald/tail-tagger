@@ -17,9 +17,8 @@ class TagSearchPanel(QWidget):
         self.exact_match_mode = False   # Initialize exact match mode to False (fuzzy search by default)
         self.setup_ui()
         self._display_search_results([])
-        self.main_window.tag_list_model.tags_selected_changed.connect(self._on_tags_changed)
-        # Connect to the new tag_state_changed signal for individual tag updates
-        self.main_window.tag_list_model.tag_state_changed.connect(self._on_tag_state_changed)
+        # Selection changes don't need a new search: result widgets restyle themselves through their tag's observers
+        self.main_window.tags_changed.connect(self._on_tags_changed)
 
     def setup_ui(self):
         """
@@ -190,11 +189,10 @@ class TagSearchPanel(QWidget):
 
     def _on_tags_changed(self):
         """
-        Handles updates when the tag selection state changes.
-        Uses debounce timer to avoid redundant searches during batch tag loading.
+        Re-runs the current search when the tag catalog changes (new tag, promotion, source switch).
+        Uses the debounce timer so it batches with any pending text change.
         """
-        # Use the same debounce timer as text changes to batch multiple tag updates
-        self.search_timer.start(50)  # Shorter delay for tag changes since they're typically batched
+        self.search_timer.start(50)  # Shorter delay than for typing
 
     def _on_search_text_changed(self, text):
         """
@@ -290,15 +288,6 @@ class TagSearchPanel(QWidget):
         """
         self.main_window.add_new_tag_to_model(tag_name)
         
-    def _on_tag_state_changed(self, tag_name):
-        """
-        Handle updates when a specific tag's state changes.
-        If the tag is in our current search results, it will automatically
-        update since the TagWidget is an observer of its TagData.
-        """
-        # No need to do anything - the TagWidget will update itself
-        # This handler is here for future expandability
-
     def _handle_tag_right_clicked(self, tag_name):
         """Handles right-click events on TagWidgets in search results.
         Creates and displays a context menu with bulk operations.

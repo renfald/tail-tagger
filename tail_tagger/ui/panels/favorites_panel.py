@@ -6,6 +6,10 @@ class FavoritesPanel(TagListPanel):
     def __init__(self, main_window, parent=None):
         super().__init__(main_window, panel_title="Favorites")
         self.setAcceptDrops(True)  # This panel accepts drops
+        # Switching tag source or adding a tag can change which favorites are shown
+        self.main_window.favorites_changed.connect(self.update_display)
+        self.main_window.tags_changed.connect(self.update_display)
+        self.update_display()
 
     def get_styling_mode(self):
         return "dim_on_select"

@@ -36,6 +36,9 @@ class SelectedTagsPanel(TagListPanel):
         # Connect button signal
         self.copy_tags_button.clicked.connect(self._handle_copy_tags_clicked)
 
+        self.main_window.selection_changed.connect(self.update_display)
+        self.main_window.tags_changed.connect(self.update_display)
+
     def _handle_copy_tags_clicked(self):
         """Copies all selected tags for current image to clipboard."""
         # Get the selected tags list from main window

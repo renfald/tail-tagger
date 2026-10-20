@@ -252,6 +252,8 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             self.dragged_tag_name = None
             
             event.acceptProposedAction()
+            # Rebuild even if the move changed nothing: the dragged widget hid itself
+            # and a no-op move sends no signal to bring it back
             self.update_display()
         else:
             event.ignore()

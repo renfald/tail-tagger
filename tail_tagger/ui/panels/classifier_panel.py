@@ -1,7 +1,7 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                              QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox, QApplication, QGraphicsOpacityEffect, QLineEdit)
-from PySide6.QtCore import Qt, Slot, QSize, Signal, QTimer
+from PySide6.QtCore import Qt, Slot, QSize, QTimer
 from PySide6.QtGui import QAction, QIcon
 
 # Import TagWidget - it will be needed for placeholder logic
@@ -10,8 +10,7 @@ from tail_tagger.tag_list_model import TagData
 from tail_tagger.file_operations import FileOperations
 
 class ClassifierPanel(QWidget):
-    # Custom signals
-    auto_analyze_toggled = Signal(bool)  # Emits True when enabled, False when disabled
+    AUTO_ANALYZE_DELAY_MS = 500 # Short pause after an image change before auto-analyze runs
 
     def __init__(self, main_window, classifier_manager, parent=None):
         super().__init__(parent)
@@ -23,6 +22,39 @@ class ClassifierPanel(QWidget):
         print("ClassifierPanel Initialized") # Basic check
 
         self._setup_ui()
+
+        # --- Auto-Analyze ---
+        self.auto_analyze_enabled = False
+        self.auto_analyze_timer = QTimer(self)
+        self.auto_analyze_timer.setSingleShot(True) # Important: only fire once per start
+        self.auto_analyze_timer.timeout.connect(self._on_auto_analyze_timeout)
+
+        self.main_window.image_changed.connect(self.on_image_changed)
+        self.main_window.tags_changed.connect(self.on_tags_changed)
+
+    @Slot()
+    def on_tags_changed(self):
+        """Rebuilds the shown suggestions so they bind to current tag objects (new source, promoted tag)."""
+        if self.raw_results is not None:
+            self._update_displayed_tags()
+
+    @Slot(object)
+    def on_image_changed(self, image_path):
+        """Clears results from the previous image and, with auto-analyze on, schedules analysis."""
+        self.clear_results()
+        # Restarting the timer on every change means fast navigation only analyzes the image you stop on
+        if self.auto_analyze_enabled and image_path:
+            self.auto_analyze_timer.start(self.AUTO_ANALYZE_DELAY_MS)
+        else:
+            self.auto_analyze_timer.stop()
+
+    @Slot()
+    def _on_auto_analyze_timeout(self):
+        """Runs the analysis when the auto-analyze delay ends."""
+        # Check if auto-analyze is STILL enabled (user might have disabled it during delay)
+        if self.auto_analyze_enabled and self.main_window.current_image_path:
+            # Go through the analyze button's handler so button state and status stay consistent
+            self._handle_analyze_clicked()
 
     def _setup_ui(self):
         """Sets up the UI components for the ClassifierPanel."""
@@ -687,8 +719,11 @@ class ClassifierPanel(QWidget):
     @Slot()
     def _handle_auto_analyze_toggled(self):
         """Handles the toggle of the auto-analyze button."""
-        is_enabled = self.auto_analyze_toggle_button.isChecked()
-        print(f"Auto-analyze toggle button clicked. New state: {'enabled' if is_enabled else 'disabled'}")
+        self.auto_analyze_enabled = self.auto_analyze_toggle_button.isChecked()
+        print(f"Auto-analyze toggle button clicked. New state: {'enabled' if self.auto_analyze_enabled else 'disabled'}")
 
-        # Emit signal for MainWindow to connect to
-        self.auto_analyze_toggled.emit(is_enabled)
+        # Turning it on analyzes the image already showing, after the usual delay
+        if self.auto_analyze_enabled and self.main_window.current_image_path:
+            self.auto_analyze_timer.start(self.AUTO_ANALYZE_DELAY_MS)
+        else:
+            self.auto_analyze_timer.stop()

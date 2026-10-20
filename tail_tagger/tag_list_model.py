@@ -1,4 +1,4 @@
-from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Signal
+from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex
 from operator import attrgetter
 from tail_tagger.file_operations import FileOperations
 from heapq import nlargest
@@ -40,9 +40,6 @@ class TagData:
 
 class TagListModel(QAbstractListModel):
     """A model to hold a list of tags."""
-
-    tags_selected_changed = Signal() # Add Signal
-    tag_state_changed = Signal(str)  # Signal emitted when a specific tag's state changes
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -185,7 +182,6 @@ class TagListModel(QAbstractListModel):
             self.beginResetModel() # Or beginRemoveRows/endRemoveRows for more specific signal
             self.tags.remove(tag_data_to_remove)
             self.endResetModel() # Or endRemoveRows
-            self.tags_selected_changed.emit() # Notify panels of change
             print(f"Tag '{tag_data_to_remove.name}' removed from TagListModel.")
         else:
             print(f"Warning: Tag '{tag_data_to_remove.name}' not found in TagListModel for removal.")
@@ -320,18 +316,14 @@ class TagListModel(QAbstractListModel):
         else:
             print(f"  Warning: No usage data found for tag '{underscored_tag_name}' to remove.") # Warning if no data found
 
-    # TODO: I suspect that tags_selected_changed isn't doing anything useful due to what happens in the method that calls this
     def switch_tag_source(self, csv_path):
-        """Reloads tags from a different CSV source"""
+        """Reloads tags from a different CSV source. MainWindow announces the change to panels."""
         print(f"Switching to tag source: {csv_path}")
-        
+
         # Clear existing data
         self.tags = []
         self.search_index = {}
         self.tags_by_name = {}
-        
+
         # Load new source
         self.load_tags_from_csv(csv_path)
-        
-        # Emit signals for UI updates
-        self.tags_selected_changed.emit()

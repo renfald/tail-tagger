@@ -6,6 +6,11 @@ from PySide6.QtGui import QAction
 class FrequentlyUsedPanel(TagListPanel):
     def __init__(self, main_window, parent=None):
         super().__init__(main_window, panel_title="Frequently Used")
+        # Also rebuilt when tags change: switching source replaces every tag, and a
+        # promoted tag may already have a usage count to show
+        self.main_window.usage_changed.connect(self.update_display)
+        self.main_window.tags_changed.connect(self.update_display)
+        self.update_display()
 
     def _get_tag_data_list(self):
         """Returns the list of TagData objects for this panel (Frequently Used Tags), ordered by usage frequency."""

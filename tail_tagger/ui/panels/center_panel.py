@@ -65,6 +65,13 @@ class CenterPanel(QFrame):
                 self._stack.setCurrentWidget(self._image_label)
                 self.update_image_display()
 
+    def show_media(self, media_path):
+        """Shows media_path, or clears the panel when it is None."""
+        if media_path:
+            self.set_media_path(media_path)
+        else:
+            self.clear()
+
     def clear(self):
         """Clears the currently displayed media and shows the default message."""
         self._release_video()
