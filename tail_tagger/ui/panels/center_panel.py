@@ -1,19 +1,36 @@
+import os
 from PySide6.QtWidgets import QFrame, QLabel, QStackedWidget, QVBoxLayout
-from PySide6.QtGui import QPixmap
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QGuiApplication, QImage, QPixmap
+from PySide6.QtCore import QCoreApplication, Qt, QSize, QThreadPool, QTimer, QUrl, Slot
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from tail_tagger.file_operations import FileOperations
+from tail_tagger.ui.image_loading import DecodeWorker
 
 DEFAULT_MESSAGE = "No image loaded. Select a folder from the file menu"
 
 class CenterPanel(QFrame):
     RESIZE_SETTLE_MS = 120  # Delay after the last resize event before doing a more expensive smooth rescale
+    DECODE_MARGIN = 1.25  # Decode images up to this much bigger than the largest screen
 
     def __init__(self):
         super().__init__()
         self.media_path = None  # Store path of the currently displayed image/video
-        self._source_pixmap = None  # Cached decode of media_path, for images
+        self._source_pixmap = None  # Cached decode of the image on screen
+
+        # Images decode on one background thread. _wanted lists the paths still to decode,
+        # current image first; _decoding is the one in progress.
+        self._decode_pool = QThreadPool(self)
+        self._decode_pool.setMaxThreadCount(1)
+        self._wanted = []
+        self._decoding = None
+        self._decode_worker = None  # Held until its result arrives, so its signals object stays alive
+        self._decoding_mtime = None  # Modified time of the file being decoded, read when the decode started
+        # Decoded images kept in memory: the current one plus the neighbors from the last prefetch().
+        # Each entry is (file modified time, pixmap); a None pixmap means that path failed to decode.
+        self._cache = {}
+        # On quit, let a running decode finish first, or it can emit after Qt has deleted its signals object
+        QCoreApplication.instance().aboutToQuit.connect(self._wait_for_decode)
 
         self._message_label = QLabel()
         self._message_label.setAlignment(Qt.AlignCenter)
@@ -53,17 +70,30 @@ class CenterPanel(QFrame):
         self.media_path = media_path
 
         if FileOperations.is_video_file(media_path):
+            self._wanted = []
             self._source_pixmap = None
             self._stack.setCurrentWidget(self._video_widget)
             self._player.setSource(QUrl.fromLocalFile(media_path))
             self._player.play()
+        elif self._is_cached(media_path):
+            self._wanted = []
+            self._show_decoded(self._cache[media_path][1])
         else:
-            self._load_source_pixmap()
-            if self._source_pixmap is None:
-                self._show_message("Error loading image")
-            else:
-                self._stack.setCurrentWidget(self._image_label)
-                self.update_image_display()
+            # The previous image stays on screen until this one is decoded, which avoids a blank flash
+            self._wanted = [media_path]
+            self._start_next_decode()
+
+    def prefetch(self, paths):
+        """Decodes these images in the background after the current one, and forgets any others."""
+        current = self.media_path
+        if current and FileOperations.is_video_file(current):
+            current = None
+        paths = [p for p in paths if p != current and not FileOperations.is_video_file(p)]
+
+        keep = set(paths) | {current}
+        self._cache = {p: pixmap for p, pixmap in self._cache.items() if p in keep}
+        self._wanted = [p for p in [current] + paths if p and not self._is_cached(p)]
+        self._start_next_decode()
 
     def show_media(self, media_path):
         """Shows media_path, or clears the panel when it is None."""
@@ -74,16 +104,15 @@ class CenterPanel(QFrame):
 
     def clear(self):
         """Clears the currently displayed media and shows the default message."""
-        self._release_video()
-        self.media_path = None
-        self._source_pixmap = None
-        self._show_message(DEFAULT_MESSAGE)
+        self.setText(DEFAULT_MESSAGE)
 
     def setText(self, text):
         """Shows a message in place of media, e.g. when no files are found."""
         self._release_video()
         self.media_path = None
         self._source_pixmap = None
+        self._wanted = []
+        self._cache = {}
         self._show_message(text)
 
     def _release_video(self):
@@ -95,14 +124,65 @@ class CenterPanel(QFrame):
         self._message_label.setText(text)
         self._stack.setCurrentWidget(self._message_label)
 
-    def _load_source_pixmap(self):
-        """Decodes media_path once and caches the result."""
-        if not self.media_path:
-            self._source_pixmap = None
-            return
+    def _decode_box(self):
+        """The largest size worth decoding: the biggest screen width and height, in physical pixels, plus a margin."""
+        width = height = 0
+        for screen in QGuiApplication.screens():
+            ratio = screen.devicePixelRatio()
+            width = max(width, screen.geometry().width() * ratio)
+            height = max(height, screen.geometry().height() * ratio)
+        return QSize(round(width * self.DECODE_MARGIN), round(height * self.DECODE_MARGIN))
 
-        pixmap = QPixmap(self.media_path)
-        self._source_pixmap = pixmap if not pixmap.isNull() else None
+    def _start_next_decode(self):
+        """Starts decoding the first wanted path, unless a decode is already running."""
+        if self._decoding is not None or not self._wanted:
+            return
+        self._decoding = self._wanted[0]
+        self._decoding_mtime = self._modified_time(self._decoding)
+        self._decode_worker = DecodeWorker(self._decoding, self._decode_box())
+        self._decode_worker.signals.finished.connect(self._on_decoded)
+        self._decode_pool.start(self._decode_worker)
+
+    @staticmethod
+    def _modified_time(path):
+        try:
+            return os.path.getmtime(path)
+        except OSError:
+            return None
+
+    def _is_cached(self, path):
+        """True when path has a cached decode and the file hasn't changed since it was read."""
+        # Checking the modified time means an image edited elsewhere, or one that failed
+        # because it was still being copied, gets decoded again instead of shown stale
+        entry = self._cache.get(path)
+        return entry is not None and entry[0] == self._modified_time(path)
+
+    def _wait_for_decode(self):
+        self._decode_pool.waitForDone()
+
+    @Slot(str, QImage)
+    def _on_decoded(self, path, image):
+        """Caches a finished decode, shows it if it is the current image, then starts the next one."""
+        mtime = self._decoding_mtime
+        self._decoding = None
+        self._decode_worker = None
+        # A path no longer wanted means the user moved on, or the panel was cleared, while it decoded
+        if path in self._wanted:
+            self._wanted.remove(path)
+            pixmap = None if image.isNull() else QPixmap.fromImage(image)
+            self._cache[path] = (mtime, pixmap)
+            if path == self.media_path:
+                self._show_decoded(pixmap)
+        self._start_next_decode()
+
+    def _show_decoded(self, pixmap):
+        """Shows a decoded image, or the error message when the decode failed (pixmap is None)."""
+        self._source_pixmap = pixmap
+        if pixmap is None:
+            self._show_message("Error loading image")
+        else:
+            self._stack.setCurrentWidget(self._image_label)
+            self.update_image_display()
 
     def resizeEvent(self, event):
         """Handles resize events to scale and display the image."""

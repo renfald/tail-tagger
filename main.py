@@ -47,6 +47,7 @@ from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationD
 
 from tail_tagger.ui.panels.left_panel_container import LeftPanelContainer
 from tail_tagger.ui.panels.center_panel import CenterPanel
+from tail_tagger.ui.image_loading import neighbor_paths
 from tail_tagger.ui.panels.selected_tags_panel import SelectedTagsPanel
 
 # Start application timer
@@ -329,6 +330,8 @@ class MainWindow(QMainWindow):
         self.tag_list_model.remove_unknown_tags() # Unknown tags belong to the previous image
         self._reload_current_image_tags()
         self.image_changed.emit(self.current_image_path)
+        # The center panel can't see the image list, so it's told which images come next
+        self.center_panel.prefetch(neighbor_paths(self.image_paths, index))
 
     def _reload_current_image_tags(self):
         """Reads the current image's tags (workfile, else .txt) and selects them.

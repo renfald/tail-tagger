@@ -219,6 +219,7 @@ class ClassifierManager(QObject):
 
         try:
             if self.model_family == "jtp2":
+                # TODO: JTP-2 decodes and preprocesses on the UI thread; Hydra does this in its worker
                 # --- Preprocessing (on main thread) ---
                 print("MainThread: Loading and preprocessing image...")
                 start_preprocess = time.time()
