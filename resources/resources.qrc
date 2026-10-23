@@ -12,5 +12,7 @@
         <file>icons/app-icon.png</file>
         <file>icons/bulk-Add.svg</file>
         <file>icons/copy-tags.svg</file>
+        <file>icons/grid-view.svg</file>
+        <file>icons/single-view.svg</file>
     </qresource>
 </RCC>

@@ -33,8 +33,13 @@ python -m pytest tests -q             # run from the repo root
 ```
 
 The tests in `tests/` cover the plain helper modules: tag list rules (`tag_state.py`),
-image sizing and decoding (`ui/image_loading.py`), and where a dragged tag lands
-(`ui/tag_rows.py`). Panels and other widgets have no automated tests, so also validate
+image sizing and decoding (`ui/image_loading.py`), where a dragged tag lands
+(`ui/tag_rows.py`), and grid moves and keys (`ui/grid_nav.py`). They also cover the
+thumbnail loader, the grid view widget, and the center panel going inactive under the grid.
+`tests/conftest.py` runs Qt on the offscreen platform (no windows open) and provides a
+`qapp` fixture for tests that need widgets or `QPixmap`. Tests that wait for background
+decodes spin `processEvents()` with short sleeps: `QTest.qWait` keeps Python's lock, so
+the decode threads would never run. Other panels have no automated tests, so also validate
 UI changes by running the app (`run.bat` / `./run.sh`) and exercising the affected panels.
 
 ## Project Architecture
@@ -53,8 +58,10 @@ tail_tagger/                    # Application package (APP_ROOT in __init__.py =
 │   ├── keyboard_manager.py
 │   ├── image_loading.py        # Image decode helpers + background decode worker
 │   ├── tag_rows.py             # Tag row colors, text width, drop position (no Qt)
+│   ├── grid_nav.py             # Grid view row moves, key decisions, load order, tile size
+│   ├── thumbnail_loader.py     # Grid thumbnails: background decodes into a capped cache
 │   ├── panels/                 # Main window regions: left container, tag list panels, center, classifier
-│   └── widgets/                # TagListView, the tag list used by every tag panel
+│   └── widgets/                # TagListView (every tag panel's list), MediaGridView (grid view)
 ├── classifier/
 │   ├── classifier_manager.py   # ClassifierManager + background workers
 │   ├── inference/              # Per-family load/preprocess/inference adapters
@@ -64,7 +71,7 @@ tail_tagger/                    # Application package (APP_ROOT in __init__.py =
 resources/                      # Icons + compiled resources_rc.py
 data/                           # Tag CSVs and user JSON files
 classifiers/<model_id>/         # Model weights and overrides
-tests/                          # pytest tests for the plain helper modules
+tests/                          # pytest tests (Qt runs offscreen; see Tests above)
 ```
 
 Most data paths (`data/`, `staging/`, `output/`, override files) are resolved from the
@@ -101,6 +108,14 @@ Model discovery uses `APP_ROOT`.
      - Favorites panel (`favorites_panel.py`)
    - Center panel (`center_panel.py`) for image and video display. Images decode on a
      background thread at screen size; the next and previous images are decoded ahead and cached.
+   - Grid view (`ui/widgets/media_grid_view.py`): the folder as thumbnail tiles. It shares the
+     center of the window with the center panel in a `QStackedWidget`; `MainWindow` owns the
+     view mode (`grid_mode`, `set_grid_mode`). The G key or the bottom-bar toggle switches views.
+     The grid changes images only through `MainWindow.go_to_image` and follows `image_changed`.
+     While the grid shows, the center panel is inactive (`set_active(False)`): it decodes
+     nothing and plays no video. Thumbnails load only for tiles near the visible area, and
+     only while the grid is showing. The grid's keys (G, Up, Down, Enter) are handled in
+     `MainWindow.eventFilter`, not as shortcuts, so text boxes keep those keys while typing.
    - Right panel for selected tags (`selected_tags_panel.py`)
 
 5. **Configuration and Persistence**
