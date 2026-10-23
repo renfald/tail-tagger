@@ -1,8 +1,8 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, QScrollArea, QPushButton, QInputDialog, QSpacerItem, QSizePolicy
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, QPushButton, QInputDialog, QSpacerItem, QSizePolicy
 from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import QKeyEvent, QIcon
 
-from tail_tagger.ui.widgets.tag_widget import TagWidget
+from tail_tagger.ui.widgets.tag_list_view import TagListView
 
 class TagSearchPanel(QWidget):
     def __init__(self, main_window, parent=None):
@@ -13,13 +13,14 @@ class TagSearchPanel(QWidget):
         self.search_timer.timeout.connect(self._execute_search)
         self.search_query = ""
         self.highlighted_tag_index = -1 # Initialize highlighted index to -1 (no tag highlighted initially)
-        self.search_results_tag_widgets = [] # Store TagWidgets in search results for navigation
+        self.search_results = [] # TagData in the results, for keyboard navigation
         self.exact_match_mode = False   # Initialize exact match mode to False (fuzzy search by default)
         self.setup_ui()
         self._display_search_results([])
-        self.main_window.tag_list_model.tags_selected_changed.connect(self._on_tags_changed)
-        # Connect to the new tag_state_changed signal for individual tag updates
-        self.main_window.tag_list_model.tag_state_changed.connect(self._on_tag_state_changed)
+        self.main_window.tags_changed.connect(self._on_tags_changed)
+        # Selection and favorite changes don't need a new search: the results just redraw
+        for signal in (self.main_window.selection_changed, self.main_window.favorites_changed, self.main_window.tags_changed):
+            signal.connect(self.results_view.repaint_tags)
 
     def setup_ui(self):
         """
@@ -91,19 +92,29 @@ class TagSearchPanel(QWidget):
         search_input_layout.addWidget(self.add_new_tag_icon_button)
         self.add_new_tag_icon_button.setStyleSheet("QPushButton { border: none; padding: 0px; margin: 0px; } QPushButton:hover { background-color: #2B2B2B; }")
 
-        # Tag Results Display Area (in Scroll Area)
-        self.results_scroll_area = QScrollArea()
-        self.results_scroll_area.setWidgetResizable(True)
-        self.results_scroll_area.viewport().setStyleSheet("background-color: #191919;") # Scroll area
-
+        # Tag Results Display Area: the result list, or the add-tag button when nothing matches
         self.results_area = QWidget()
+        self.results_area.setObjectName("results_area")
+        self.results_area.setAttribute(Qt.WA_StyledBackground, True)
+        self.results_area.setStyleSheet("#results_area { background-color: #191919; }")
         self.results_area_layout = QVBoxLayout(self.results_area) # Layout for results area
-        self.results_area_layout.setAlignment(Qt.AlignTop)
         self.results_area_layout.setSpacing(1)
-        self.results_area_layout.setContentsMargins(1, 1, 1, 1)
-        self.results_area.setLayout(self.results_area_layout)
-        self.results_scroll_area.setWidget(self.results_area)
-        layout.addWidget(self.results_scroll_area)
+        self.results_area_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.results_view = TagListView(dim_on_select=True, reorderable=False)
+        self.results_view.tag_clicked.connect(self.main_window.toggle_tag)
+        self.results_view.favorite_clicked.connect(self.main_window.toggle_favorite)
+        self.results_view.tag_right_clicked.connect(self._handle_tag_right_clicked)
+        self.results_area_layout.addWidget(self.results_view, 1)
+
+        self.add_new_tag_button = QPushButton()
+        self.add_new_tag_button.clicked.connect(self._handle_add_new_tag_button_clicked)
+        self.results_area_layout.addWidget(self.add_new_tag_button)
+        self.no_results_label = QLabel("No tags found.")
+        self.results_area_layout.addWidget(self.no_results_label)
+        # Takes the space when the list is hidden, so the add-tag button stays at the top
+        self.results_area_layout.addStretch(0)
+        layout.addWidget(self.results_area)
 
     def _toggle_exact_match_mode(self):
         """Toggles the exact match mode and updates the toggle icon and tooltip."""
@@ -139,62 +150,33 @@ class TagSearchPanel(QWidget):
     
     def _display_search_results(self, tag_data_list):
         """
-        Clears the current results and displays the provided list of TagData objects as TagWidgets.
+        Shows the provided list of TagData objects as the results.
         Displays "Add New Tag" button if no results are found.
         """
-        for i in reversed(range(self.results_area_layout.count())):
-            widget = self.results_area_layout.itemAt(i).widget()
-            if widget is not None:
-                if hasattr(widget, 'cleanup'):
-                    widget.cleanup()
-                self.results_area_layout.removeWidget(widget)
-                widget.deleteLater()
+        self.search_results = list(tag_data_list)
+        # A note after the results when we've hit the result limit (hardcoded to 50 for now)
+        # This value should match MAX_SEARCH_RESULTS in tag_list_model.py
+        footer = None
+        if len(self.search_results) >= 50 and self.search_query:
+            footer = "Showing top 50 results. Refine your search for more specific matches."
+        self.results_view.set_tags(self.search_results, footer=footer)
 
-        self.search_results_tag_widgets = []
-        self.highlighted_tag_index = -1
+        has_results = bool(self.search_results)
+        no_match = not has_results and bool(self.search_query)
+        self.results_view.setVisible(has_results or not self.search_query)
+        self.add_new_tag_button.setText(f"Add New Tag: '{self.search_query}'")
+        self.add_new_tag_button.setVisible(no_match)
+        self.no_results_label.setVisible(no_match)
 
-        if not tag_data_list: # Check if tag_data_list is empty (no results)
-            if self.search_query: # Check if search_query is NOT empty
-                add_new_tag_button = QPushButton(f"Add New Tag: '{self.search_query}'") # Create button
-                add_new_tag_button.clicked.connect(self._handle_add_new_tag_button_clicked) # Connect signal
-                self.results_area_layout.addWidget(add_new_tag_button) # Add button to layout
-                no_results_label = QLabel("No tags found.") # Keep "No tags found" message
-                self.results_area_layout.addWidget(no_results_label)
-
-        else: # If there are search results (tag_data_list is not empty)
-            # Display new TagWidgets from the provided list (Existing code - no change here)
-            for tag_data in tag_data_list:
-                tag_widget = TagWidget(tag_data=tag_data)
-                tag_widget.set_styling_mode("dim_on_select")
-                tag_widget.tag_clicked.connect(self.main_window._handle_tag_clicked)
-                tag_widget.favorite_star_clicked.connect(self.main_window._handle_favorite_star_clicked)
-                tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
-                self.results_area_layout.addWidget(tag_widget)
-                self.search_results_tag_widgets.append(tag_widget)
-                
-            # Check if we've hit the result limit (hardcoded to 50 for now)
-            # This value should match MAX_SEARCH_RESULTS in tag_list_model.py
-            if len(tag_data_list) >= 50 and self.search_query:
-                # Add a label to indicate there are more results
-                more_results_label = QLabel(f"Showing top 50 results. Refine your search for more specific matches.")
-                more_results_label.setStyleSheet("color: #888888; font-style: italic; padding: 5px;")
-                more_results_label.setWordWrap(True)
-                self.results_area_layout.addWidget(more_results_label)
-
-        if self.search_results_tag_widgets:
-            self.highlighted_tag_index = 0
-            self._update_tag_highlight()
-        else:
-            self.highlighted_tag_index = -1
-            self._update_tag_highlight()
+        self.highlighted_tag_index = 0 if has_results else -1
+        self._update_tag_highlight()
 
     def _on_tags_changed(self):
         """
-        Handles updates when the tag selection state changes.
-        Uses debounce timer to avoid redundant searches during batch tag loading.
+        Re-runs the current search when the tag catalog changes (new tag, promotion, source switch).
+        Uses the debounce timer so it batches with any pending text change.
         """
-        # Use the same debounce timer as text changes to batch multiple tag updates
-        self.search_timer.start(50)  # Shorter delay for tag changes since they're typically batched
+        self.search_timer.start(50)  # Shorter delay than for typing
 
     def _on_search_text_changed(self, text):
         """
@@ -217,7 +199,7 @@ class TagSearchPanel(QWidget):
             filtered_tags = self.main_window.tag_list_model.search_tags(query_text, self.exact_match_mode) # Perform search
             self._display_search_results(filtered_tags) # Update UI with search results
 
-        if self.search_results_tag_widgets: # Check if there are results to highlight
+        if self.search_results: # Check if there are results to highlight
             self.highlighted_tag_index = 0 # Highlight the first tag (index 0)
             self._update_tag_highlight() # Update the visual highlight
         else:
@@ -226,12 +208,12 @@ class TagSearchPanel(QWidget):
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handles key press events for keyboard navigation and delegates to KeyboardManager."""
-        if not self.search_results_tag_widgets: # Keep existing check - Do nothing if no search results
+        if not self.search_results: # Keep existing check - Do nothing if no search results
             pass # Keep existing - do nothing if no search results
         elif event.key() == Qt.Key_Down or event.key() == Qt.Key_Up or event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter: # Keep existing panel-specific navigation
             # --- Panel-specific navigation logic (Up/Down/Enter) ---
             if event.key() == Qt.Key_Down:
-                self.highlighted_tag_index = min(self.highlighted_tag_index + 1, len(self.search_results_tag_widgets) - 1)
+                self.highlighted_tag_index = min(self.highlighted_tag_index + 1, len(self.search_results) - 1)
                 self._update_tag_highlight()
                 event.accept() # Accept the event
                 return
@@ -241,9 +223,9 @@ class TagSearchPanel(QWidget):
                 event.accept() # Accept the event
                 return
             elif event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter: # Handle Enter key press
-                if 0 <= self.highlighted_tag_index < len(self.search_results_tag_widgets):
-                    highlighted_tag_widget = self.search_results_tag_widgets[self.highlighted_tag_index]
-                    self.main_window._handle_tag_clicked(highlighted_tag_widget.tag_name) # Select the highlighted tag
+                if 0 <= self.highlighted_tag_index < len(self.search_results):
+                    highlighted_tag = self.search_results[self.highlighted_tag_index]
+                    self.main_window.toggle_tag(highlighted_tag.name) # Select the highlighted tag
                     self.search_input.clear() # Clear search input after selection - for next phase
                     self._execute_search() # Refresh results to be empty - for next phase
                 event.accept() # Accept the event
@@ -255,11 +237,7 @@ class TagSearchPanel(QWidget):
 
     def _update_tag_highlight(self):
         """Updates the visual highlight of the currently highlighted tag."""
-        for index, tag_widget in enumerate(self.search_results_tag_widgets):
-            if index == self.highlighted_tag_index:
-                tag_widget.setStyleSheet("border: 2px solid grey;") # Highlight style
-            else:
-                tag_widget.setStyleSheet("") # Reset to default style
+        self.results_view.set_highlighted_row(self.highlighted_tag_index)
 
     def _handle_add_new_tag_button_clicked(self):
         """Handles clicks on the "Add New Tag" button (no search results)."""
@@ -290,17 +268,8 @@ class TagSearchPanel(QWidget):
         """
         self.main_window.add_new_tag_to_model(tag_name)
         
-    def _on_tag_state_changed(self, tag_name):
-        """
-        Handle updates when a specific tag's state changes.
-        If the tag is in our current search results, it will automatically
-        update since the TagWidget is an observer of its TagData.
-        """
-        # No need to do anything - the TagWidget will update itself
-        # This handler is here for future expandability
-
     def _handle_tag_right_clicked(self, tag_name):
-        """Handles right-click events on TagWidgets in search results.
+        """Handles right-click events on tags in search results.
         Creates and displays a context menu with bulk operations.
         """
         print(f"Right-clicked tag in search: {tag_name}")

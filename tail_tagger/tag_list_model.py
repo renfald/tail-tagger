@@ -1,4 +1,4 @@
-from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex, Signal
+from PySide6.QtCore import QAbstractListModel, Qt, QModelIndex
 from operator import attrgetter
 from tail_tagger.file_operations import FileOperations
 from heapq import nlargest
@@ -11,38 +11,10 @@ class TagData:
         self.selected = selected
         self.favorite = favorite
         self.is_known = is_known # Indicates if the tag is loaded from CSV (known) or from the .txt file for the image. 
-        self.observers = []  # List of functions to call when this tag's state changes
-    
-    def add_observer(self, callback):
-        """Add a callback function to be notified when this tag's state changes."""
-        if callback not in self.observers:
-            self.observers.append(callback)
-    
-    def remove_observer(self, callback):
-        """Remove a callback function from the observers list."""
-        if callback in self.observers:
-            self.observers.remove(callback)
-    
-    def notify_observers(self):
-        """Notify all observers that this tag's state has changed."""
-        # Make a copy of the observers list to avoid issues if observers 
-        # remove themselves during notification
-        observers_copy = self.observers.copy()
-        for callback in observers_copy:
-            try:
-                callback()
-            except RuntimeError as e:
-                # If we hit a deleted Qt object, remove it from observers
-                print(f"Observer error for tag {self.name}: {e}")
-                if callback in self.observers:
-                    self.observers.remove(callback)
 
 
 class TagListModel(QAbstractListModel):
     """A model to hold a list of tags."""
-
-    tags_selected_changed = Signal() # Add Signal
-    tag_state_changed = Signal(str)  # Signal emitted when a specific tag's state changes
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -185,7 +157,6 @@ class TagListModel(QAbstractListModel):
             self.beginResetModel() # Or beginRemoveRows/endRemoveRows for more specific signal
             self.tags.remove(tag_data_to_remove)
             self.endResetModel() # Or endRemoveRows
-            self.tags_selected_changed.emit() # Notify panels of change
             print(f"Tag '{tag_data_to_remove.name}' removed from TagListModel.")
         else:
             print(f"Warning: Tag '{tag_data_to_remove.name}' not found in TagListModel for removal.")
@@ -194,15 +165,6 @@ class TagListModel(QAbstractListModel):
         """Clears all tags."""
         self.tags = []
     
-    def set_tag_selected_state(self, tag_name, is_tag_selected):
-        """Set the current selection state for a given tag."""
-        tag = next((tag for tag in self.tags if tag.name == tag_name), None)
-        if tag:
-            tag.selected = is_tag_selected
-            tag.notify_observers()  # Notify observers of this specific tag
-            self.tag_state_changed.emit(tag_name)  # Emit signal with tag name
-            self.tags_selected_changed.emit()  # Keep existing signal for backward compatibility TODO: is anything broken if this is removed? check search panel
-
     def remove_unknown_tags(self):
         """Removes any tags where is_known is False from the tag list and tags_by_name dict."""
         # Identify unknown tags to remove
@@ -224,12 +186,6 @@ class TagListModel(QAbstractListModel):
         """Returns data for a specific item and role."""
         return None # Modified
     
-    def clear_selected_tags(self):
-        """Resets the 'selected' status of all tags to False."""
-        for tag in self.tags:
-            tag.selected = False
-        self.tags_selected_changed.emit() # Notify any listeners
-
     def get_known_tags(self):
         """Returns a list of all known tags."""
         return [tag for tag in self.tags if tag.is_known]
@@ -335,18 +291,14 @@ class TagListModel(QAbstractListModel):
         else:
             print(f"  Warning: No usage data found for tag '{underscored_tag_name}' to remove.") # Warning if no data found
 
-    # TODO: I suspect that tags_selected_changed isn't doing anything useful due to what happens in the method that calls this
     def switch_tag_source(self, csv_path):
-        """Reloads tags from a different CSV source"""
+        """Reloads tags from a different CSV source. MainWindow announces the change to panels."""
         print(f"Switching to tag source: {csv_path}")
-        
+
         # Clear existing data
         self.tags = []
         self.search_index = {}
         self.tags_by_name = {}
-        
+
         # Load new source
         self.load_tags_from_csv(csv_path)
-        
-        # Emit signals for UI updates
-        self.tags_selected_changed.emit()

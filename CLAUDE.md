@@ -25,8 +25,17 @@ pip install -r requirements.txt
 python main.py
 ```
 
-There is no automated test suite. Validate changes by running the app
-(`run.bat` / `./run.sh`) and exercising the affected panels.
+### Tests
+
+```bash
+pip install -r requirements-dev.txt   # pytest; the setup scripts don't install it
+python -m pytest tests -q             # run from the repo root
+```
+
+The tests in `tests/` cover the plain helper modules: tag list rules (`tag_state.py`),
+image sizing and decoding (`ui/image_loading.py`), and where a dragged tag lands
+(`ui/tag_rows.py`). Panels and other widgets have no automated tests, so also validate
+UI changes by running the app (`run.bat` / `./run.sh`) and exercising the affected panels.
 
 ## Project Architecture
 
@@ -36,13 +45,16 @@ There is no automated test suite. Validate changes by running the app
 main.py                         # Entry point and MainWindow
 tail_tagger/                    # Application package (APP_ROOT in __init__.py = repo root)
 ├── tag_list_model.py           # TagData + TagListModel
+├── tag_state.py                # List rules for selected tags and favorites (no Qt)
 ├── file_operations.py          # Workfiles, .txt tags, favorites, usage data, export
 ├── config_manager.py           # config.json
 ├── ui/
 │   ├── theme.py                # Dark palette + tag category colors
 │   ├── keyboard_manager.py
+│   ├── image_loading.py        # Image decode helpers + background decode worker
+│   ├── tag_rows.py             # Tag row colors, text width, drop position (no Qt)
 │   ├── panels/                 # Main window regions: left container, tag list panels, center, classifier
-│   └── widgets/                # TagWidget
+│   └── widgets/                # TagListView, the tag list used by every tag panel
 ├── classifier/
 │   ├── classifier_manager.py   # ClassifierManager + background workers
 │   ├── inference/              # Per-family load/preprocess/inference adapters
@@ -52,6 +64,7 @@ tail_tagger/                    # Application package (APP_ROOT in __init__.py =
 resources/                      # Icons + compiled resources_rc.py
 data/                           # Tag CSVs and user JSON files
 classifiers/<model_id>/         # Model weights and overrides
+tests/                          # pytest tests for the plain helper modules
 ```
 
 Most data paths (`data/`, `staging/`, `output/`, override files) are resolved from the
@@ -61,14 +74,16 @@ Model discovery uses `APP_ROOT`.
 ### Core Components
 
 1. **MainWindow** (`main.py`)
-   - Orchestrates the application flow
-   - Manages image loading and navigation
-   - Coordinates tag management across panels
-   - Handles file operations for saving/loading tags
+   - Owns the app state: the image list and current image, the current image's ordered
+     tags, and the favorites. It is the only writer of `TagData.selected` and `TagData.favorite`.
+   - Panels change state by calling its actions (`toggle_tag`, `toggle_favorite`,
+     `move_selected_tag`, `move_favorite`, `add_tags`, `add_new_tag_to_model`, `switch_tag_source`)
+   - Announces changes with signals: `image_changed`, `selection_changed`,
+     `favorites_changed`, `usage_changed`, `tags_changed`
+   - Saves workfiles, favorites and usage data
 
 2. **Tag Model** (`tail_tagger/tag_list_model.py`)
    - Stores all tags in `TagData` objects
-   - Manages tag selection state
    - Implements search functionality
    - Tracks tag usage statistics
 
@@ -84,7 +99,8 @@ Model discovery uses `APP_ROOT`.
      - Frequently used panel (`frequently_used_panel.py`)
      - Classifier panel (`classifier_panel.py`)
      - Favorites panel (`favorites_panel.py`)
-   - Center panel (`center_panel.py`) for image display
+   - Center panel (`center_panel.py`) for image and video display. Images decode on a
+     background thread at screen size; the next and previous images are decoded ahead and cached.
    - Right panel for selected tags (`selected_tags_panel.py`)
 
 5. **Configuration and Persistence**
@@ -99,7 +115,7 @@ Model discovery uses `APP_ROOT`.
 3. Tags are stored in both:
    - Memory during runtime (via TagData objects)
    - JSON workfiles for persistence
-4. Tag changes trigger UI updates via the observer pattern and Qt signals
+4. Tag changes go through MainWindow, which emits a signal; panels rebuild or redraw their lists in response
 
 ## Key Implementation Details
 
@@ -107,8 +123,13 @@ Model discovery uses `APP_ROOT`.
 
 - Tags are stored as `TagData` objects with properties like `name`, `selected`, `favorite`
 - Tag names are stored with underscores internally (`tag_name`) but displayed with spaces ("tag name")
-- The `TagListModel` manages all tags and provides methods to get/set tag states
+- The `TagListModel` holds all tags and provides lookup, search and usage counts
 - Each panel displays tags in different groupings (search results, favorites, etc.)
+- Every tag list is a `TagListView` (`ui/widgets/tag_list_view.py`): a `QListView` with a
+  delegate that draws each row from its `TagData`. Because rows read their `TagData` each
+  time they are drawn, a flag change only needs `repaint_tags()`; a change to which tags a
+  list shows needs `set_tags()`. The view emits `tag_clicked`, `favorite_clicked`,
+  `tag_right_clicked` and `tag_moved`, and the panel decides what each one does.
 
 ### Classifier System
 
@@ -142,8 +163,8 @@ see each model folder's `DOWNLOAD_INSTRUCTIONS.md`.
 
 - `MainWindow` is the parent for all major panels
 - `LeftPanelContainer` manages multiple tag selection panels
-- `TagWidget` instances represent individual tags and handle selection/favorite toggling
-- Panels observe model changes and update their displays accordingly
+- Each tag panel shows its tags in a `TagListView` and connects its signals to `MainWindow` actions
+- Panels connect to `MainWindow`'s signals and update their lists when state changes
 
 ## Bulk Operations Architecture
 

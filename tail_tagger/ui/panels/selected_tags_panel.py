@@ -5,9 +5,10 @@ from tail_tagger.ui.panels.tag_list_panel import TagListPanel
 from tail_tagger.file_operations import FileOperations
 
 class SelectedTagsPanel(TagListPanel):
+    reorderable = True
+
     def __init__(self, main_window, parent=None):
         super().__init__(main_window, panel_title="Selected Tags")
-        self.setAcceptDrops(True)  # This panel accepts drops
 
         # --- Button Section (below title, above tags area) ---
         # Create a container widget for the button row
@@ -27,14 +28,17 @@ class SelectedTagsPanel(TagListPanel):
         self.copy_tags_button.setIconSize(QSize(20, 22))
         button_row_layout.addWidget(self.copy_tags_button)
 
-        # Insert button row into main layout (between title and scroll area)
-        # Index 1 is right after the title_label, pushing scroll_area down
+        # Insert button row into main layout (between title and tag list)
+        # Index 1 is right after the title_label, pushing the tag list down
         # TODO: This feels like an oversight in the base class design. Tag Panels do not natively support adding widgets 
-        # between title and scroll area. Consider refactoring base class to allow more flexible layouts.
+        # between title and tag list. Consider refactoring base class to allow more flexible layouts.
         self.main_layout.insertWidget(1, button_row_widget, 0)  # 0 stretch factor
 
         # Connect button signal
         self.copy_tags_button.clicked.connect(self._handle_copy_tags_clicked)
+
+        self.main_window.selection_changed.connect(self.update_display)
+        self.main_window.tags_changed.connect(self.update_display)
 
     def _handle_copy_tags_clicked(self):
         """Copies all selected tags for current image to clipboard."""
@@ -82,25 +86,12 @@ class SelectedTagsPanel(TagListPanel):
             
         return actions_added
 
-    def is_tag_draggable(self, tag_name):
-        """Always allow dragging in this panel."""
-        return True
-
     def _get_bulk_operations(self):
         """Returns list of allowed bulk operations for this panel."""
         return ['add_front', 'add_end', 'remove', 'replace']
 
-    def _remove_tag_from_data_list(self, tag_data):
-        """Remove tag from the selected tags list."""
-        self.main_window.selected_tags_for_current_image.remove(tag_data)
-
-    def _insert_tag_into_data_list(self, tag_data, index):
-        """Insert tag into the selected tags list at specified index."""
-        self.main_window.selected_tags_for_current_image.insert(index, tag_data)
-
-    def _handle_post_drop_update(self, tag_name, original_index, new_index):
-        """Update workfile after tag order changes."""
-        self.main_window.update_workfile_for_current_image()
-        print("  Workfile updated with new tag order.")
+    def _move_tag(self, tag_name, new_index):
+        """Reorder the current image's tags and save the workfile."""
+        self.main_window.move_selected_tag(tag_name, new_index)
 
     
