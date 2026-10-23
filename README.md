@@ -189,6 +189,17 @@ MIT License
 
 You are free to fork the repo, request features/improvements and submit pull requests
 
+### Running the tests
+
+From the repo root, with the virtual environment active:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests
+```
+
+The tests cover the helper modules. Check UI changes by running the app as well.
+
 ## Credits
 
 - AI models provided by [RedRocket/JointTaggerProject](https://huggingface.co/RedRocket/JointTaggerProject)

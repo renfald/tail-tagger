@@ -48,19 +48,26 @@ from tail_tagger.bulk_operations import BulkOperationsManager, TagBulkOperationD
 from tail_tagger.ui.panels.left_panel_container import LeftPanelContainer
 from tail_tagger.ui.panels.center_panel import CenterPanel
 from tail_tagger.ui.image_loading import neighbor_paths
+from tail_tagger.ui.grid_nav import key_action, row_step
+from tail_tagger.ui.widgets.media_grid_view import MediaGridView
 from tail_tagger.ui.panels.selected_tags_panel import SelectedTagsPanel
 
 # Start application timer
 app_start_time = time.time()
 import resources.resources_rc as resources_rc  
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QFrame, QLabel, QSizePolicy, 
-                               QVBoxLayout, QPushButton, QSpacerItem, QFileDialog, QSplitter, QMessageBox)
-from PySide6.QtCore import Qt, Signal, QUrl
-from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QDesktopServices
+                               QVBoxLayout, QPushButton, QSpacerItem, QFileDialog, QSplitter, QMessageBox,
+                               QStackedWidget, QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit, QPlainTextEdit)
+from PySide6.QtCore import Qt, Signal, QUrl, QEvent, QSize
+from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QDesktopServices, QPixmap
 
 # Import compiled resources for icons
 # Update resources.qrc and run this command to recompile:
 # pyside6-rcc resources/resources.qrc -o resources/resources_rc.py
+
+# Widgets that keep typed keys for themselves; the grid's keys do nothing while one has focus
+TEXT_INPUT_WIDGETS = (QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit, QPlainTextEdit)
+
 
 class MainWindow(QMainWindow):
     """Main application window for the Image Tagger."""
@@ -83,6 +90,7 @@ class MainWindow(QMainWindow):
         self.image_paths = []  # List of image file paths for the loaded folder.
         self.current_image_index = 0
         self.last_folder_path = None
+        self.grid_mode = False  # True while the grid view shows in place of the single image
         
         # --- Tag Management ---
         """These lists are used by panels that need to display tags in a particular order.
@@ -136,6 +144,8 @@ class MainWindow(QMainWindow):
 
         # --- Setup UI and Load Tags/Images ---
         self._setup_ui()
+        # Sees every key press first, to handle the grid's keys (see eventFilter)
+        QApplication.instance().installEventFilter(self)
 
         # --- Validate and Load Last Opened Folder ---
         if self.last_folder_path and not os.path.isdir(self.last_folder_path):
@@ -178,11 +188,17 @@ class MainWindow(QMainWindow):
         self.left_panel_container = LeftPanelContainer(main_window=self, classifier_manager=self.classifier_manager)
         main_splitter.addWidget(self.left_panel_container)  # Add to main splitter
 
-        # --- Center Panel (Image Display) ---
+        # --- Center Panel (Image Display) and the grid view, which takes its place in grid mode ---
         self.center_panel = CenterPanel()
         self.center_panel.setFrameShape(QFrame.StyledPanel)
         self.center_panel.setMinimumSize(100, 100)
-        main_splitter.addWidget(self.center_panel)  # Add to splitter
+        self.grid_view = MediaGridView()
+        self.grid_view.image_clicked.connect(self.go_to_image)
+        self.grid_view.image_activated.connect(self._open_from_grid)
+        self.center_stack = QStackedWidget()
+        self.center_stack.addWidget(self.center_panel)
+        self.center_stack.addWidget(self.grid_view)
+        main_splitter.addWidget(self.center_stack)  # Add to splitter
 
         # --- Right Panel (Selected Tags) ---
         main_splitter.addWidget(self.selected_tags_panel)  # Add panel directly to splitter
@@ -211,9 +227,15 @@ class MainWindow(QMainWindow):
         self.folder_path_label.setTextFormat(Qt.RichText)
         self.folder_path_label.setOpenExternalLinks(False)
         self.folder_path_label.linkActivated.connect(self._open_current_folder)
+        # Without this a label is never narrower than its text, so a long path would stop
+        # the window from being made narrower
+        self.folder_path_label.setMinimumWidth(1)
         left_bottom_layout.addWidget(self.folder_path_label)
         left_bottom_layout.addStretch()
         bottom_layout.addWidget(left_bottom_container, 1)  # stretch factor 1
+        # The path is cut to fit this area (see _elide_folder_path), and again whenever it resizes
+        self.folder_path_area = left_bottom_container
+        self._folder_path = None  # The full path the label shows, uncut
 
         # Center filename
         self.filename_label = QLabel("No Image")
@@ -225,7 +247,15 @@ class MainWindow(QMainWindow):
         right_bottom_layout = QHBoxLayout(right_bottom_container)
         right_bottom_layout.setContentsMargins(0, 0, 0, 0)
         right_bottom_layout.addStretch()
-        
+
+        # Switches between the single image and the grid; enabled once a folder has images
+        self.grid_toggle_button = QPushButton()
+        self.grid_toggle_button.setIconSize(QSize(16, 16))
+        self.grid_toggle_button.setEnabled(False)
+        self.grid_toggle_button.clicked.connect(lambda: self.set_grid_mode(not self.grid_mode))
+        right_bottom_layout.addWidget(self.grid_toggle_button)
+        self._update_grid_toggle()
+
         # Prev/Next start disabled; _on_image_changed enables them once a folder has images
         self.prev_button = QPushButton("< Prev")
         self.prev_button.setEnabled(False)
@@ -275,8 +305,7 @@ class MainWindow(QMainWindow):
         """Loads images from the given folder and updates the UI."""
         if not folder_path:
             print("No folder path, handling as no images.")
-            self.folder_path_label.setText("Opened Folder: (none)")
-            self.folder_path_label.setToolTip("")
+            self._update_folder_path_label(None)
             self._show_no_images(None)
             return
 
@@ -290,6 +319,7 @@ class MainWindow(QMainWindow):
         if media_paths:
             print(f"Found {len(media_paths)} images in folder: {folder_path}")
             self.image_paths = media_paths
+            self.grid_view.set_paths(media_paths)
             self.go_to_image(0)
         else:
             print(f"No images found in folder: {folder_path}")
@@ -300,6 +330,8 @@ class MainWindow(QMainWindow):
         had_image = self.current_image_path is not None
         self.image_paths = []
         self.current_image_index = 0
+        self.grid_view.set_paths([], message or "")
+        self.grid_toggle_button.setEnabled(False)
 
         # Only announce a change when an image was actually showing, so startup with
         # no folder leaves the classifier's status text alone
@@ -348,21 +380,90 @@ class MainWindow(QMainWindow):
         if image_path:
             self.filename_label.setText(os.path.basename(image_path))
             self.index_label.setText(f"{self.current_image_index + 1} of {len(self.image_paths)}")
+            self.grid_view.set_current(self.current_image_index)
         else:
             self.filename_label.setText("No Image")
             self.index_label.setText("0 of 0")
+            self.grid_view.set_current(-1)
         self.prev_button.setEnabled(bool(self.image_paths))
         self.next_button.setEnabled(bool(self.image_paths))
+        self.grid_toggle_button.setEnabled(bool(self.image_paths))
+
+    # --- Grid view ---
+    def set_grid_mode(self, on):
+        """Shows the grid (on) or the single image in the center of the window."""
+        if on == self.grid_mode:
+            return
+        self.grid_mode = on
+        if on:
+            # The center panel is hidden under the grid, so it stops decoding and playing video
+            self.center_panel.set_active(False)
+            self.center_stack.setCurrentWidget(self.grid_view)
+            if self.current_image_path:
+                self.grid_view.set_current(self.current_image_index, center=True)
+            self.grid_view.setFocus()
+        else:
+            self.center_stack.setCurrentWidget(self.center_panel)
+            # The grid's thumbnail stands in, scaled up, until the full image is decoded
+            thumbnail = self.grid_view.loader.thumbnail(self.current_image_path)
+            self.center_panel.set_active(True, placeholder=thumbnail if isinstance(thumbnail, QPixmap) else None)
+            if self.current_image_path:
+                self.center_panel.prefetch(neighbor_paths(self.image_paths, self.current_image_index))
+            self.center_panel.setFocus()
+        self._update_grid_toggle()
+
+    def _update_grid_toggle(self):
+        """The toggle shows the icon of the view it switches to."""
+        if self.grid_mode:
+            self.grid_toggle_button.setIcon(QIcon(":/icons/single-view.svg"))
+            self.grid_toggle_button.setToolTip("Single view (G)")
+        else:
+            self.grid_toggle_button.setIcon(QIcon(":/icons/grid-view.svg"))
+            self.grid_toggle_button.setToolTip("Grid view (G)")
+
+    def _open_from_grid(self, row):
+        """Double-click on a tile: makes it current and shows it in single view."""
+        self.go_to_image(row)
+        self.set_grid_mode(False)
+
+    def eventFilter(self, obj, event):
+        if obj is getattr(self, "folder_path_area", None) and event.type() == QEvent.Resize:
+            self._elide_folder_path()
+        if (event.type() == QEvent.KeyPress and isinstance(obj, QWidget) and obj.window() is self):
+            typing = isinstance(QApplication.focusWidget(), TEXT_INPUT_WIDGETS)
+            action = key_action(event.key(), self.grid_mode, typing, bool(self.image_paths))
+            if action == "toggle":
+                self.set_grid_mode(not self.grid_mode)
+                return True
+            if action in ("up", "down"):
+                step = -1 if action == "up" else 1
+                target = row_step(self.current_image_index, len(self.image_paths), self.grid_view.columns(), step)
+                if target != self.current_image_index:
+                    self.go_to_image(target)
+                return True
+            if action == "open":
+                self.set_grid_mode(False)
+                return True
+        return super().eventFilter(obj, event)
 
     def _update_folder_path_label(self, folder_path):
-        """Updates the folder path label with elided text."""
+        """Shows folder_path in the bottom bar, cut to fit (see _elide_folder_path)."""
+        self._folder_path = folder_path
+        self._elide_folder_path()
+
+    def _elide_folder_path(self):
+        """Fits the folder path into 75% of the bar's left area (between the window's left
+        edge and the centered filename), cutting it from the left when it's longer."""
+        folder_path = self._folder_path
         if folder_path:
             # Set full path as tooltip
             self.folder_path_label.setToolTip(folder_path)
             # Use elided text from the left
             display_prefix = "Opened Folder: "
             font_metrics = self.folder_path_label.fontMetrics()
-            elided_path = font_metrics.elidedText(folder_path, Qt.ElideLeft, self.folder_path_label.width() - font_metrics.horizontalAdvance(display_prefix))
+            # Measured from the area, not the label: the label is only as wide as its last text
+            available = self.folder_path_area.width() * 3 // 4 - font_metrics.horizontalAdvance(display_prefix)
+            elided_path = font_metrics.elidedText(folder_path, Qt.ElideLeft, max(available, 0))
             # Use rich text with link for hover effect and theme color
             self.folder_path_label.setText(f'{display_prefix}<a href="#">{elided_path}</a>')
         else:

@@ -17,6 +17,8 @@ class CenterPanel(QFrame):
         super().__init__()
         self.media_path = None  # Store path of the currently displayed image/video
         self._source_pixmap = None  # Cached decode of the image on screen
+        # False while the grid view covers the panel: it then only remembers media_path
+        self._active = True
 
         # Images decode on one background thread. _wanted lists the paths still to decode,
         # current image first; _decoding is the one in progress.
@@ -64,10 +66,35 @@ class CenterPanel(QFrame):
         self._smooth_rescale_timer.setInterval(self.RESIZE_SETTLE_MS)
         self._smooth_rescale_timer.timeout.connect(self._apply_smooth_scale)
 
+    def set_active(self, active, placeholder=None):
+        """Starts or stops the panel's work. While inactive (the grid covers it), new media
+        is only remembered: nothing decodes and no video plays. Becoming active shows it.
+
+        The picture from before the panel went inactive belongs to a different image, so
+        while the remembered image decodes, the panel shows placeholder (e.g. the grid's
+        thumbnail, scaled up) or nothing.
+        """
+        if active == self._active:
+            return
+        self._active = active
+        if not active:
+            self._release_video()
+            self._wanted = []
+        elif self.media_path:
+            if not FileOperations.is_video_file(self.media_path) and not self._is_cached(self.media_path):
+                self._source_pixmap = placeholder
+                self._image_label.clear()
+                self._stack.setCurrentWidget(self._image_label)
+                self.update_image_display(smooth=False)
+            self.set_media_path(self.media_path)
+
     def set_media_path(self, media_path):
         """Sets the media path (image or video) for the center panel and displays it."""
         self._release_video()
         self.media_path = media_path
+        if not self._active:
+            self._wanted = []
+            return
 
         if FileOperations.is_video_file(media_path):
             self._wanted = []
@@ -85,6 +112,8 @@ class CenterPanel(QFrame):
 
     def prefetch(self, paths):
         """Decodes these images in the background after the current one, and forgets any others."""
+        if not self._active:
+            return
         current = self.media_path
         if current and FileOperations.is_video_file(current):
             current = None
