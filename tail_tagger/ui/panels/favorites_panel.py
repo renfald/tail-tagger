@@ -3,9 +3,10 @@ from PySide6.QtGui import QAction
 from tail_tagger.ui.panels.tag_list_panel import TagListPanel
 
 class FavoritesPanel(TagListPanel):
+    reorderable = True
+
     def __init__(self, main_window, parent=None):
         super().__init__(main_window, panel_title="Favorites")
-        self.setAcceptDrops(True)  # This panel accepts drops
         # Switching tag source or adding a tag can change which favorites are shown
         self.main_window.favorites_changed.connect(self.update_display)
         self.main_window.tags_changed.connect(self.update_display)
@@ -17,10 +18,6 @@ class FavoritesPanel(TagListPanel):
     def _get_tag_data_list(self):
         """Returns the list of TagData objects for this panel (Favorites)."""
         return self.main_window.visible_favorite_tags()
-
-    def is_tag_draggable(self, tag_name):
-        """Always allow dragging in this panel."""
-        return True
 
     def _get_bulk_operations(self):
         """Returns list of allowed bulk operations for this panel."""

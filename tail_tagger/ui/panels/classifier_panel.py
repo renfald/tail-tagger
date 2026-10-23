@@ -1,11 +1,10 @@
 # classifier_panel.py
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-                             QScrollArea, QFrame, QMenu, QDoubleSpinBox, QComboBox, QApplication, QGraphicsOpacityEffect, QLineEdit)
+                             QFrame, QMenu, QDoubleSpinBox, QComboBox, QApplication, QGraphicsOpacityEffect, QLineEdit)
 from PySide6.QtCore import Qt, Slot, QSize, QTimer
 from PySide6.QtGui import QAction, QIcon
 
-# Import TagWidget - it will be needed for placeholder logic
-from tail_tagger.ui.widgets.tag_widget import TagWidget
+from tail_tagger.ui.widgets.tag_list_view import TagListView
 from tail_tagger.tag_list_model import TagData
 from tail_tagger.file_operations import FileOperations
 
@@ -31,6 +30,9 @@ class ClassifierPanel(QWidget):
 
         self.main_window.image_changed.connect(self.on_image_changed)
         self.main_window.tags_changed.connect(self.on_tags_changed)
+        # Suggestions redraw to dim newly selected tags and update stars
+        for signal in (self.main_window.selection_changed, self.main_window.favorites_changed, self.main_window.tags_changed):
+            signal.connect(self.results_view.repaint_tags)
 
     @Slot()
     def on_tags_changed(self):
@@ -214,21 +216,13 @@ class ClassifierPanel(QWidget):
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
-        # --- Scroll Area for Results ---
-        self.results_scroll_area = QScrollArea()
-        self.results_scroll_area.setWidgetResizable(True)
-        self.results_scroll_area.setFrameShape(QFrame.NoFrame) # Optional: remove frame
-        self.results_scroll_area.viewport().setStyleSheet("background-color: #191919;")
-        layout.addWidget(self.results_scroll_area, 1) # Make scroll area take remaining space
-
-        # --- Container for Tag Widgets (inside scroll area) ---
-        self.results_container = QWidget()
-        self.results_layout = QVBoxLayout(self.results_container)
-        self.results_layout.setAlignment(Qt.AlignTop)
-        self.results_layout.setSpacing(1)
-        self.results_layout.setContentsMargins(1, 1, 1, 1)
-        self.results_container.setLayout(self.results_layout)
-        self.results_scroll_area.setWidget(self.results_container)
+        # --- Results list ---
+        self.results_view = TagListView(dim_on_select=True, reorderable=False)
+        self.results_view.setFrameShape(QFrame.NoFrame)
+        self.results_view.tag_clicked.connect(self.main_window.toggle_tag)
+        self.results_view.favorite_clicked.connect(self.main_window.toggle_favorite)
+        self.results_view.tag_right_clicked.connect(self._handle_tag_right_clicked)
+        layout.addWidget(self.results_view, 1) # Make the list take remaining space
 
         # --- Connect Button Signals ---
         self.analyze_button.clicked.connect(self._handle_analyze_clicked)
@@ -287,17 +281,9 @@ class ClassifierPanel(QWidget):
                 include_terms.append(token.lower())
         return include_terms, exclude_terms
 
-    def _clear_results_widgets(self):
-        """Helper to clear existing widgets from the results layout."""
-        for i in reversed(range(self.results_layout.count())):
-            widget_item = self.results_layout.itemAt(i)
-            if widget_item is not None:
-                widget = widget_item.widget()
-                if widget is not None:
-                    if hasattr(widget, 'cleanup'):
-                        widget.cleanup()
-                    self.results_layout.removeWidget(widget)
-                    widget.deleteLater()
+    def _clear_results_list(self):
+        """Helper to empty the results list."""
+        self.results_view.set_tags([])
 
     def _handle_analyze_clicked(self):
         """Handles clicks on the 'Analyze' button."""
@@ -376,15 +362,13 @@ class ClassifierPanel(QWidget):
         if self.raw_results is None:
             # No analysis run yet or results cleared
             # print("Update skipped: No raw results available.")
-            self._clear_results_widgets() # Ensure display is clear
+            self._clear_results_list() # Ensure display is clear
             # Reset status if called before analysis? Or assume status is handled elsewhere?
             # Let's only clear here. Status is set elsewhere.
             self.displayed_results = []
             self._set_copy_button_enabled(False)
             self._set_bulk_add_button_enabled(False)
             return
-
-        self._clear_results_widgets() # Clear previous widgets
 
         # --- Base result set ---
         # For Hydra models the manager already applied per-tag calibrated thresholds,
@@ -422,31 +406,24 @@ class ClassifierPanel(QWidget):
 
         # --- Populate results area with filtered results ---
         tag_model = self.main_window.tag_list_model
-        widgets_added = 0
+        shown_tags = []
+        tooltips = {}
         for tag_name, score in filtered_results:
             tag_data = tag_model.tags_by_name.get(tag_name)
             if tag_data is None:
                 tag_data = TagData(name=tag_name, is_known=False)
                 tag_model.add_tag(tag_data)
-
-            if tag_data:
-                tag_widget = TagWidget(tag_data=tag_data)
-                tag_widget.setToolTip(f"Confidence: {score:.2%}")
-                tag_widget.set_styling_mode("dim_on_select")
-                tag_widget.tag_clicked.connect(self.main_window.toggle_tag)
-                tag_widget.favorite_star_clicked.connect(self.main_window.toggle_favorite)
-                tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked)
-                self.results_layout.addWidget(tag_widget)
-                widgets_added += 1
-            else:
-                print(f"Error: Failed to get or create TagData for '{tag_name}'")
+            shown_tags.append(tag_data)
+            tooltips[tag_name] = f"Confidence: {score:.2%}"
+        self.results_view.set_tags(shown_tags, tooltips)
+        tags_shown = len(shown_tags)
 
         # --- Update status label ---
-        if widgets_added > 0:
+        if tags_shown > 0:
             if filter_is_active:
-                self.status_label.setText(f"Displaying {widgets_added} of {threshold_count} suggestions (filtered)")
+                self.status_label.setText(f"Displaying {tags_shown} of {threshold_count} suggestions (filtered)")
             else:
-                self.status_label.setText(f"Displaying {widgets_added} suggestions")
+                self.status_label.setText(f"Displaying {tags_shown} suggestions")
         else:
             if filter_is_active:
                 self.status_label.setText("No tags match filter")
@@ -456,7 +433,7 @@ class ClassifierPanel(QWidget):
                 else:
                     self.status_label.setText(f"No suggestions above threshold {self.threshold_spinbox.value():.2f}")
             # else: status is likely "Ready" or "Loading", don't overwrite
-        print(f"Displayed {widgets_added} widgets.")
+        print(f"Displayed {tags_shown} tags.")
 
         # --- Update button states ---
         # Base on threshold-only count so buttons stay enabled when filter hides all results
@@ -467,7 +444,7 @@ class ClassifierPanel(QWidget):
         """Clears the results area and resets the status label."""
         print("ClassifierPanel: Clearing results.")
         self.raw_results = None
-        self._clear_results_widgets()
+        self._clear_results_list()
         self.status_label.setText("Ready (New Image)")
         # Only enable analyze button if models are available
         if self.classifier_manager.get_available_models():
@@ -522,7 +499,7 @@ class ClassifierPanel(QWidget):
         """Slot called when analysis starts."""
         print("ClassifierPanel received: analysis_started")
         self.status_label.setText("Analyzing image...")
-        self._clear_results_widgets()
+        self._clear_results_list()
         self.analyze_button.setEnabled(False)
 
     @Slot(list)
@@ -558,11 +535,11 @@ class ClassifierPanel(QWidget):
 
         # Don't clear results on loading message
         if "Model is loading" not in error_message:
-            self._clear_results_widgets()
+            self._clear_results_list()
 
     @Slot(str) # Receives the tag name emitted by the signal
     def _handle_tag_right_clicked(self, tag_name):
-        """Handles right-clicks on TagWidgets in the results area."""
+        """Handles right-clicks on tags in the results area."""
         print(f"Right-click detected on tag: {tag_name}")
 
         from PySide6.QtGui import QCursor

@@ -467,7 +467,6 @@ class MainWindow(QMainWindow):
         tag.favorite = tag_name in self.favorite_tag_names
 
         self.file_operations.save_favorites(self.favorite_tag_names)
-        tag.notify_observers() # Updates the star on every widget showing this tag
         self.favorites_changed.emit()
 
     def add_tags(self, tag_names):
@@ -614,8 +613,6 @@ class MainWindow(QMainWindow):
             existing_unknown_tag_data.post_count = 0
             existing_unknown_tag_data.favorite = underscored_tag_name in self.favorite_tag_names
             self.tag_list_model.index_tag(existing_unknown_tag_data)
-            # Restyles the tag wherever it's already shown
-            existing_unknown_tag_data.notify_observers()
             print(f"Unknown tag '{underscored_tag_name}' promoted to known tag (in-place update).")
 
         else:
@@ -652,8 +649,7 @@ class MainWindow(QMainWindow):
     def _apply_selection(self, tags):
         """Sets the current image's ordered tags. The only writer of the list and of TagData.selected.
 
-        Flags change only on tags entering or leaving the list, and only those tags notify
-        their widgets.
+        Flags change only on tags entering or leaving the list.
         """
         old_list = self.selected_tags_for_current_image
         old_tags = set(old_list)
@@ -662,10 +658,8 @@ class MainWindow(QMainWindow):
 
         for tag in old_tags - new_tags:
             tag.selected = False
-            tag.notify_observers()
         for tag in new_tags - old_tags:
             tag.selected = True
-            tag.notify_observers()
 
         # Skip the signal when nothing changed, so reloading the same tags rebuilds nothing
         if self.selected_tags_for_current_image != old_list:
@@ -694,7 +688,7 @@ class MainWindow(QMainWindow):
             self._apply_selection(self._tags_for_names(self._selected_names()))
             self.update_workfile_for_current_image()
 
-        # Every TagData object was replaced, so panels rebuild their widgets against the new ones
+        # Every TagData object was replaced, so panels rebuild against the new ones
         self.tags_changed.emit()
 
 app = QApplication(sys.argv)

@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy, QScrollArea
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QKeyEvent
-from tail_tagger.ui.widgets.tag_widget import TagWidget
+from tail_tagger.ui.widgets.tag_list_view import TagListView
 
 class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget), type(ABC)), {})):  # Explicit metaclass
     """Abstract base class for tag list panels."""
+
+    reorderable = False  # Whether tags can be dragged to a new position in this panel
 
     def __init__(self, main_window=None, panel_title=""):
         super().__init__(main_window)
@@ -25,29 +27,16 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         self.title_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.main_layout.addWidget(self.title_label, 0, Qt.AlignTop)
         
-        # Create scroll area for tag widgets
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.viewport().setStyleSheet("background-color: #191919;") # Explicitly set viewport color
-        self.main_layout.addWidget(self.scroll_area, 1) # Make scroll area take remaining space
-        
-        # Container widget for tag widgets inside scroll area
-        self.tags_container = QWidget()
-        # self.tags_container.setStyleSheet("background-color: #242424;")
-        self.layout = QVBoxLayout(self.tags_container)
-        self.layout.setAlignment(Qt.AlignTop)
-        self.layout.setSpacing(1) # Space between the widgets
-        self.layout.setContentsMargins(1, 1, 1, 1) # Margin around the tags container
-        
-        # Set the container as the scroll area's widget
-        self.scroll_area.setWidget(self.tags_container)
-        
-        # Drag and drop properties
-        self.drop_indicator_line = None  # Initialize drop indicator line as None
-        self.dragged_tag_name = None  # Track the tag being dragged
-        
-        # Connect to resize events to update tags when container size changes
-        self.scroll_area.resizeEvent = self._on_scroll_area_resize
+        # The tags, drawn by the shared list view
+        self.view = TagListView(dim_on_select=self.get_styling_mode() == "dim_on_select", reorderable=self.reorderable)
+        self.main_layout.addWidget(self.view, 1) # Make the list take remaining space
+        self.view.tag_clicked.connect(self.main_window.toggle_tag)
+        self.view.favorite_clicked.connect(self.main_window.toggle_favorite)
+        self.view.tag_right_clicked.connect(self._handle_tag_right_clicked)
+        self.view.tag_moved.connect(self._move_tag)
+        # Rows are drawn from their TagData, so any change to selection, favorites or tags only needs a redraw
+        for signal in (main_window.selection_changed, main_window.favorites_changed, main_window.tags_changed):
+            signal.connect(self.view.repaint_tags)
 
     @abstractmethod
     def _get_tag_data_list(self):
@@ -60,33 +49,8 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
         pass
 
     def update_display(self):
-        """Template method: Updates the panel display."""
-        self._clear_widgets()  # Clear existing widgets (using helper method)
-        tag_data_list = self._get_tag_data_list() # Get tag data from subclass
-
-        for tag_data in tag_data_list:
-            tag_widget = self._create_tag_widget(tag_data) # Create and configure TagWidget
-            self.layout.addWidget(tag_widget) # Add to container layout
-
-    def _clear_widgets(self):
-        """Helper method: Clears existing TagWidgets from the layout."""
-        for i in reversed(range(self.layout.count())):
-            widget = self.layout.itemAt(i).widget()
-            if widget is not None:
-                if hasattr(widget, 'cleanup'):
-                    widget.cleanup()
-                self.layout.removeWidget(widget)
-                widget.deleteLater()
-
-    def _create_tag_widget(self, tag_data):
-        """Helper method: Creates and configures a TagWidget."""
-        from tail_tagger.ui.widgets.tag_widget import TagWidget # Import here to avoid circular dependency
-        tag_widget = TagWidget(tag_data=tag_data, is_selected=None, is_known_tag=None) # Pass tag_data as first arg, remove positional is_selected and is_known_tag
-        tag_widget.set_styling_mode(self.get_styling_mode()) # Set styling mode from subclass
-        tag_widget.tag_clicked.connect(self.main_window.toggle_tag) # Connect tag selection logic
-        tag_widget.favorite_star_clicked.connect(self.main_window.toggle_favorite) # Connect favorite logic
-        tag_widget.tag_right_clicked.connect(self._handle_tag_right_clicked) # Connect right-click handling
-        return tag_widget
+        """Shows the panel's current tags."""
+        self.view.set_tags(self._get_tag_data_list())
 
     def keyPressEvent(self, event: QKeyEvent):
         """Overrides keyPressEvent to handle keyboard shortcuts."""
@@ -95,180 +59,11 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             # If event was not handled by KeyboardManager, pass it to the parent
             super().keyPressEvent(event)
 
-    # Common drag and drop functionality
-    def dragEnterEvent(self, event):
-        """Handles drag enter events for the panel."""
-        # Check if dragging is allowed in this panel for the tag being dragged
-        if self._accepts_drag(event):
-            event.acceptProposedAction()
-            print("Drag Enter Event: Drag accepted for text data.")
-            
-            # Store the dragged tag name
-            self.dragged_tag_name = event.mimeData().text()
-            print(f"  Dragged tag name: {self.dragged_tag_name}")
-
-            # Initialize or reset drop indicator
-            self._ensure_drop_indicator_exists()
-            self.drop_indicator_line.hide() # Ensure hidden at drag start
-        else:
-            event.ignore()
-            print("Drag Enter Event: Drag ignored - no text data or panel does not support dragging.")
-
-    def dragMoveEvent(self, event):
-        """Handles drag move events for the panel, updating drop indicator."""
-        if self._accepts_drag(event):
-            event.acceptProposedAction()
-            drop_pos = event.pos()
-            # Convert position to be relative to the tags container
-            container_pos = self.tags_container.mapFrom(self, drop_pos)
-            
-            # Get the visual insertion position (y-coordinate) and tag index
-            visual_position, tag_index = self._get_visual_insertion_position(container_pos)
-            
-            # Set and show the indicator line
-            container_width = self.tags_container.width()
-            self._ensure_drop_indicator_exists()
-            
-            self.drop_indicator_line.setGeometry(0, visual_position, container_width, 2)
-            self.drop_indicator_line.raise_()
-            self.drop_indicator_line.show()
-        else:
-            event.ignore()
-            print("Drag Move Event: Drag ignored - no text data or panel does not support dragging.")
-
-    def dragLeaveEvent(self, event):
-        """Handles drag leave events."""
-        print("Drag Leave Event: Hiding indicator")
-        if self.drop_indicator_line:
-            self.drop_indicator_line.hide() # Hide the indicator when drag leaves
-        self.dragged_tag_name = None  # Reset dragged tag name
-        
-    def _accepts_drag(self, event):
-        """Accepts only drags of a draggable tag that started in this panel."""
-        source = event.source()
-        return (isinstance(source, TagWidget)
-                and self.isAncestorOf(source)
-                and self.is_tag_draggable(source.tag_name))
-        
-    def _ensure_drop_indicator_exists(self):
-        """Helper method to initialize the drop indicator line if it doesn't exist yet."""
-        if self.drop_indicator_line is None:
-            self.drop_indicator_line = QWidget(self.tags_container)
-            self.drop_indicator_line.setStyleSheet("background-color: white; height: 2px;")
-            self.drop_indicator_line.hide()
-
-    def _get_visual_insertion_position(self, container_pos):
-        """
-        Determine the visual insertion position and corresponding tag index
-        based on the container position, accounting for hidden tags.
-        
-        Returns:
-        - visual_position: Y coordinate for the indicator line
-        - tag_index: Index in the data model where the tag should be inserted
-        """
-        # Get visible tag widgets
-        visible_tags = []
-        for index in range(self.layout.count()):
-            widget_item = self.layout.itemAt(index)
-            if widget_item is not None and widget_item.widget() is not None:
-                tag_widget = widget_item.widget()
-                if isinstance(tag_widget, TagWidget) and tag_widget.isVisible():
-                    visible_tags.append((index, tag_widget))
-        
-        # Find the desired position among visible tags
-        insertion_point_found = False
-        visual_position = 0
-        tag_index = 0
-        
-        # Find the position in the visible tags
-        for layout_index, tag_widget in visible_tags:
-            tag_pos_bottom = tag_widget.geometry().bottom()
-            # Check if the mouse is less than 10px above the bottom of the tag. 
-            # We want the indicator to change if the mouse goes past the middle
-            if container_pos.y() < tag_pos_bottom - 10:  # Adjust this if the line should change at a diff height
-                visual_position = tag_widget.geometry().top()
-                tag_index = self._get_data_index_for_tag(tag_widget.tag_name)
-                # print(f"  Drop index determined: {tag_index} (before tag '{tag_widget.tag_name}')")
-                insertion_point_found = True
-                break
-        
-        if not insertion_point_found:
-            # Position at the end of visible tags
-            if visible_tags:
-                _, last_tag_widget = visible_tags[-1]
-                visual_position = last_tag_widget.geometry().bottom()
-                tag_index = len(self._get_tag_data_list())
-                # print(f"  Drop index determined: {tag_index} (after last tag)")
-            else:
-                # Panel is empty or all tags are hidden
-                visual_position = 0
-                tag_index = 0
-                #  print("  Drop index determined: 0 (panel empty)")
-        
-        return visual_position, tag_index
-    
-    def _get_data_index_for_tag(self, tag_name):
-        """
-        Get the index of a tag in the data model by its name.
-        Default implementation - override if necessary.
-        """
-        for i, tag_data in enumerate(self._get_tag_data_list()):
-            if tag_data.name == tag_name:
-                return i
-        return 0  # Default to first position if not found
-
-    def dropEvent(self, event):
-        """Handles drop events for the panel, implementing tag reordering."""
-        if self._accepts_drag(event):
-            tag_name = event.mimeData().text()
-            print(f"Drop Event: Tag '{tag_name}' dropped!")
-
-            if self.drop_indicator_line:
-                self.drop_indicator_line.hide() # Hide indicator on drop
-
-            # Get the drop position
-            drop_pos = event.pos()
-            container_pos = self.tags_container.mapFrom(self, drop_pos)
-            
-            # Get visual position and data index
-            _, drop_index = self._get_visual_insertion_position(container_pos)
-            
-            # Find the dragged tag's current position
-            names = [tag_data.name for tag_data in self._get_tag_data_list()]
-
-            if tag_name in names:
-                dragged_tag_orig_index = names.index(tag_name)
-
-                # drop_index counts the dragged tag itself, so shift it back when moving down
-                if drop_index > dragged_tag_orig_index:
-                    drop_index -= 1
-
-                self._move_tag(tag_name, drop_index)
-                print(f"  Tag '{tag_name}' reordered from {dragged_tag_orig_index} to {drop_index}")
-            else:
-                print(f"Warning: Dragged tag '{tag_name}' not found in tag list!")
-
-            # Reset dragged tag name
-            self.dragged_tag_name = None
-            
-            event.acceptProposedAction()
-            # Rebuild even if the move changed nothing: the dragged widget hid itself
-            # and a no-op move sends no signal to bring it back
-            self.update_display()
-        else:
-            event.ignore()
-            print("Drop Event: Drop ignored - panel doesn't support dragging or tag not draggable.")
-
-    @abstractmethod
     def _move_tag(self, tag_name, new_index):
-        """Abstract method: Move a dropped tag to new_index (its final position in this panel's list)."""
+        """Moves a dropped tag to new_index (its final position in this panel's list).
+        Panels with reorderable = True override this; the others never receive a drop."""
         pass
 
-
-    @abstractmethod
-    def is_tag_draggable(self, tag_name):
-        """Returns True if draggable, False otherwise."""
-        return False
 
     @abstractmethod
     def _get_bulk_operations(self):
@@ -283,7 +78,7 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
 
     @Slot(str)
     def _handle_tag_right_clicked(self, tag_name):
-        """Handles right-click events on TagWidgets. Creates and displays a context menu with panel-specific actions."""
+        """Handles right-click events on tags. Creates and displays a context menu with panel-specific actions."""
         print(f"Right-clicked tag: {tag_name}")
         
         from PySide6.QtWidgets import QMenu
@@ -359,26 +154,3 @@ class TagListPanel(QWidget, ABC, metaclass=type('ABCMetaQWidget', (type(QWidget)
             bool: True if any actions were added, False otherwise
         """
         return False
-        
-    def _on_scroll_area_resize(self, event):
-        """Handle scroll area resize events to update tag widget elided text.
-        
-        This method ensures that when the panel is resized via splitter,
-        the tag widgets will update their elided text accordingly.
-        """
-        # Call original resize event handler
-        QScrollArea.resizeEvent(self.scroll_area, event)
-        
-        # Update all tag widgets
-        self._update_tag_widgets_elided_text()
-        
-    def _update_tag_widgets_elided_text(self):
-        """Update elided text in all tag widgets in this panel."""
-        # Find all TagWidget instances in the container
-        for i in range(self.layout.count()):
-            widget_item = self.layout.itemAt(i)
-            if widget_item and widget_item.widget():
-                tag_widget = widget_item.widget()
-                # Check if it's a TagWidget with _update_elided_text method
-                if hasattr(tag_widget, '_update_elided_text'):
-                    tag_widget._update_elided_text()

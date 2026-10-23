@@ -32,15 +32,8 @@ class FrequentlyUsedPanel(TagListPanel):
         return True
 
     # Required implementations for abstract methods
-    def is_tag_draggable(self, tag_name):
-        return False # Not draggable in this panel
-
     def _get_bulk_operations(self):
         """Returns list of allowed bulk operations for this panel."""
         return ['add_front', 'add_end', 'remove', 'replace']
-
-    def _move_tag(self, tag_name, new_index):
-        """Not used in non-draggable panel."""
-        pass
     
     

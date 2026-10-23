@@ -5,9 +5,10 @@ from tail_tagger.ui.panels.tag_list_panel import TagListPanel
 from tail_tagger.file_operations import FileOperations
 
 class SelectedTagsPanel(TagListPanel):
+    reorderable = True
+
     def __init__(self, main_window, parent=None):
         super().__init__(main_window, panel_title="Selected Tags")
-        self.setAcceptDrops(True)  # This panel accepts drops
 
         # --- Button Section (below title, above tags area) ---
         # Create a container widget for the button row
@@ -27,10 +28,10 @@ class SelectedTagsPanel(TagListPanel):
         self.copy_tags_button.setIconSize(QSize(20, 22))
         button_row_layout.addWidget(self.copy_tags_button)
 
-        # Insert button row into main layout (between title and scroll area)
-        # Index 1 is right after the title_label, pushing scroll_area down
+        # Insert button row into main layout (between title and tag list)
+        # Index 1 is right after the title_label, pushing the tag list down
         # TODO: This feels like an oversight in the base class design. Tag Panels do not natively support adding widgets 
-        # between title and scroll area. Consider refactoring base class to allow more flexible layouts.
+        # between title and tag list. Consider refactoring base class to allow more flexible layouts.
         self.main_layout.insertWidget(1, button_row_widget, 0)  # 0 stretch factor
 
         # Connect button signal
@@ -84,10 +85,6 @@ class SelectedTagsPanel(TagListPanel):
             actions_added = True
             
         return actions_added
-
-    def is_tag_draggable(self, tag_name):
-        """Always allow dragging in this panel."""
-        return True
 
     def _get_bulk_operations(self):
         """Returns list of allowed bulk operations for this panel."""

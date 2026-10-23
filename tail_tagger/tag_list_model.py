@@ -11,31 +11,6 @@ class TagData:
         self.selected = selected
         self.favorite = favorite
         self.is_known = is_known # Indicates if the tag is loaded from CSV (known) or from the .txt file for the image. 
-        self.observers = []  # List of functions to call when this tag's state changes
-    
-    def add_observer(self, callback):
-        """Add a callback function to be notified when this tag's state changes."""
-        if callback not in self.observers:
-            self.observers.append(callback)
-    
-    def remove_observer(self, callback):
-        """Remove a callback function from the observers list."""
-        if callback in self.observers:
-            self.observers.remove(callback)
-    
-    def notify_observers(self):
-        """Notify all observers that this tag's state has changed."""
-        # Make a copy of the observers list to avoid issues if observers 
-        # remove themselves during notification
-        observers_copy = self.observers.copy()
-        for callback in observers_copy:
-            try:
-                callback()
-            except RuntimeError as e:
-                # If we hit a deleted Qt object, remove it from observers
-                print(f"Observer error for tag {self.name}: {e}")
-                if callback in self.observers:
-                    self.observers.remove(callback)
 
 
 class TagListModel(QAbstractListModel):
