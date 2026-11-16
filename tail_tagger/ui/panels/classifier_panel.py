@@ -322,19 +322,15 @@ class ClassifierPanel(QWidget):
         if self.raw_results is None:
             return
 
-        spaced_tags = [
-            FileOperations.convert_underscores_to_spaces(tag_name)
-            for tag_name, score in self.displayed_results
-        ]
-
-        # Join with comma-space separator (matches export format)
-        tags_string = ", ".join(spaced_tags)
+        tag_names = [tag_name for tag_name, score in self.displayed_results]
+        use_underscores = self.main_window.config_manager.get_config_value("output_underscores")
+        tags_string = FileOperations.format_tags_for_output(tag_names, use_underscores)
 
         # Copy to clipboard
         clipboard = QApplication.clipboard()
         clipboard.setText(tags_string)
 
-        print(f"Copied {len(spaced_tags)} tags to clipboard")
+        print(f"Copied {len(tag_names)} tags to clipboard")
 
     def _handle_bulk_add_clicked(self):
         """Adds all displayed classifier tags to the current image."""

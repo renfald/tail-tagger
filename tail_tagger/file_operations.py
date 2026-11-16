@@ -127,6 +127,8 @@ class FileOperations:
                         with open(tag_file_to_use, 'r', encoding='utf-8') as tag_file:
                             tag_content = tag_file.readline().strip()
                             loaded_tags = [tag.strip() for tag in tag_content.split(',')]
+                            # txt files may have spaces in tag names, matching the workfile's underscore form
+                            loaded_tags = [FileOperations.convert_spaces_to_underscores(tag) for tag in loaded_tags]
                     except Exception as e:
                         print(f"  Error reading tag file {tag_file_to_use}: {e}")
 
@@ -189,7 +191,7 @@ class FileOperations:
         return loaded_tags
 
 
-    def export_tags(self, parent, last_folder_path):
+    def export_tags(self, parent, last_folder_path, use_underscores):
         """Handles the export process: prompts for export directory, gathers tags, and writes files."""
         from PySide6.QtWidgets import QFileDialog
         import sys
@@ -220,8 +222,7 @@ class FileOperations:
 
                 try:
                     with open(txt_filepath, 'w', encoding='utf-8') as f:
-                        spaced_tags = [FileOperations.convert_underscores_to_spaces(tag) for tag in tags] # TODO: may need to have it configurable
-                        f.write(", ".join(spaced_tags))
+                        f.write(FileOperations.format_tags_for_output(tags, use_underscores))
                     print(f"  Wrote tags for {filename} to {txt_filepath}")
                 except Exception as e:
                     print(f"  Error writing to {txt_filepath}: {e}")
@@ -364,6 +365,14 @@ class FileOperations:
     def convert_spaces_to_underscores(tag_name):
         """Converts spaces in a tag name to underscores for storage."""
         return tag_name.replace(' ', '_')
+
+    @staticmethod
+    def format_tags_for_output(tag_names, use_underscores):
+        """Joins tag names into the comma-separated line used for the clipboard and .txt export.
+        Tag names keep their underscores when use_underscores is set, otherwise they become spaces."""
+        if not use_underscores:
+            tag_names = [FileOperations.convert_underscores_to_spaces(tag) for tag in tag_names]
+        return ", ".join(tag_names)
 
     def add_tag_to_csv(self, csv_path, tag_name):
         """
