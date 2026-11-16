@@ -488,7 +488,9 @@ class MainWindow(QMainWindow):
             self.go_to_image((self.current_image_index + 1) % len(self.image_paths))
 
     def _export_tags(self):
-        self.file_operations.export_tags(self, self.last_folder_path)
+        self.file_operations.export_tags(
+            self, self.last_folder_path,
+            self.config_manager.get_config_value("output_underscores"))
 
     def _load_favorites(self):
         """Loads favorite names from favorites.json and marks the visible ones as favorites."""

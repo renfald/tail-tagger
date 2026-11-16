@@ -45,20 +45,15 @@ class SelectedTagsPanel(TagListPanel):
         # Get the selected tags list from main window
         selected_tags = self.main_window.selected_tags_for_current_image
 
-        # Convert tag names from underscores to spaces
-        spaced_tags = [
-            FileOperations.convert_underscores_to_spaces(tag.name)
-            for tag in selected_tags
-        ]
-
-        # Join with comma-space separator (matches export format)
-        tags_string = ", ".join(spaced_tags)
+        tag_names = [tag.name for tag in selected_tags]
+        use_underscores = self.main_window.config_manager.get_config_value("output_underscores")
+        tags_string = FileOperations.format_tags_for_output(tag_names, use_underscores)
 
         # Copy to clipboard (will be empty string if no tags)
         clipboard = QApplication.clipboard()
         clipboard.setText(tags_string)
 
-        print(f"Copied {len(spaced_tags)} tags to clipboard")
+        print(f"Copied {len(tag_names)} tags to clipboard")
 
     def get_styling_mode(self):
         return "ignore_select"  # Right panel ignores selection for styling
